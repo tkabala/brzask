@@ -29,12 +29,19 @@
       "groupSlug": "{{manager}}-minor-patch"
     },
     {
-      "description": "Toolchain runtimes move together with mise.toml, CI and the devcontainer",
-      "matchManagers": [
-        "mise"
-      ],
+      "description": "Python versions are upgraded deliberately (3.13 to 3.14 is a new language version)",
       "matchDepNames": [
-        "python",
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Node major versions are upgraded deliberately",
+      "matchDepNames": [
         "node"
       ],
       "matchUpdateTypes": [
