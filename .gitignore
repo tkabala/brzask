@@ -37,3 +37,7 @@ site/
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Logs and local overrides
+*.log
+*.local

@@ -12,7 +12,7 @@ Conventions for anyone (human or agent) working in this repository.
 ## Commands
 
 - Backend: `uv run ruff check`, `uv run ruff format`, `uv run mypy`, `uv run pytest` (from `backend/`).
-- Frontend: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` (from `frontend/`).
+- Frontend: `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test`, `pnpm build` (from `frontend/`). Node 24, pnpm via corepack.
 - Whole repo: `just check`, `just test`, `just fmt`, `just dev`.
 
 ## Conventions
