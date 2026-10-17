@@ -13,7 +13,7 @@ Conventions for anyone (human or agent) working in this repository.
 
 - Backend: `uv run ruff check`, `uv run ruff format`, `uv run mypy`, `uv run pytest` (from `backend/`).
 - Frontend: `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test`, `pnpm build` (from `frontend/`). Node 24; pnpm version pinned in `package.json` (`packageManager`).
-- Whole repo: `just check`, `just test`, `just fmt`, `just dev`.
+- Whole repo: `just check`, `just test`, `just fmt`, `just dev`. After changing a setting run `just env-example` (a test fails while `.env.example` is stale).
 
 ## Conventions
 

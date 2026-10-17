@@ -1,4 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
+set dotenv-load
 
 default:
     @just --list
@@ -29,6 +30,10 @@ check-docs:
 # Serve the documentation site with live reload
 docs:
     uv run --project backend --only-group docs mkdocs serve
+
+# Regenerate .env.example from the settings
+env-example:
+    cd backend && uv run python -m brzask.config.env_example > ../.env.example
 
 # Run all tests
 test:

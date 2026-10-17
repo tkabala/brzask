@@ -29,6 +29,7 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - '.env.example'
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
