@@ -1,0 +1,9 @@
+# Development toolchain. With mise installed, `mise install` provides all of it.
+# The devcontainer installs the same versions.
+[tools]
+python = "3.13"
+node = "24"
+pnpm = "12.14.0"
+uv = "0.13"
+just = "1.59"
+prek = "0.5"

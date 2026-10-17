@@ -8,7 +8,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [
     // Must run before the React plugin so generated routes are compiled.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      routeFileIgnorePattern: '\\.test\\.tsx?$',
+    }),
     react(),
     tailwindcss(),
   ],
