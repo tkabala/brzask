@@ -48,6 +48,13 @@
         "typescript"
       ],
       "allowedVersions": "<6.1.0"
+    },
+    {
+      "description": "MkDocs 2.0 drops the plugin and theme system that Material for MkDocs needs",
+      "matchPackageNames": [
+        "mkdocs"
+      ],
+      "allowedVersions": "<2"
     }
   ]
 }

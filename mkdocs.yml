@@ -1,0 +1,49 @@
+site_name: brzask
+site_description: Self-hosted daily news digest that picks exactly 7 articles worth reading.
+repo_url: https://github.com/tkabala/brzask
+repo_name: tkabala/brzask
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Decisions:
+      - decisions/index.md
+      - decisions/0001-record-architecture-decisions.md
+      - Template: decisions/0000-template.md
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn

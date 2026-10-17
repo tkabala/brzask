@@ -10,7 +10,7 @@ setup:
     prek install --install-hooks
 
 # Lint, type-check and test everything
-check: check-backend check-frontend
+check: check-backend check-frontend check-docs
 
 check-backend:
     cd backend && uv run ruff check
@@ -22,6 +22,13 @@ check-frontend:
     cd frontend && pnpm lint
     cd frontend && pnpm typecheck
     cd frontend && pnpm test
+
+check-docs:
+    uv run --project backend --only-group docs mkdocs build --strict
+
+# Serve the documentation site with live reload
+docs:
+    uv run --project backend --only-group docs mkdocs serve
 
 # Run all tests
 test:

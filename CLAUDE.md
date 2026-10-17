@@ -6,7 +6,7 @@ Conventions for anyone (human or agent) working in this repository.
 
 - `backend/`: Python 3.13 package `brzask` (src layout, uv). Layers: `api/` (routers, DTOs) → `services/` (logic, pipelines) → `repositories/` (data access). CLI, worker, MCP and HTTP all call `services`.
 - `frontend/`: React 19 + TypeScript (Vite, pnpm).
-- `docs/`: mkdocs-material site; architecture decisions in `docs/decisions/` (MADR).
+- `docs/`: mkdocs-material site (`mkdocs.yml` at the root; `just docs` to preview); architecture decisions in `docs/decisions/` (MADR, copy `0000-template.md`).
 - `deploy/`: compose files, reverse proxy examples, Helm chart.
 
 ## Commands
