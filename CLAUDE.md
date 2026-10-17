@@ -1,0 +1,25 @@
+# Agent instructions
+
+Conventions for anyone (human or agent) working in this repository.
+
+## Layout
+
+- `backend/`: Python 3.13 package `brzask` (src layout, uv). Layers: `api/` (routers, DTOs) → `services/` (logic, pipelines) → `repositories/` (data access). CLI, worker, MCP and HTTP all call `services`.
+- `frontend/`: React 19 + TypeScript (Vite, pnpm).
+- `docs/`: mkdocs-material site; architecture decisions in `docs/decisions/` (MADR).
+- `deploy/`: compose files, reverse proxy examples, Helm chart.
+
+## Commands
+
+- Backend: `uv run ruff check`, `uv run ruff format`, `uv run mypy`, `uv run pytest` (from `backend/`).
+- Frontend: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` (from `frontend/`).
+- Whole repo: `just check`, `just test`, `just fmt`, `just dev`.
+
+## Conventions
+
+- English everywhere: code, comments, docs, commits. UI strings in English; other languages only as i18n translations.
+- Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `ci:`, `build:`), optional scope, e.g. `feat(digest): …`.
+- Tests ship with the change. Pure functions get unit tests; anything touching SQL gets a testcontainers test against Postgres with pgvector.
+- `mypy --strict` must pass. Raw SQL (`text()`) only for vector/ranking queries, each with a comment explaining why.
+- Measured constants (thresholds, limits) keep a short comment stating what they were measured on. Change them only with evidence from `brzask replay`.
+- Keep the default deployment simple: `migrate` + `api` + `worker` + `db`. Everything else is opt-in.
