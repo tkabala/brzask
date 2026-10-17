@@ -19,6 +19,7 @@ from brzask.config.settings import (
     EmbeddingSettings,
     ExtractorSettings,
     LLMSettings,
+    LoggingSettings,
     Schedule,
     SchedulerSettings,
     WebSearchSettings,
@@ -343,3 +344,9 @@ def test_env_example_lists_every_setting() -> None:
     for group in GROUPS:
         for name in group.model_fields:
             assert f"{env_name(group, name)}=" in rendered
+
+
+def test_log_level_is_case_insensitive(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LOG_LEVEL", "debug")
+
+    assert LoggingSettings().level == "DEBUG"

@@ -383,6 +383,27 @@ class BudgetSettings(SettingsGroup):
     monthly_usd: PositiveAmount = Field(None, description="Monthly limit in USD; empty for none.")
 
 
+class LoggingSettings(SettingsGroup):
+    """Logging."""
+
+    model_config = SettingsConfigDict(env_prefix="LOG_")
+
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        "INFO", description="Minimum level: DEBUG, INFO, WARNING or ERROR."
+    )
+    format: Literal["auto", "json", "console"] = Field(
+        "auto",
+        description="json (one object per line), console (readable) or auto (console on a TTY).",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_level(cls, data: Any) -> Any:
+        if isinstance(data, dict) and isinstance(data.get("level"), str):
+            data = {**data, "level": data["level"].upper()}
+        return data
+
+
 GROUPS: tuple[type[SettingsGroup], ...] = (
     DatabaseSettings,
     LLMSettings,
@@ -393,6 +414,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     SchedulerSettings,
     DigestSettings,
     BudgetSettings,
+    LoggingSettings,
 )
 
 
@@ -437,6 +459,10 @@ class Settings:
     @cached_property
     def budget(self) -> BudgetSettings:
         return BudgetSettings()
+
+    @cached_property
+    def logging(self) -> LoggingSettings:
+        return LoggingSettings()
 
 
 @lru_cache(maxsize=1)

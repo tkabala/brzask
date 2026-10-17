@@ -5,6 +5,8 @@ from typing import Annotated
 import typer
 
 from brzask import __version__
+from brzask.config import get_settings
+from brzask.log import configure_logging
 
 app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
 
@@ -28,3 +30,5 @@ def main(
     ] = None,
 ) -> None:
     """Self-hosted daily news digest."""
+    log_settings = get_settings().logging
+    configure_logging(log_settings.level, log_settings.format)
