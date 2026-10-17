@@ -7,4 +7,5 @@ brzask is a self-hosted daily news digest. Every day it reads around 200 article
 
 ## Documentation
 
+- [Data model](data-model.md): tables, states and why they exist.
 - [Architecture decisions](decisions/index.md): why brzask is built the way it is.

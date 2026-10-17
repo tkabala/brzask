@@ -5,8 +5,10 @@ description = "Self-hosted daily news digest: exactly 7 articles worth reading, 
 license = "MIT"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "pgvector>=0.4",
     "pydantic>=2.9",
     "pydantic-settings>=2.11",
+    "sqlalchemy>=2.0.40",
     "structlog>=25.4",
     "typer>=0.15",
 ]

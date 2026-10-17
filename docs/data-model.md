@@ -1,0 +1,95 @@
+# Data model
+
+brzask keeps everything in one Postgres database with the pgvector extension.
+The tables are defined in `backend/src/brzask/db/models.py`; this page explains
+what the states mean and why some columns exist.
+
+## Tables
+
+| Table | Holds |
+|---|---|
+| `sources` | RSS/Atom feeds, whether they are fetched, and where they came from |
+| `interests` | Topics you care about: keywords and free-text reader notes |
+| `articles` | Every fetched entry, its ranking, embedding, digest text and whether you opened it |
+| `runs` | One row per pipeline run: status, stats, timings, error |
+| `settings` | Values changed at runtime, such as a pause (configuration lives in environment variables) |
+| `change_log` | Every change to sources, interests or configuration, by a person, a pipeline or an agent |
+| `api_tokens` | Hashed API tokens with a `read` or `write` scope |
+
+## Articles
+
+An article moves through these steps:
+
+```
+fetched ──► seen ──► ranked (rank set) ──► shown (in a digest) ──► opened
+              │
+              └─► carried over to the next days, until it is too old
+```
+
+- **`state = seen`**: fetched and stored. Unshown articles from the last days
+  are carried over into the next day's candidate pool.
+- **`rank`**: the article's position in the LLM ranking. Only the top
+  candidates get one, so `rank IS NOT NULL` means "made the top of the ranking".
+- **`state = shown`**: picked for a digest. `digest_date` and
+  `digest_position` say where it appeared; a constraint keeps both set or both
+  empty, and only shown articles can have them.
+- **`opened_at`**: the first time you opened the article. Opening is the only
+  preference signal brzask uses, so this column drives learning, source review
+  and measurement.
+
+`digest_title`, `summary`, `why_it_matters` and `topic` are written in the
+digest language when the article is picked.
+
+### Embeddings
+
+`embedding` always has 768 dimensions: every embedding model is asked for
+vectors of that size, so the column type never changes when the model does.
+`embedding_model` records which model produced each vector, and similarity
+queries compare only vectors of the same model. A constraint keeps the two
+columns set together.
+
+## Sources
+
+| Status | Meaning |
+|---|---|
+| `active` | Fetched every day |
+| `pending` | Proposed (by discovery, an opened link or an OPML import), waiting for a decision |
+| `rejected` | Declined; the row stays so the same URL is not proposed again |
+| `muted` | Switched off, by hand or by the source review |
+| `dead` | The feed no longer works |
+
+`kind` is `release` for release-note feeds, which are judged on their content
+instead of being dropped as noise. `origin` (`manual`, `discovery`, `visited`,
+`opml`) and `origin_detail` record where a source came from, so it is possible
+to measure which ways of finding sources produce feeds you keep reading.
+
+### Why statistics join on `source_id`
+
+Each article points to its source with a foreign key. Per-source statistics
+(articles fetched, ranked, shown, opened) are grouped by `source_id`, not by
+name: a source can be renamed without losing its history, two sources with
+similar names are never merged, and an article keeps its numbers even if its
+source's title changes in the feed. Deleting a source sets `source_id` to null
+instead of deleting its articles, so digest history and opens are kept.
+
+## Runs
+
+Every pipeline run (`digest`, `review`, `visited`, `discovery`) writes one row.
+Its `id` is the same as the `run_id` in the logs, so a failed run can be traced
+from the status page to its log lines. `status` is `running`, `ok`, `skipped`
+(paused, or today's digest already exists) or `failed`.
+
+## Change log
+
+Changes are recorded with who made them (`actor`), what changed (`action`,
+`entity_type`, `entity_id`, `before`, `after`) and why (`reason`). A change
+is `proposed` while it waits for approval, then `applied` or `rejected`;
+an applied change can later be `reverted`.
+
+## Conventions
+
+- Statuses are stored as text with a CHECK constraint rather than native
+  Postgres enums, so adding a value is a one-statement migration.
+- Constraint and index names follow a fixed pattern (`uq_articles_link`,
+  `fk_articles_source_id_sources`, ...), so migrations can refer to them.
+- All timestamps are `timestamptz`.
