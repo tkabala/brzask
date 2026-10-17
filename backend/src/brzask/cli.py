@@ -6,6 +6,7 @@ import typer
 
 from brzask import __version__
 from brzask.config import get_settings
+from brzask.db import migrations
 from brzask.log import configure_logging
 
 app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
@@ -32,3 +33,9 @@ def main(
     """Self-hosted daily news digest."""
     log_settings = get_settings().logging
     configure_logging(log_settings.level, log_settings.format)
+
+
+@app.command()
+def migrate() -> None:
+    """Create or upgrade the database schema. Safe to run repeatedly."""
+    migrations.migrate()

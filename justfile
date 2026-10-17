@@ -31,6 +31,15 @@ check-docs:
 docs:
     uv run --project backend --only-group docs mkdocs serve
 
+# Apply migrations to the dev database
+migrate:
+    docker compose up -d --wait db
+    cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run brzask migrate
+
+# Generate a migration from model changes, e.g. just migration "add source health"
+migration message: migrate
+    cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run alembic revision --autogenerate -m "{{message}}"
+
 # Regenerate .env.example from the settings
 env-example:
     cd backend && uv run python -m brzask.config.env_example > ../.env.example
