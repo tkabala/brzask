@@ -1,0 +1,18 @@
+# CI skips the backend or frontend job when its files did not change,
+# so each flag keeps its last coverage until the next upload.
+flag_management:
+  default_rules:
+    carryforward: true
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "condensed_header, diff, flags"
+  require_changes: true

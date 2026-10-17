@@ -16,6 +16,7 @@ brzask = "brzask.cli:app"
 dev = [
     "mypy>=1.15",
     "pytest>=8.3",
+    "pytest-cov>=7.1.0",
     "ruff>=0.11",
 ]
 
@@ -59,3 +60,11 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config"]
+
+[tool.coverage.run]
+source = ["brzask"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
