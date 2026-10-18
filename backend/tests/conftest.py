@@ -3,8 +3,8 @@ from contextlib import contextmanager
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import Engine, create_engine, make_url, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection, Engine, create_engine, make_url, text
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
@@ -63,22 +63,37 @@ def db_engine(postgres: PostgresContainer) -> Iterator[Engine]:
 
 
 @pytest.fixture
-def session(db_engine: Engine) -> Iterator[Session]:
+def connection(db_engine: Engine) -> Iterator[Connection]:
+    """A connection inside a transaction that is rolled back after the test."""
+    with db_engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            yield connection
+        finally:
+            transaction.rollback()
+
+
+@pytest.fixture
+def sessions(connection: Connection) -> sessionmaker[Session]:
+    """Session factory for code that opens its own transactions (CLI, pipeline runner).
+
+    Commits become savepoints on the test's connection, so the test sees them
+    and they are still rolled back afterwards.
+    """
+    return sessionmaker(
+        bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+    )
+
+
+@pytest.fixture
+def session(sessions: sessionmaker[Session]) -> Iterator[Session]:
     """A session whose work is rolled back after the test.
 
     Commits inside the code under test become savepoints, so every test starts
     from the same empty, migrated schema.
     """
-    with db_engine.connect() as connection:
-        transaction = connection.begin()
-        session = Session(
-            bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
-        )
-        try:
-            yield session
-        finally:
-            session.close()
-            transaction.rollback()
+    with sessions() as session:
+        yield session
 
 
 @pytest.fixture

@@ -1,0 +1,104 @@
+import pytest
+from sqlalchemy.orm import Session
+
+from brzask.db.models import ChangeStatus, SourceKind, SourceOrigin, SourceStatus
+from brzask.repositories import ChangeRepository
+from brzask.services.errors import ConflictError, NotFoundError, ServiceError
+from brzask.services.sources import (
+    add_source,
+    default_name,
+    enable_source,
+    find_source,
+    is_release_feed,
+    mute_source,
+)
+from tests.factories import Factories
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://github.com/astral-sh/uv/releases.atom", True),
+        ("https://github.com/astral-sh/uv/releases.atom/", True),
+        ("https://github.com/astral-sh/uv/tags.atom", False),
+        ("https://example.com/feed.xml?from=releases.atom", False),
+        ("https://example.com/blog/releases.atom-notes", False),
+    ],
+)
+def test_is_release_feed(url: str, expected: bool) -> None:
+    assert is_release_feed(url) is expected
+
+
+def test_default_name_is_the_host() -> None:
+    assert default_name("https://www.example.com/feed.xml") == "example.com"
+    assert default_name("https://blog.example.com/rss") == "blog.example.com"
+
+
+def test_add_source_records_the_change(session: Session) -> None:
+    source = add_source(session, "https://github.com/a/b/releases.atom", actor="user")
+
+    assert (source.name, source.status, source.origin, source.kind) == (
+        "github.com",
+        SourceStatus.ACTIVE,
+        SourceOrigin.MANUAL,
+        SourceKind.RELEASE,
+    )
+    [change] = ChangeRepository(session).find(limit=5)
+    assert (change.action, change.entity_id, change.status) == (
+        "source.add",
+        str(source.id),
+        ChangeStatus.APPLIED,
+    )
+
+
+def test_add_source_rejects_known_urls_and_names(session: Session, make: Factories) -> None:
+    make.source("Known", url="https://known.example/feed", status=SourceStatus.REJECTED)
+
+    with pytest.raises(ConflictError, match="already a source \\(rejected\\)"):
+        add_source(session, "https://known.example/feed", actor="user", name="Other")
+    with pytest.raises(ConflictError, match="named 'known'"):
+        add_source(session, "https://new.example/feed", actor="user", name="known")
+
+
+@pytest.mark.parametrize("url", ["ftp://example.com/feed", "example.com/feed", "https://"])
+def test_add_source_needs_an_http_url(session: Session, url: str) -> None:
+    with pytest.raises(ServiceError, match="not an http"):
+        add_source(session, url, actor="user")
+
+
+def test_find_source_by_id_url_or_name(session: Session, make: Factories) -> None:
+    source = make.source("Lobsters", url="https://lobste.rs/rss")
+
+    assert find_source(session, str(source.id)) is source
+    assert find_source(session, "https://lobste.rs/rss") is source
+    assert find_source(session, "lobsters") is source
+    with pytest.raises(NotFoundError):
+        find_source(session, "Slashdot")
+
+
+def test_mute_then_enable(session: Session, make: Factories) -> None:
+    source = make.source("Noisy")
+
+    assert mute_source(session, "Noisy", actor="user", reason="too chatty")
+    assert not mute_source(session, "Noisy", actor="user")
+    assert source.status is SourceStatus.MUTED
+    assert source.note == "too chatty"
+
+    assert enable_source(session, "Noisy", actor="user")
+    assert not enable_source(session, "Noisy", actor="user")
+    enabled = find_source(session, "Noisy")
+    assert (enabled.status, enabled.note) == (SourceStatus.ACTIVE, None)
+
+    changes = ChangeRepository(session).find(limit=10)
+    assert [(c.action, c.before, c.after) for c in changes] == [
+        ("source.enable", {"status": "muted"}, {"status": "active"}),
+        ("source.mute", {"status": "active"}, {"status": "muted"}),
+    ]
+    assert changes[1].reason == "too chatty"
+
+
+def test_enable_a_pending_source(session: Session, make: Factories) -> None:
+    source = make.source(status=SourceStatus.PENDING)
+
+    assert enable_source(session, str(source.id), actor="user")
+    assert source.status is SourceStatus.ACTIVE

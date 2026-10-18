@@ -39,9 +39,14 @@ class SourceRepository:
             query = query.where(Source.status.in_(statuses))
         return self.session.scalars(query).all()
 
-    def name_exists(self, name: str) -> bool:
-        query = select(Source.id).where(func.lower(Source.name) == name.lower())
-        return self.session.scalar(query) is not None
+    def get_by_name(self, name: str) -> Source | None:
+        """Names are compared ignoring case, as people type them."""
+        query = select(Source).where(func.lower(Source.name) == name.lower())
+        return self.session.scalars(query).first()
+
+    def count_by_status(self) -> dict[SourceStatus, int]:
+        query = select(Source.status, func.count()).group_by(Source.status)
+        return {status: count for status, count in self.session.execute(query)}
 
     def add(
         self,

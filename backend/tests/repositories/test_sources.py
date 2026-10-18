@@ -53,12 +53,22 @@ def test_find_filters_by_status_and_sorts_by_name(session: Session, make: Factor
     assert [s.name for s in sources.find(SourceStatus.MUTED, SourceStatus.PENDING)] == ["c", "d"]
 
 
-def test_name_exists_ignores_case(session: Session, make: Factories) -> None:
-    make.source("Hacker News")
+def test_get_by_name_ignores_case(session: Session, make: Factories) -> None:
+    source = make.source("Hacker News")
     sources = SourceRepository(session)
 
-    assert sources.name_exists("hacker news")
-    assert not sources.name_exists("Lobsters")
+    assert sources.get_by_name("hacker news") is source
+    assert sources.get_by_name("Lobsters") is None
+
+
+def test_count_by_status(session: Session, make: Factories) -> None:
+    make.source()
+    make.source()
+    make.source(status=SourceStatus.PENDING)
+
+    counts = SourceRepository(session).count_by_status()
+
+    assert counts == {SourceStatus.ACTIVE: 2, SourceStatus.PENDING: 1}
 
 
 def test_set_status_stores_the_reason(session: Session, make: Factories) -> None:
