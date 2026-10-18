@@ -50,6 +50,16 @@ def test_add_new_with_nothing_does_nothing(session: Session) -> None:
     assert ArticleRepository(session).add_new([]) == {}
 
 
+def test_add_new_stores_more_rows_than_one_statement_takes(session: Session) -> None:
+    # 14,000 rows x 5 columns is more than the 65,535 parameters of one statement.
+    links = [f"https://bulk.example/{n}" for n in range(14_000)]
+
+    ids = ArticleRepository(session).add_new([NewArticle(link, "Title", None) for link in links])
+
+    assert len(ids) == len(links)
+    assert set(ids) == set(links)
+
+
 def test_shown_links_within_the_window(session: Session, make: Factories) -> None:
     make.article(link="https://a.example/recent", digest_date=TODAY, shown_at=NOW)
     make.article(

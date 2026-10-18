@@ -3,6 +3,7 @@
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from itertools import batched
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -10,6 +11,10 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.util import identity_key
 
 from brzask.db.models import Article, ArticleState, Source
+
+# Rows per INSERT in `add_new`: five bind parameters each, far below the 65,535
+# parameters Postgres accepts in one statement.
+_INSERT_BATCH = 1000
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,22 +90,23 @@ class ArticleRepository:
         Returns the ID of every given link, new or not, so later stages can
         update candidates by ID.
         """
-        if not articles:
-            return {}
-        rows = [
-            {
-                "link": article.link,
-                "title": article.title,
-                "source_id": article.source_id,
-                "snippet": article.snippet,
-                "published_at": article.published_at,
-            }
-            for article in articles
-        ]
-        self.session.execute(insert(Article).values(rows).on_conflict_do_nothing())
-        links = [article.link for article in articles]
-        query = select(Article.link, Article.id).where(Article.link.in_(links))
-        return dict(self.session.execute(query).all())
+        ids: dict[str, int] = {}
+        for batch in batched(articles, _INSERT_BATCH, strict=False):
+            rows = [
+                {
+                    "link": article.link,
+                    "title": article.title,
+                    "source_id": article.source_id,
+                    "snippet": article.snippet,
+                    "published_at": article.published_at,
+                }
+                for article in batch
+            ]
+            self.session.execute(insert(Article).values(rows).on_conflict_do_nothing())
+            links = [article.link for article in batch]
+            query = select(Article.link, Article.id).where(Article.link.in_(links))
+            ids.update(dict(self.session.execute(query).all()))
+        return ids
 
     def shown_links(self, since: datetime) -> set[str]:
         query = select(Article.link).where(
