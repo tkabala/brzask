@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from brzask.db.models import ChangeStatus, Source, SourceKind, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
+from brzask.services.refs import as_id
 
 
 def is_release_feed(url: str) -> bool:
@@ -24,9 +25,10 @@ def default_name(url: str) -> str:
 def find_source(session: Session, ref: str) -> Source:
     """A source by ID, feed URL or name (ignoring case)."""
     sources = SourceRepository(session)
+    source_id = as_id(ref)
     source = (
-        sources.get(int(ref))
-        if ref.isdecimal()
+        sources.get(source_id)
+        if source_id is not None
         else sources.get_by_url(ref) or sources.get_by_name(ref)
     )
     if source is None:
@@ -44,6 +46,9 @@ def add_source(session: Session, url: str, *, actor: str, name: str | None = Non
     if parts.scheme not in {"http", "https"} or not parts.hostname:
         raise ServiceError(f"not an http(s) URL: {url!r}")
     sources = SourceRepository(session)
+    known = sources.get_by_url(url)
+    if known is not None:
+        raise ConflictError(f"{url} is already a source ({known.status.value})")
     name = name or default_name(url)
     if sources.get_by_name(name) is not None:
         raise ConflictError(f"a source named {name!r} already exists; choose another name")
@@ -54,10 +59,8 @@ def add_source(session: Session, url: str, *, actor: str, name: str | None = Non
         origin=SourceOrigin.MANUAL,
         kind=SourceKind.RELEASE if is_release_feed(url) else SourceKind.FEED,
     )
-    if source is None:
-        existing = sources.get_by_url(url)
-        status = existing.status.value if existing else "unknown"
-        raise ConflictError(f"{url} is already a source ({status})")
+    if source is None:  # added by another process since the check above
+        raise ConflictError(f"{url} is already a source")
     ChangeRepository(session).record(
         actor=actor,
         action="source.add",

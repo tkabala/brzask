@@ -60,6 +60,15 @@ def test_add_source_rejects_known_urls_and_names(session: Session, make: Factori
         add_source(session, "https://new.example/feed", actor="user", name="known")
 
 
+def test_add_source_reports_a_known_url_before_its_default_name(
+    session: Session, make: Factories
+) -> None:
+    make.source("known.example", url="https://known.example/feed", status=SourceStatus.MUTED)
+
+    with pytest.raises(ConflictError, match="already a source \\(muted\\)"):
+        add_source(session, "https://known.example/feed", actor="user")
+
+
 @pytest.mark.parametrize("url", ["ftp://example.com/feed", "example.com/feed", "https://"])
 def test_add_source_needs_an_http_url(session: Session, url: str) -> None:
     with pytest.raises(ServiceError, match="not an http"):
@@ -74,6 +83,8 @@ def test_find_source_by_id_url_or_name(session: Session, make: Factories) -> Non
     assert find_source(session, "lobsters") is source
     with pytest.raises(NotFoundError):
         find_source(session, "Slashdot")
+    with pytest.raises(NotFoundError):
+        find_source(session, "9" * 30)  # larger than any ID
 
 
 def test_mute_then_enable(session: Session, make: Factories) -> None:

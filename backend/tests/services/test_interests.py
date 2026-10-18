@@ -70,3 +70,5 @@ def test_find_interest(session: Session, make: Factories) -> None:
     assert find_interest(session, "Postgres") is interest
     with pytest.raises(NotFoundError):
         find_interest(session, "MySQL")
+    with pytest.raises(NotFoundError):
+        find_interest(session, "9" * 30)  # larger than any ID

@@ -8,12 +8,16 @@ from sqlalchemy.orm import Session
 from brzask.db.models import ChangeStatus, Interest
 from brzask.repositories import ChangeRepository, InterestRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
+from brzask.services.refs import as_id
 
 
 def find_interest(session: Session, ref: str) -> Interest:
     """An interest by ID or topic."""
     interests = InterestRepository(session)
-    interest = interests.get(int(ref)) if ref.isdecimal() else interests.get_by_topic(ref)
+    interest_id = as_id(ref)
+    interest = (
+        interests.get(interest_id) if interest_id is not None else interests.get_by_topic(ref)
+    )
     if interest is None:
         raise NotFoundError(f"no interest {ref!r}")
     return interest
