@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from datetime import date, datetime, time
+from datetime import datetime
 from functools import lru_cache
 
 import typer
@@ -49,11 +49,8 @@ def parse_moment(value: str) -> datetime:
     """A date (start of that day) or a date and time, in the configured time zone."""
     zone = get_settings().scheduler.timezone
     try:
-        moment = (
-            datetime.combine(date.fromisoformat(value), time())
-            if len(value) == len("2026-01-01")
-            else datetime.fromisoformat(value)
-        )
+        # A date alone parses as midnight.
+        moment = datetime.fromisoformat(value)
     except ValueError as error:
         raise typer.BadParameter(
             f"expected YYYY-MM-DD or YYYY-MM-DDTHH:MM, got {value!r}"

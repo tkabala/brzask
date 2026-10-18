@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from brzask.db.models import (
@@ -19,6 +18,7 @@ from brzask.db.models import (
     SourceOrigin,
     SourceStatus,
 )
+from brzask.repositories import ArticleRepository
 
 TEST_MODEL = "test/embedding"
 
@@ -100,11 +100,11 @@ class Factories:
             fields.setdefault("state", ArticleState.SHOWN)
             fields.setdefault("shown_at", seen)
             fields["digest_date"] = digest_date
-            fields["digest_position"] = digest_position or self._next_position(digest_date)
+            fields["digest_position"] = (
+                digest_position
+                if digest_position is not None
+                else (ArticleRepository(self.session).last_digest_position(digest_date) or 0) + 1
+            )
         return self._add(
             Article(source_id=source.id if source else None, first_seen_at=seen, **fields)
         )
-
-    def _next_position(self, day: date) -> int:
-        query = select(func.max(Article.digest_position)).where(Article.digest_date == day)
-        return (self.session.scalar(query) or 0) + 1

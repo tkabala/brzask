@@ -5,7 +5,7 @@ from typing import Any, Literal
 from alembic import context
 from alembic.autogenerate.api import AutogenContext
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.pool import NullPool
 
 import brzask.db.models  # noqa: F401  (registers the tables on Base.metadata)
@@ -50,7 +50,7 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             # Two processes starting at once (e.g. api and worker) migrate one after another.
-            connection.execute(text("SELECT pg_advisory_xact_lock(:id)"), {"id": MIGRATION_LOCK_ID})
+            connection.execute(select(func.pg_advisory_xact_lock(MIGRATION_LOCK_ID)))
             context.run_migrations()
     engine.dispose()
 
