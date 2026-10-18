@@ -6,6 +6,8 @@ license = "MIT"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.16",
+    "feedparser>=6.0.11",
+    "httpx2>=2.14",
     "openai>=3.35",
     "pgvector>=0.4",
     "psycopg[binary]>=3.2",
@@ -15,6 +17,9 @@ dependencies = [
     "structlog>=25.4",
     "typer>=0.15",
 ]
+
+[project.urls]
+Homepage = "https://github.com/tkabala/brzask"
 
 [project.scripts]
 brzask = "brzask.cli:app"
@@ -66,6 +71,11 @@ python_version = "3.13"
 files = ["src", "tests"]
 # SQLAlchemy 2.0 typed models (Mapped[...]) need no plugin; its legacy plugin is deprecated.
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# feedparser ships no type information; brzask.clients.feeds wraps it.
+module = ["feedparser", "feedparser.*"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

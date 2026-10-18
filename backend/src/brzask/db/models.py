@@ -70,6 +70,10 @@ class Source(TimestampMixin, Base):
         comment="Which discovery adapter or interest proposed the source."
     )
     note: Mapped[str | None] = mapped_column(comment="Reason for the current status.")
+    etag: Mapped[str | None] = mapped_column(comment="ETag of the last fetch, for conditional GET.")
+    last_modified: Mapped[str | None] = mapped_column(
+        comment="Last-Modified of the last fetch, for conditional GET."
+    )
 
     articles: Mapped[list["Article"]] = relationship(back_populates="source")
 

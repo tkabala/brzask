@@ -90,6 +90,15 @@ def test_set_status_stores_the_reason(session: Session, make: Factories) -> None
     assert source.note == "30 articles, none opened"
 
 
+def test_set_fetch_validators(session: Session, make: Factories) -> None:
+    source = make.source()
+
+    SourceRepository(session).set_fetch_validators(source, '"abc"', "Sat, 17 Oct 2026 06:00:00 GMT")
+    session.expire_all()
+
+    assert (source.etag, source.last_modified) == ('"abc"', "Sat, 17 Oct 2026 06:00:00 GMT")
+
+
 def test_stats_count_by_source_id_within_the_window(session: Session, make: Factories) -> None:
     busy = make.source("Busy")
     renamed = make.source("Old name")

@@ -86,6 +86,14 @@ class SourceRepository:
         source.note = note
         self.session.flush()
 
+    def set_fetch_validators(
+        self, source: Source, etag: str | None, last_modified: str | None
+    ) -> None:
+        """Remember the feed's validators, sent back on the next fetch."""
+        source.etag = etag
+        source.last_modified = last_modified
+        self.session.flush()
+
     def stats(self, since: datetime) -> dict[int, SourceStats]:
         """Counts per source for articles first seen at or after `since`.
 

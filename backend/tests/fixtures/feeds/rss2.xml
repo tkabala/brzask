@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Example &amp; Co. Blog</title>
+    <link>https://blog.example.com/</link>
+    <description>Test feed</description>
+    <item>
+      <title>Postgres 18 &lt;b&gt;released&lt;/b&gt;</title>
+      <link>https://blog.example.com/posts/postgres-18</link>
+      <description><![CDATA[<p>Short <em>summary</em> of the release.</p>]]></description>
+      <content:encoded><![CDATA[<h2>What is new</h2><p>Asynchronous I/O &amp; virtual generated columns.</p><script>track()</script><ul><li>One</li><li>Two</li></ul>]]></content:encoded>
+      <pubDate>Fri, 16 Oct 2026 09:30:00 +0200</pubDate>
+    </item>
+    <item>
+      <title>Broken date</title>
+      <link>https://blog.example.com/posts/broken-date</link>
+      <description>No usable date.</description>
+      <pubDate>sometime last week</pubDate>
+    </item>
+    <item>
+      <title>From the future</title>
+      <link>https://blog.example.com/posts/future</link>
+      <pubDate>Thu, 01 Jan 2099 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Dublin Core date only</title>
+      <link>https://blog.example.com/posts/dc-date</link>
+      <dc:date>2026-10-15T08:00:00Z</dc:date>
+    </item>
+    <item>
+      <title>Relative link</title>
+      <link>/posts/relative</link>
+    </item>
+    <item>
+      <title>Postgres 18 released (again)</title>
+      <link>https://blog.example.com/posts/postgres-18</link>
+    </item>
+    <item>
+      <title>No link</title>
+    </item>
+    <item>
+      <title>   </title>
+      <link>https://blog.example.com/posts/no-title</link>
+    </item>
+    <item>
+      <title>Not a web link</title>
+      <link>mailto:someone@example.com</link>
+    </item>
+  </channel>
+</rss>
