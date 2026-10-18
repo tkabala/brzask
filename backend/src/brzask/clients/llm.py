@@ -1,7 +1,6 @@
 """Chat completions over any OpenAI-compatible API (OpenRouter, Ollama, OpenAI, ...)."""
 
 import json
-import random
 import re
 import time
 from collections.abc import Callable
@@ -12,26 +11,18 @@ from urllib.parse import urlsplit
 import openai
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
+from brzask.clients.retry import APIError, EmptyResponseError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import LLMSettings
 from brzask.log import get_logger
 
 log = get_logger(__name__)
 
-# One call plus three retries; with the delays below a call gives up after about
-# 14 s of waiting, which covers short provider hiccups without stalling a run.
-ATTEMPTS = 4
-BASE_DELAY_SECONDS = 2.0
-MAX_DELAY_SECONDS = 30.0
-
-# Errors worth another attempt: the request may succeed unchanged.
-_RETRYABLE = (openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError)
-
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*\n?(.*?)\n?```", re.DOTALL)
 
 
-class LLMError(Exception):
-    """The API failed or kept failing; the message says why."""
+class LLMError(APIError):
+    """The chat API failed or kept failing; the message says why."""
 
 
 class InvalidJSONError(LLMError):
@@ -112,43 +103,26 @@ class LLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        for attempt in range(1, ATTEMPTS + 1):
+        def attempt() -> tuple[str, CallUsage]:
             started = time.perf_counter()
-            try:
-                response = self._create(messages, json_mode=json_mode)
-                content = _content(response)
-            except (*_RETRYABLE, _EmptyResponseError) as error:
-                if attempt == ATTEMPTS:
-                    raise LLMError(
-                        f"{purpose}: gave up after {ATTEMPTS} attempts: {error}"
-                    ) from error
-                delay = _delay(attempt, error)
-                log.warning(
-                    "llm call failed, retrying",
-                    purpose=purpose,
-                    attempt=attempt,
-                    delay_s=round(delay, 1),
-                    error=str(error),
-                )
-                self._sleep(delay)
-                continue
-            except openai.APIError as error:
-                raise LLMError(f"{purpose}: {error}") from error
+            response = self._create(messages, json_mode=json_mode)
+            return _content(response), _usage(response, self.model, purpose, started)
 
-            usage = _usage(response, self.model, purpose, started)
-            if meter is not None:
-                meter.add(usage)
-            log.info(
-                "llm call",
-                purpose=purpose,
-                model=usage.model,
-                input_tokens=usage.input_tokens,
-                output_tokens=usage.output_tokens,
-                cost_usd=usage.cost_usd,
-                duration_ms=usage.duration_ms,
-            )
-            return Completion(content, usage)
-        raise AssertionError("unreachable")  # pragma: no cover
+        content, usage = call_with_retries(
+            attempt, purpose=purpose, error=LLMError, sleep=self._sleep
+        )
+        if meter is not None:
+            meter.add(usage)
+        log.info(
+            "llm call",
+            purpose=purpose,
+            model=usage.model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cost_usd=usage.cost_usd,
+            duration_ms=usage.duration_ms,
+        )
+        return Completion(content, usage)
 
     def complete_json(
         self,
@@ -175,17 +149,13 @@ class LLMClient:
         )
 
 
-class _EmptyResponseError(Exception):
-    """A 200 response without an answer; providers send these when an upstream model fails."""
-
-
 def _content(response: ChatCompletion) -> str:
     # `choices` is required by the schema, but some providers send an error object instead.
     choices = response.choices or []
     content = choices[0].message.content if choices else None
     if not content or not content.strip():
         error = (response.model_extra or {}).get("error")
-        raise _EmptyResponseError(f"empty answer{f': {error}' if error else ''}")
+        raise EmptyResponseError(f"empty answer{f': {error}' if error else ''}")
     return content
 
 
@@ -200,16 +170,3 @@ def _usage(response: ChatCompletion, model: str, purpose: str, started: float) -
         cost_usd=float(cost) if isinstance(cost, int | float) else None,
         duration_ms=round((time.perf_counter() - started) * 1000),
     )
-
-
-def _delay(attempt: int, error: Exception) -> float:
-    """The server's Retry-After when given (capped), else exponential backoff with jitter."""
-    if isinstance(error, openai.APIStatusError):
-        retry_after = error.response.headers.get("retry-after")
-        try:
-            if retry_after is not None:
-                return min(float(retry_after), MAX_DELAY_SECONDS)
-        except ValueError:
-            pass  # an HTTP date; fall back to backoff
-    delay: float = min(BASE_DELAY_SECONDS * 2 ** (attempt - 1), MAX_DELAY_SECONDS)
-    return delay * random.uniform(0.8, 1.2)  # noqa: S311  (jitter, not security)

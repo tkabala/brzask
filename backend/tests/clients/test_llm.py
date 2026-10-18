@@ -6,12 +6,12 @@ import openai
 import pytest
 
 from brzask.clients.llm import (
-    ATTEMPTS,
     InvalidJSONError,
     LLMClient,
     LLMError,
     parse_json,
 )
+from brzask.clients.retry import ATTEMPTS
 from brzask.clients.usage import UsageMeter
 from brzask.config.settings import LLMSettings
 
