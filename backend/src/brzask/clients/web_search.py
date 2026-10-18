@@ -10,6 +10,7 @@ import httpx2
 import openai
 from openai.types.chat import ChatCompletion
 
+from brzask import prompts
 from brzask.clients.http import new_client
 from brzask.clients.retry import APIError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
@@ -24,12 +25,6 @@ TIMEOUT = httpx2.Timeout(30.0, connect=10.0)
 # Online models search and read pages before answering.
 LLM_TIMEOUT_SECONDS = 120.0
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
-
-LLM_ONLINE_INSTRUCTION = (
-    "Search the web for: {query}\n\n"
-    "List up to {limit} of the most relevant pages, one per line, as: "
-    "Title - URL - one short sentence about the page. Only real, currently existing pages."
-)
 
 _URL = re.compile(r"https?://[^\s<>()\[\]\"'`]+")
 _TRAILING = ".,;:!?*_)]>'\""
@@ -140,7 +135,7 @@ class LLMOnlineSearch:
     def search(
         self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
     ) -> list[SearchResult]:
-        prompt = LLM_ONLINE_INSTRUCTION.format(query=query, limit=limit)
+        prompt = prompts.render("web_search", query=query, limit=limit)
 
         def attempt() -> tuple[ChatCompletion, int]:
             started = time.perf_counter()
