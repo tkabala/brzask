@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
+from brzask.clients.feed_finder import FeedFinder, FoundFeed
 from brzask.db.models import ChangeStatus, Source, SourceKind, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
@@ -48,16 +49,42 @@ def list_sources(session: Session, *statuses: SourceStatus) -> Sequence[Source]:
     return SourceRepository(session).find(*statuses)
 
 
-def add_source(session: Session, url: str, *, actor: str, name: str | None = None) -> Source:
-    """Add a feed by its URL; it is fetched from the next digest on."""
+def ensure_unknown(session: Session, url: str) -> None:
+    """Raise when `url` is already a source, whatever its status."""
+    known = SourceRepository(session).get_by_url(url)
+    if known is not None:
+        raise ConflictError(f"{url} is already a source ({known.status.value})")
+
+
+def find_feed(finder: FeedFinder, url: str) -> FoundFeed:
+    """The feed of the site `url` belongs to; `url` may be the feed itself or any page."""
+    found = finder.find(url)
+    if found is None:
+        raise NotFoundError(f"no RSS or Atom feed found for {url}")
+    return found
+
+
+def add_source(
+    session: Session,
+    url: str,
+    *,
+    actor: str,
+    name: str | None = None,
+    title: str | None = None,
+    site_url: str | None = None,
+) -> Source:
+    """Add a feed by its URL; it is fetched from the next digest on.
+
+    Without `name`, the feed's `title` is used, or the host; release feeds are
+    named after their project instead, which tells them apart better.
+    """
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"} or not parts.hostname:
         raise ServiceError(f"not an http(s) URL: {url!r}")
     sources = SourceRepository(session)
-    known = sources.get_by_url(url)
-    if known is not None:
-        raise ConflictError(f"{url} is already a source ({known.status.value})")
-    name = name or default_name(url)
+    ensure_unknown(session, url)
+    release = is_release_feed(url)
+    name = (name or (None if release else title) or default_name(url)).strip()
     if sources.get_by_name(name) is not None:
         raise ConflictError(f"a source named {name!r} already exists; choose another name")
     source = sources.add(
@@ -65,7 +92,8 @@ def add_source(session: Session, url: str, *, actor: str, name: str | None = Non
         url=url,
         status=SourceStatus.ACTIVE,
         origin=SourceOrigin.MANUAL,
-        kind=SourceKind.RELEASE if is_release_feed(url) else SourceKind.FEED,
+        kind=SourceKind.RELEASE if release else SourceKind.FEED,
+        site_url=site_url,
     )
     if source is None:  # added by another process since the check above
         raise ConflictError(f"{url} is already a source")

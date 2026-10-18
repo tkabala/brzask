@@ -4,7 +4,8 @@ from typing import Annotated
 
 import typer
 
-from brzask.cli.common import ACTOR, local, table, unit_of_work
+from brzask.cli import common
+from brzask.cli.common import ACTOR, errors_as_messages, local, table, unit_of_work
 from brzask.db.models import SourceStatus
 from brzask.services import sources
 
@@ -34,15 +35,28 @@ def list_command(
 
 @app.command()
 def add(
-    url: Annotated[str, typer.Argument(help="Feed URL (RSS or Atom).")],
+    url: Annotated[
+        str, typer.Argument(help="Feed URL, or any page of the site: its feed is looked up.")
+    ],
     name: Annotated[
-        str | None, typer.Option("--name", "-n", help="Display name; defaults to the host.")
+        str | None,
+        typer.Option("--name", "-n", help="Display name; defaults to the feed's title."),
     ] = None,
 ) -> None:
     """Add a feed; it is read from the next digest on."""
     with unit_of_work() as session:
-        source = sources.add_source(session, url, actor=ACTOR, name=name)
-        message = f"Added {source.name} (#{source.id}, {source.kind.value})."
+        sources.ensure_unknown(session, url)  # before any request to the site
+    finder = common.get_feed_finder()
+    try:
+        with errors_as_messages():
+            found = sources.find_feed(finder, url)
+    finally:
+        finder.close()
+    with unit_of_work() as session:
+        source = sources.add_source(
+            session, found.url, actor=ACTOR, name=name, title=found.title, site_url=found.site_url
+        )
+        message = f"Added {source.name} (#{source.id}, {source.kind.value}): {source.url}"
     typer.echo(message)
 
 

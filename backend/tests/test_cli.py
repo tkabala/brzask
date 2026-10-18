@@ -7,6 +7,7 @@ from typer.testing import CliRunner, Result
 
 from brzask import __version__
 from brzask.cli import app, common
+from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import RunKind, RunStatus, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services import runs
@@ -19,10 +20,35 @@ runner = CliRunner()
 Invoke = Callable[..., Result]
 
 
+class FakeFinder:
+    """Finds `feeds[url]`; any other http(s) URL is taken to be a feed without a title."""
+
+    def __init__(self) -> None:
+        self.feeds: dict[str, FoundFeed | None] = {}
+        self.asked: list[str] = []
+
+    def find(self, url: str) -> FoundFeed | None:
+        self.asked.append(url)
+        if url in self.feeds:
+            return self.feeds[url]
+        return FoundFeed(url, None, url) if url.startswith(("http://", "https://")) else None
+
+    def close(self) -> None:
+        pass
+
+
 @pytest.fixture
-def cli(sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> Invoke:
+def finder() -> FakeFinder:
+    return FakeFinder()
+
+
+@pytest.fixture
+def cli(
+    sessions: sessionmaker[Session], finder: FakeFinder, monkeypatch: pytest.MonkeyPatch
+) -> Invoke:
     """Run a command against the test database, in UTC."""
     monkeypatch.setattr(common, "get_sessions", lambda: sessions)
+    monkeypatch.setattr(common, "get_feed_finder", lambda: finder)
     monkeypatch.setenv("TZ", "UTC")
 
     def invoke(*args: str) -> Result:
@@ -69,6 +95,39 @@ def test_sources_add_list_mute_enable(cli: Invoke) -> None:
     assert "Lobsters" in cli("sources", "list", "-s", "muted").stdout
 
     assert cli("sources", "enable", "https://lobste.rs/rss").stdout.startswith("Enabled")
+
+
+def test_sources_add_finds_the_feed_of_a_page(cli: Invoke, finder: FakeFinder) -> None:
+    finder.feeds["https://blog.example.com/"] = FoundFeed(
+        "https://blog.example.com/feed/", "Example Blog", "https://blog.example.com/"
+    )
+
+    added = cli("sources", "add", "https://blog.example.com/")
+
+    assert added.exit_code == 0, added.output
+    assert added.stdout.startswith("Added Example Blog (#")
+    assert added.stdout.rstrip().endswith(": https://blog.example.com/feed/")
+
+
+def test_sources_add_without_a_feed(cli: Invoke, finder: FakeFinder) -> None:
+    finder.feeds["https://nofeed.example/"] = None
+
+    result = cli("sources", "add", "https://nofeed.example/")
+
+    assert result.exit_code == 1
+    assert "no RSS or Atom feed found for https://nofeed.example/" in result.stderr
+
+
+def test_a_known_url_is_reported_without_a_lookup(
+    cli: Invoke, finder: FakeFinder, make: Factories
+) -> None:
+    make.source(url="https://known.example/feed", status=SourceStatus.MUTED)
+
+    result = cli("sources", "add", "https://known.example/feed")
+
+    assert result.exit_code == 1
+    assert "already a source (muted)" in result.stderr
+    assert finder.asked == []
 
 
 def test_sources_errors_exit_with_a_message(cli: Invoke, make: Factories) -> None:

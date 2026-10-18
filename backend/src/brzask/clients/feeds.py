@@ -99,7 +99,7 @@ class FeedFetcher:
         )
         return results
 
-    def fetch(self, request: FeedRequest) -> FeedResult:
+    def fetch(self, request: FeedRequest, *, log_failure: bool = True) -> FeedResult:
         headers = {}
         if request.etag:
             headers["If-None-Match"] = request.etag
@@ -121,7 +121,7 @@ class FeedFetcher:
                 etag = response.headers.get("ETag")
                 last_modified = response.headers.get("Last-Modified")
         except (httpx2.HTTPError, ResponseTooLargeError) as error:
-            return self._failed(request.url, f"{type(error).__name__}: {error}")
+            return self._failed(request.url, f"{type(error).__name__}: {error}", log_failure)
 
         # The final URL resolves relative links; the content type helps detect the encoding.
         parsed = feedparser.parse(
@@ -129,7 +129,7 @@ class FeedFetcher:
         )
         if not parsed.get("version") and not parsed.entries:
             reason = parsed.get("bozo_exception") or "no RSS or Atom content"
-            return self._failed(request.url, f"not a feed: {reason}")
+            return self._failed(request.url, f"not a feed: {reason}", log_failure)
         now = self._now()
         return FeedResult(
             request.url,
@@ -140,8 +140,9 @@ class FeedFetcher:
             last_modified=last_modified,
         )
 
-    def _failed(self, url: str, error: str) -> FeedResult:
-        log.warning("feed failed", url=url, error=error)
+    def _failed(self, url: str, error: str, log_failure: bool) -> FeedResult:
+        if log_failure:
+            log.warning("feed failed", url=url, error=error)
         return FeedResult(url, FetchStatus.FAILED, error=error)
 
 

@@ -8,6 +8,8 @@ from functools import lru_cache
 import typer
 from sqlalchemy.orm import Session, sessionmaker
 
+from brzask.clients.feed_finder import FeedFinder
+from brzask.clients.feeds import FeedFetcher
 from brzask.config import get_settings
 from brzask.db.session import create_db_engine, session_factory
 from brzask.services.errors import ServiceError
@@ -19,6 +21,10 @@ ACTOR = "user"
 @lru_cache(maxsize=1)
 def get_sessions() -> sessionmaker[Session]:
     return session_factory(create_db_engine())
+
+
+def get_feed_finder() -> FeedFinder:
+    return FeedFinder(FeedFetcher())
 
 
 @contextmanager

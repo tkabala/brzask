@@ -126,3 +126,30 @@ def test_enable_a_pending_source(session: Session, make: Factories) -> None:
 
     assert enable_source(session, str(source.id), actor="user")
     assert source.status is SourceStatus.ACTIVE
+
+
+def test_feed_title_names_the_source_unless_given_a_name(session: Session) -> None:
+    titled = add_source(
+        session,
+        "https://blog.example.com/feed/",
+        actor="user",
+        title="  Example Blog ",
+        site_url="https://blog.example.com/",
+    )
+    named = add_source(
+        session, "https://other.example/rss", actor="user", name="Mine", title="Their title"
+    )
+
+    assert (titled.name, titled.site_url) == ("Example Blog", "https://blog.example.com/")
+    assert named.name == "Mine"
+
+
+def test_release_feeds_ignore_the_generic_feed_title(session: Session) -> None:
+    source = add_source(
+        session,
+        "https://github.com/astral-sh/uv/releases.atom",
+        actor="user",
+        title="Release notes from uv",
+    )
+
+    assert source.name == "github.com/astral-sh/uv"
