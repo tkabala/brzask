@@ -14,6 +14,10 @@ BLOCK_PHRASES = re.compile(
     r"enable javascript and cookies|captcha",
     re.IGNORECASE,
 )
+# Block pages are a few hundred characters; an article about CAPTCHAs or access
+# errors is far longer and must not be mistaken for one. A starting point, to be
+# checked with extract-bench.
+BLOCK_PAGE_MAX_CHARS = 2000
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +53,6 @@ def unusable_reason(text: str | None) -> str | None:
     stripped = (text or "").strip()
     if len(stripped) < MIN_CHARS:
         return "too_short"
-    if BLOCK_PHRASES.search(stripped):
+    if len(stripped) <= BLOCK_PAGE_MAX_CHARS and BLOCK_PHRASES.search(stripped):
         return "blocked"
     return None

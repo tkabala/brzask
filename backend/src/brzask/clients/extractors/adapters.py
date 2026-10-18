@@ -4,9 +4,10 @@ from typing import Any
 
 import httpx2
 import trafilatura
+from trafilatura.utils import decode_file
 
 from brzask.clients.extractors.base import Extracted, ExtractionError, ExtractionInput
-from brzask.clients.http import ResponseTooLargeError, read_limited
+from brzask.clients.http import REQUEST_ERRORS, read_limited
 
 # Article pages are rarely above 2 MB of HTML; larger responses are not articles.
 MAX_PAGE_BYTES = 5 * 1024 * 1024
@@ -64,13 +65,20 @@ class TrafilaturaExtractor:
             ) as response:
                 response.raise_for_status()
                 content_type = response.headers.get("Content-Type", "")
-                if content_type and "html" not in content_type:
+                if content_type and "html" not in content_type.lower():
                     raise ExtractionError(f"not an HTML page ({content_type.split(';')[0]})")
                 body = read_limited(response, MAX_PAGE_BYTES)
-                encoding = response.encoding or "utf-8"
-        except (httpx2.HTTPError, ResponseTooLargeError) as error:
+                encoding = response.charset_encoding
+        except REQUEST_ERRORS as error:
             raise ExtractionError(f"{type(error).__name__}: {error}") from error
-        return body.decode(encoding, errors="replace")
+        if encoding is not None:
+            try:
+                return body.decode(encoding, errors="replace")
+            except LookupError:
+                pass  # an unknown charset name; detect it like a missing one
+        # Many pages name their charset only in a <meta> tag; trafilatura
+        # detects it instead of assuming UTF-8.
+        return decode_file(body)
 
 
 class JinaExtractor:
@@ -149,7 +157,7 @@ def _json(client: httpx2.Client, method: str, url: str, **kwargs: Any) -> dict[s
         response = client.request(method, url, timeout=READER_TIMEOUT, **kwargs)
         response.raise_for_status()
         data = response.json()
-    except (httpx2.HTTPError, ValueError) as error:
+    except (*REQUEST_ERRORS, ValueError) as error:
         raise ExtractionError(f"{type(error).__name__}: {error}") from error
     if not isinstance(data, dict):
         raise ExtractionError("unexpected response")

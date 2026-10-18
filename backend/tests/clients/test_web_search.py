@@ -236,14 +236,16 @@ class FakeLLM:
         self.bodies.append(json.loads(request.content))
         return self.responses.pop(0)
 
-    def search(self) -> LLMOnlineSearch:
+    def search(self, *, report_cost: bool = True) -> LLMOnlineSearch:
         client = openai.OpenAI(
             base_url="https://llm.test/v1",
             api_key="k",
             max_retries=0,
             http_client=httpx2.Client(transport=httpx2.MockTransport(self.handle)),
         )
-        return LLMOnlineSearch(client, "perplexity/sonar", sleep=self.sleeps.append)
+        return LLMOnlineSearch(
+            client, "perplexity/sonar", report_cost=report_cost, sleep=self.sleeps.append
+        )
 
 
 def test_llm_online_search_asks_the_online_model_and_meters_the_call() -> None:
@@ -263,6 +265,27 @@ def test_llm_online_search_asks_the_online_model_and_meters_the_call() -> None:
     assert body["usage"] == {"include": True}
     [call] = meter.calls
     assert (call.purpose, call.cost_usd) == ("web_search", 0.00527)
+
+
+def test_llm_online_asks_for_the_cost_only_where_supported() -> None:
+    fake = FakeLLM(httpx2.Response(200, json=completion(SONAR_CONTENT)))
+
+    fake.search(report_cost=False).search("q")
+
+    [body] = fake.bodies
+    assert "usage" not in body
+
+
+def test_list_markers_are_dropped_but_titles_starting_with_digits_kept() -> None:
+    content = (
+        "1. 37signals blog - https://dev.37signals.com/ - Posts.\n"
+        "- 2025 in review - https://example.com/2025 - Recap."
+    )
+
+    assert [r.title for r in llm_results(completion(content))] == [
+        "37signals blog",
+        "2025 in review",
+    ]
 
 
 def test_llm_online_retries_and_fails_as_a_search_error() -> None:

@@ -70,7 +70,8 @@ def test_alternate_feeds_ignore_other_links() -> None:
     html = """<link rel="alternate" hreflang="de" href="/de/">
     <link rel="alternate" type="application/json" href="/feed.json">
     <LINK REL="Alternate" TYPE="application/atom+xml; charset=utf-8" HREF="atom.xml">
-    <link rel="alternate" type="application/rss+xml" href="javascript:void(0)">"""
+    <link rel="alternate" type="application/rss+xml" href="javascript:void(0)">
+    <link rel="alternate" type="application/rss+xml" href="http://[oops/feed">"""
 
     assert alternate_feeds(html, "https://site.example/blog/") == [
         "https://site.example/blog/atom.xml"
@@ -224,8 +225,9 @@ def test_unreachable_site_still_tries_the_common_paths() -> None:
     assert found.url == "https://site.example/rss.xml"
 
 
-def test_not_a_url() -> None:
-    assert Web({}).finder().find("   ") is None
+@pytest.mark.parametrize("url", ["   ", "https://[::1/blog"])
+def test_not_a_url(url: str) -> None:
+    assert Web({}).finder().find(url) is None
 
 
 # --- GitHub --------------------------------------------------------------------
@@ -262,6 +264,17 @@ def test_github_pages_that_are_not_repositories(url: str) -> None:
 
     assert web.finder().find(url) is None
     assert web.requested == []
+
+
+def test_github_subdomains_are_ordinary_sites() -> None:
+    web = Web(
+        {"https://gist.github.com/someone": page(BLOG), "https://gist.github.com/feed/": feed()}
+    )
+
+    found = web.finder().find("https://gist.github.com/someone")
+
+    assert found is not None
+    assert found.url == "https://gist.github.com/feed/"
 
 
 def test_a_missing_repository() -> None:

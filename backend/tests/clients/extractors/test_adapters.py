@@ -101,6 +101,16 @@ def test_trafilatura_failures(response: httpx2.Response | Exception, error: str)
         TrafilaturaExtractor(Server(response).client).extract(ExtractionInput(URL))
 
 
+def test_trafilatura_refuses_a_url_httpx_cannot_send() -> None:
+    with pytest.raises(ExtractionError, match="InvalidURL"):
+        TrafilaturaExtractor(Server(html()).client).extract(ExtractionInput("https://a\x00b/"))
+
+
+def test_jina_refuses_a_url_httpx_cannot_send() -> None:
+    with pytest.raises(ExtractionError, match="InvalidURL"):
+        JinaExtractor(Server(html()).client).extract(ExtractionInput("https://a\x00b/"))
+
+
 # --- jina ----------------------------------------------------------------------
 
 
@@ -200,3 +210,23 @@ def test_crawl4ai_failure() -> None:
         Crawl4AIExtractor(server.client, "http://crawl4ai:11235").extract(ExtractionInput(URL))
         is None
     )
+
+
+def test_trafilatura_detects_a_charset_named_only_in_the_page() -> None:
+    text = "Zażółć gęślą jaźń. " * 30
+    body = (
+        '<html><head><meta charset="windows-1250"><title>T</title></head>'
+        f"<body><article><p>{text}</p></article></body></html>"
+    ).encode("windows-1250")
+    server = Server(httpx2.Response(200, content=body, headers={"Content-Type": "text/html"}))
+
+    extracted = TrafilaturaExtractor(server.client).extract(ExtractionInput(URL))
+
+    assert extracted is not None
+    assert "Zażółć gęślą jaźń" in extracted.text
+
+
+def test_trafilatura_reads_content_types_in_any_case() -> None:
+    server = Server(html(content_type="Text/HTML; charset=UTF-8"))
+
+    assert TrafilaturaExtractor(server.client).extract(ExtractionInput(URL)) is not None

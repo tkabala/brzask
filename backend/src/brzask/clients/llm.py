@@ -83,7 +83,7 @@ class LLMClient:
             # Local servers need no key, but the SDK requires one.
             api_key=api_key or "unused",
             timeout=settings.timeout_seconds,
-            max_retries=0,  # retried here, with logging and accounting per attempt
+            max_retries=0,  # retried here, with a log line per retry
         )
         # OpenRouter reports the cost of a call only when asked; other APIs reject the field.
         is_openrouter = urlsplit(str(settings.base_url)).hostname == "openrouter.ai"

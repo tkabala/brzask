@@ -10,14 +10,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
-from urllib.parse import urlsplit
 
 import feedparser
 import httpx2
 
-from brzask.clients.http import USER_AGENT, ResponseTooLargeError, read_limited
+from brzask.clients.http import REQUEST_ERRORS, USER_AGENT, read_limited
 from brzask.log import get_logger
 from brzask.text import from_struct_time, strip_html
+from brzask.urls import is_http_url
 
 log = get_logger(__name__)
 
@@ -120,7 +120,7 @@ class FeedFetcher:
                 content_type = response.headers.get("Content-Type", "")
                 etag = response.headers.get("ETag")
                 last_modified = response.headers.get("Last-Modified")
-        except (httpx2.HTTPError, ResponseTooLargeError) as error:
+        except REQUEST_ERRORS as error:
             return self._failed(request.url, f"{type(error).__name__}: {error}", log_failure)
 
         # The final URL resolves relative links; the content type helps detect the encoding.
@@ -157,7 +157,7 @@ def parse_entries(entries: Sequence[Mapping[str, Any]], now: datetime) -> list[F
         entry = dict(raw)
         link = str(entry.get("link") or "").strip()
         title = strip_html(entry.get("title"))
-        if not title or link in seen or urlsplit(link).scheme not in {"http", "https"}:
+        if not title or link in seen or not is_http_url(link):
             continue
         seen.add(link)
         parsed.append(

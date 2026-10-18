@@ -31,3 +31,9 @@ def test_exactly_the_minimum_is_usable() -> None:
 )
 def test_block_pages_are_not_usable(page: str) -> None:
     assert unusable_reason(page + " " + "padding " * 40) == "blocked"
+
+
+def test_long_articles_mentioning_block_phrases_stay_usable() -> None:
+    article = "How CAPTCHA solvers work and why access denied errors confuse users. " * 40
+
+    assert unusable_reason(article) is None

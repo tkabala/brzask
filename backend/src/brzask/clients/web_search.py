@@ -5,13 +5,14 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol, Self
+from urllib.parse import urlsplit
 
 import httpx2
 import openai
 from openai.types.chat import ChatCompletion
 
 from brzask import prompts
-from brzask.clients.http import new_client
+from brzask.clients.http import REQUEST_ERRORS, new_client
 from brzask.clients.retry import APIError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import Settings
@@ -30,6 +31,9 @@ _URL = re.compile(r"https?://[^\s<>()\[\]\"'`]+")
 _TRAILING = ".,;:!?*_)]>'\""
 # Perplexity ends sentences with footnote markers such as "[1]".
 _FOOTNOTE = re.compile(r"\[\d+\]")
+# List markers before a title ("1. ", "- ", "**", "## "); digits that start the
+# title itself ("37signals", "2025 in review") stay.
+_LIST_MARKER = re.compile(r"^(?:\s|[-*#]+|\d+[.)](?=\s))+")
 # `:online` citations carry the whole page text; a search result needs a line.
 SNIPPET_CHARS = 300
 # Separators models put between title, URL and description: hyphen, en dash, em dash.
@@ -115,10 +119,12 @@ class LLMOnlineSearch:
         client: openai.OpenAI,
         model: str,
         *,
+        report_cost: bool = False,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.client = client
         self.model = model
+        self.report_cost = report_cost
         self._sleep = sleep
 
     @classmethod
@@ -130,7 +136,9 @@ class LLMOnlineSearch:
             timeout=LLM_TIMEOUT_SECONDS,
             max_retries=0,
         )
-        return cls(client, settings.web_search.web_search_model)
+        # OpenRouter reports the cost of a call only when asked; other APIs reject the field.
+        is_openrouter = urlsplit(str(llm.base_url)).hostname == "openrouter.ai"
+        return cls(client, settings.web_search.web_search_model, report_cost=is_openrouter)
 
     def search(
         self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
@@ -142,7 +150,7 @@ class LLMOnlineSearch:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                extra_body={"usage": {"include": True}},
+                extra_body={"usage": {"include": True}} if self.report_cost else None,
             )
             return response, round((time.perf_counter() - started) * 1000)
 
@@ -175,7 +183,7 @@ def llm_results(response: dict[str, Any]) -> list[SearchResult]:
         match = _URL.search(line)
         if match:
             url = match.group(0).rstrip(_TRAILING)
-            title = re.sub(r"^[\s\-*\d.)#]+", "", line[: match.start()]).replace("*", "")
+            title = _LIST_MARKER.sub("", line[: match.start()]).replace("*", "")
             title = title.strip(_SEPARATORS + "[]()").strip()  # also `[Title](url)`
             snippet = line[match.end() :].lstrip(_SEPARATORS + ")]").strip()
             found.append((url, title, snippet))
@@ -241,7 +249,7 @@ def _get_json(client: httpx2.Client, url: str, **kwargs: Any) -> dict[str, Any]:
         response = client.get(url, timeout=TIMEOUT, **kwargs)
         response.raise_for_status()
         data = response.json()
-    except (httpx2.HTTPError, ValueError) as error:
+    except (*REQUEST_ERRORS, ValueError) as error:
         raise WebSearchError(f"{type(error).__name__}: {error}") from error
     if not isinstance(data, dict):
         raise WebSearchError("unexpected response")

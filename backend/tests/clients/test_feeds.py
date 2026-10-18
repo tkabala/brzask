@@ -11,6 +11,7 @@ from brzask.clients.feeds import (
     FeedRequest,
     FeedResult,
     FetchStatus,
+    parse_entries,
 )
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "feeds"
@@ -84,6 +85,16 @@ def test_rss_keeps_only_usable_entries() -> None:
         "https://blog.example.com/posts/dc-date",
         "https://feeds.test/posts/relative",
     ]
+
+
+def test_malformed_links_are_skipped() -> None:
+    entries = [
+        {"link": "http://[oops/post", "title": "Malformed"},
+        {"link": "https:///no-host", "title": "No host"},
+        {"link": "https://blog.example.com/ok", "title": "Fine"},
+    ]
+
+    assert [entry.title for entry in parse_entries(entries, NOW)] == ["Fine"]
 
 
 def test_broken_and_implausible_dates_are_unknown() -> None:
@@ -169,6 +180,13 @@ def test_download_failures_are_reported(route: httpx2.Response | Exception, erro
     assert result.error is not None
     assert result.error.startswith(error)
     assert result.entries == []
+
+
+def test_a_url_httpx_refuses_is_a_failure() -> None:
+    result = FakeServer().fetcher().fetch(FeedRequest("https://feeds.test/a\x00b"))
+
+    assert result.status is FetchStatus.FAILED
+    assert (result.error or "").startswith("InvalidURL")
 
 
 def test_oversized_responses_are_refused() -> None:

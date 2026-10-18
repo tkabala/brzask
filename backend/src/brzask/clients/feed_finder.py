@@ -9,12 +9,10 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-import httpx2
-
 from brzask.clients.feeds import FeedFetcher, FeedRequest, FetchStatus
-from brzask.clients.http import ResponseTooLargeError, read_limited
+from brzask.clients.http import REQUEST_ERRORS, read_limited
 from brzask.log import get_logger
-from brzask.urls import host_matches, host_of
+from brzask.urls import host_matches, host_of, is_http_url
 
 log = get_logger(__name__)
 
@@ -70,7 +68,8 @@ class FeedFinder:
         host = host_of(page)
         if not host:
             return None
-        if host_matches(host, "github.com"):
+        # Only github.com itself has repositories; gist., docs. and other subdomains are sites.
+        if host == "github.com":
             return self._github(page)
         if host_matches(host, "youtube.com") or host == "youtu.be":
             return self._youtube(page)
@@ -117,7 +116,7 @@ class FeedFinder:
                 return body.decode(response.encoding or "utf-8", errors="replace"), str(
                     response.url
                 )
-        except (httpx2.HTTPError, ResponseTooLargeError) as error:
+        except REQUEST_ERRORS as error:
             log.info("page not available", url=url, error=str(error))
             return None, url
 
@@ -180,8 +179,14 @@ def alternate_feeds(html: str, page_url: str) -> list[str]:
     """Feeds a page announces with `<link rel="alternate">`, comment feeds last."""
     parser = _AlternateLinks()
     parser.feed(html)
-    links = [(urljoin(page_url, href), title) for href, title in parser.links]
-    links = [(href, title) for href, title in links if urlsplit(href).scheme in {"http", "https"}]
+    links: list[tuple[str, str]] = []
+    for href, title in parser.links:
+        try:
+            absolute = urljoin(page_url, href)
+        except ValueError:  # a malformed href, e.g. `http://[oops`
+            continue
+        if is_http_url(absolute):
+            links.append((absolute, title))
 
     def is_comments(link: tuple[str, str]) -> bool:
         href, title = link

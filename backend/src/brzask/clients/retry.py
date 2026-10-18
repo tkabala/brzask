@@ -1,5 +1,6 @@
 """Retrying calls to OpenAI-compatible APIs."""
 
+import math
 import random
 from collections.abc import Callable
 
@@ -66,9 +67,11 @@ def _delay(attempt: int, error: Exception) -> float:
     if isinstance(error, openai.APIStatusError):
         retry_after = error.response.headers.get("retry-after")
         try:
-            if retry_after is not None:
-                return min(float(retry_after), MAX_DELAY_SECONDS)
+            seconds = float(retry_after) if retry_after is not None else None
         except ValueError:
-            pass  # an HTTP date; fall back to backoff
+            seconds = None  # an HTTP date; fall back to backoff
+        # A negative or non-finite value would make `sleep` raise.
+        if seconds is not None and math.isfinite(seconds) and seconds >= 0:
+            return min(seconds, MAX_DELAY_SECONDS)
     delay: float = min(BASE_DELAY_SECONDS * 2 ** (attempt - 1), MAX_DELAY_SECONDS)
     return delay * random.uniform(0.8, 1.2)  # noqa: S311  (jitter, not security)

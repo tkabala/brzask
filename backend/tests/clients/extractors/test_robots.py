@@ -1,6 +1,6 @@
 import httpx2
 
-from brzask.clients.extractors.robots import CACHE_SECONDS, RobotsPolicy
+from brzask.clients.extractors.robots import CACHE_SECONDS, FAILURE_CACHE_SECONDS, RobotsPolicy
 
 ROBOTS = """
 User-agent: *
@@ -45,6 +45,19 @@ def test_missing_robots_allows_everything() -> None:
 def test_server_errors_and_unreachable_sites_disallow() -> None:
     assert not Site(httpx2.Response(503)).policy().allowed("https://site.test/any")
     assert not Site(httpx2.ConnectError("refused")).policy().allowed("https://site.test/any")
+
+
+def test_a_failed_fetch_is_retried_within_the_hour() -> None:
+    site = Site(httpx2.ConnectError("timeout"))
+    policy = site.policy()
+
+    assert not policy.allowed("https://site.test/a")
+    site.response = httpx2.Response(200, text=ROBOTS)
+    assert not policy.allowed("https://site.test/a")  # still cached
+
+    site.now = FAILURE_CACHE_SECONDS + 1
+    assert policy.allowed("https://site.test/a")
+    assert len(site.fetches) == 2
 
 
 def test_robots_is_fetched_once_per_site_and_refreshed_daily() -> None:

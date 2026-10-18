@@ -106,7 +106,7 @@ class Embedder:
             # Local servers need no key, but the SDK requires one.
             api_key=secret.get_secret_value() if secret else "unused",
             timeout=REQUEST_TIMEOUT_SECONDS,
-            max_retries=0,  # retried here, with logging and accounting per attempt
+            max_retries=0,  # retried here, with a log line per retry
         )
         return cls(
             client, embedding.model, openrouter=urlsplit(base_url).hostname == "openrouter.ai"

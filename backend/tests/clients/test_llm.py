@@ -210,6 +210,15 @@ def test_retry_after_is_respected_and_capped() -> None:
     assert 6.4 <= fake.sleeps[2] <= 9.6  # an HTTP date falls back to backoff
 
 
+@pytest.mark.parametrize("value", ["-5", "nan", "inf"])
+def test_an_unusable_retry_after_falls_back_to_backoff(value: str) -> None:
+    fake = Fake(error(429, {"retry-after": value}), answer("ok"))
+
+    fake.llm.complete("p", purpose="test")
+
+    assert 1.6 <= fake.sleeps[0] <= 2.4
+
+
 @pytest.mark.parametrize("status", [400, 401, 404, 422])
 def test_client_errors_are_not_retried(status: int) -> None:
     fake = Fake(error(status))
