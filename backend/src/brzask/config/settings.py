@@ -409,6 +409,25 @@ class LoggingSettings(SettingsGroup):
         return data
 
 
+class TelemetrySettings(SettingsGroup):
+    """Traces, metrics and error reports; all off unless configured."""
+
+    otlp_endpoint: Annotated[HttpUrl | None, BeforeValidator(_empty_to_none)] = Field(
+        None,
+        validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
+        description="OTLP/HTTP collector URL; traces and metrics are sent only when set.",
+    )
+    service_name: str = Field(
+        "brzask", validation_alias="OTEL_SERVICE_NAME", description="Service name in traces."
+    )
+    sentry_dsn: OptionalSecret = Field(
+        None, description="Sentry DSN; errors are reported only when set."
+    )
+    sentry_environment: str = Field(
+        "production", description="Environment name attached to Sentry reports."
+    )
+
+
 GROUPS: tuple[type[SettingsGroup], ...] = (
     DatabaseSettings,
     LLMSettings,
@@ -420,6 +439,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     DigestSettings,
     BudgetSettings,
     LoggingSettings,
+    TelemetrySettings,
 )
 
 
@@ -468,6 +488,10 @@ class Settings:
     @cached_property
     def logging(self) -> LoggingSettings:
         return LoggingSettings()
+
+    @cached_property
+    def telemetry(self) -> TelemetrySettings:
+        return TelemetrySettings()
 
 
 @lru_cache(maxsize=1)

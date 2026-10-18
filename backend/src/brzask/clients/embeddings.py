@@ -21,6 +21,7 @@ from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import Settings
 from brzask.db.models import EMBEDDING_DIMENSIONS
 from brzask.log import get_logger
+from brzask.telemetry import api_call_span
 
 log = get_logger(__name__)
 
@@ -140,9 +141,11 @@ class Embedder:
             response = self._create(texts, kind)
             return _vectors(response, len(texts)), _usage(response, self.model, purpose, started)
 
-        raw, usage = call_with_retries(
-            attempt, purpose=purpose, error=EmbeddingError, sleep=self._sleep
-        )
+        with api_call_span("embeddings", self.model, purpose) as span:
+            raw, usage = call_with_retries(
+                attempt, purpose=purpose, error=EmbeddingError, sleep=self._sleep
+            )
+            span.record(usage)
         if meter is not None:
             meter.add(usage)
         log.info(

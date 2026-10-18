@@ -15,6 +15,7 @@ from brzask.clients.retry import APIError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import Settings
 from brzask.log import get_logger
+from brzask.telemetry import api_call_span
 from brzask.text import strip_html
 
 log = get_logger(__name__)
@@ -150,11 +151,14 @@ class LLMOnlineSearch:
             )
             return response, round((time.perf_counter() - started) * 1000)
 
-        response, duration_ms = call_with_retries(
-            attempt, purpose="web_search", error=WebSearchError, sleep=self._sleep
-        )
+        with api_call_span("chat", self.model, "web_search") as span:
+            response, duration_ms = call_with_retries(
+                attempt, purpose="web_search", error=WebSearchError, sleep=self._sleep
+            )
+            usage = _usage(response, self.model, duration_ms)
+            span.record(usage)
         if meter is not None:
-            meter.add(_usage(response, self.model, duration_ms))
+            meter.add(usage)
         results = llm_results(response.model_dump())
         log.info("web search", provider=self.name, model=self.model, results=len(results))
         return results[:limit]

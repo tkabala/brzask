@@ -22,6 +22,7 @@ from brzask.log import configure_logging
 from brzask.services import pause as pausing
 from brzask.services.runs import run_pipeline
 from brzask.services.status import get_status
+from brzask.telemetry import setup_telemetry
 
 app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
 app.add_typer(sources.app, name="sources")
@@ -47,8 +48,9 @@ def main(
     ] = None,
 ) -> None:
     """Self-hosted daily news digest."""
-    log_settings = get_settings().logging
-    configure_logging(log_settings.level, log_settings.format)
+    settings = get_settings()
+    configure_logging(settings.logging.level, settings.logging.format)
+    setup_telemetry(settings.telemetry, component="cli")
 
 
 @app.command()

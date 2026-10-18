@@ -15,6 +15,7 @@ from brzask.clients.retry import APIError, EmptyResponseError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import LLMSettings
 from brzask.log import get_logger
+from brzask.telemetry import api_call_span
 
 log = get_logger(__name__)
 
@@ -108,9 +109,11 @@ class LLMClient:
             response = self._create(messages, json_mode=json_mode)
             return _content(response), _usage(response, self.model, purpose, started)
 
-        content, usage = call_with_retries(
-            attempt, purpose=purpose, error=LLMError, sleep=self._sleep
-        )
+        with api_call_span("chat", self.model, purpose) as span:
+            content, usage = call_with_retries(
+                attempt, purpose=purpose, error=LLMError, sleep=self._sleep
+            )
+            span.record(usage)
         if meter is not None:
             meter.add(usage)
         log.info(

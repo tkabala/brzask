@@ -6,7 +6,8 @@ Repositories take a `Session` and never commit; the caller owns the unit of work
         SourceRepository(session).add(...)
 """
 
-from sqlalchemy import Engine, create_engine
+import sqlalchemy
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.config import get_settings
@@ -14,7 +15,9 @@ from brzask.config import get_settings
 
 def create_db_engine(url: str | None = None) -> Engine:
     """Engine for the configured database; `pool_pre_ping` survives database restarts."""
-    return create_engine(url or get_settings().database.url, pool_pre_ping=True)
+    # Looked up at call time: OpenTelemetry's SQLAlchemy instrumentation traces
+    # queries by replacing `sqlalchemy.create_engine` once telemetry is set up.
+    return sqlalchemy.create_engine(url or get_settings().database.url, pool_pre_ping=True)
 
 
 def session_factory(engine: Engine) -> sessionmaker[Session]:
