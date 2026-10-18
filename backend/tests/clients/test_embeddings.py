@@ -98,11 +98,9 @@ def test_prefixes_per_model(model: str, query: str, document: str) -> None:
     assert adapter.texts(["q"], "document") == [document]
 
 
-def test_gemini_gets_a_task_type_and_no_prefix() -> None:
-    adapter = adapter_for("google/gemini-embedding-001")
-
-    assert adapter.texts(["q"], "query") == ["q"]
-    assert adapter.request_fields["query"] != adapter.request_fields["document"]
+def test_gemini_is_sent_without_a_task_type() -> None:
+    # Stored vectors and the duplicate thresholds come from untyped Gemini vectors.
+    assert adapter_for("google/gemini-embedding-001") is PLAIN
 
 
 def test_unknown_models_are_sent_unchanged() -> None:
@@ -121,7 +119,7 @@ def test_requests_carry_prefix_dimensions_and_kind() -> None:
     assert nomic["encoding_format"] == "float"
     assert "input_type" not in nomic
     assert gemini["input"] == ["An article"]
-    assert gemini["input_type"] == "search_document"
+    assert "input_type" not in gemini
 
 
 def test_openrouter_requires_the_parameters_and_reports_cost() -> None:

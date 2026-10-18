@@ -3,7 +3,7 @@
 Every vector has `EMBEDDING_DIMENSIONS` components and unit length. Retrieval
 models embed a search query differently from the documents it should find, so
 each call says which kind of text it embeds; a per-model adapter turns that
-into whatever the model expects (a task type, or a prefix on every text).
+into whatever the model expects (a prefix on every text, or nothing).
 """
 
 import math
@@ -41,7 +41,6 @@ class ModelAdapter:
     """How one model family is told whether it embeds a query or a document."""
 
     prefixes: dict[EmbeddingKind, str] = field(default_factory=dict)
-    request_fields: dict[EmbeddingKind, dict[str, Any]] = field(default_factory=dict)
 
     def texts(self, texts: Sequence[str], kind: EmbeddingKind) -> list[str]:
         prefix = self.prefixes.get(kind, "")
@@ -51,16 +50,14 @@ class ModelAdapter:
 PLAIN = ModelAdapter()
 
 # Model name fragments, checked in order against the lower-cased model name.
+#
+# gemini-embedding-001 is deliberately sent without a task type. Measured on
+# OpenRouter: the document task type moves a vector to cosine 0.89 from the
+# untyped one for the same text (0.92-0.95 on stored articles), below the 0.96
+# cross-day duplicate threshold, which was measured on untyped vectors; the
+# query task type gives exactly the untyped vector. Typed vectors would need
+# their own thresholds, validated with `brzask replay`.
 ADAPTERS: tuple[tuple[str, ModelAdapter], ...] = (
-    (
-        "gemini-embedding",
-        ModelAdapter(
-            request_fields={
-                "query": {"input_type": "search_query"},
-                "document": {"input_type": "search_document"},
-            }
-        ),
-    ),
     (
         "nomic-embed",
         ModelAdapter(prefixes={"query": "search_query: ", "document": "search_document: "}),
@@ -160,7 +157,7 @@ class Embedder:
         return [l2_normalise(vector) for vector in raw]
 
     def _create(self, texts: list[str], kind: EmbeddingKind) -> CreateEmbeddingResponse:
-        extra_body: dict[str, Any] = dict(self.adapter.request_fields.get(kind, {}))
+        extra_body: dict[str, Any] = {}
         if self.openrouter:
             # Without require_parameters OpenRouter may route to a provider that
             # ignores `dimensions`; asking for the cost is OpenRouter-only too.
