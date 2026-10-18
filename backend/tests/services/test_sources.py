@@ -34,11 +34,24 @@ def test_default_name_is_the_host() -> None:
     assert default_name("https://blog.example.com/rss") == "blog.example.com"
 
 
+def test_release_feeds_are_named_after_the_project() -> None:
+    assert (
+        default_name("https://github.com/astral-sh/uv/releases.atom") == "github.com/astral-sh/uv"
+    )
+
+
+def test_two_release_feeds_from_one_host_can_be_added(session: Session) -> None:
+    add_source(session, "https://github.com/astral-sh/uv/releases.atom", actor="user")
+    second = add_source(session, "https://github.com/astral-sh/ruff/releases.atom", actor="user")
+
+    assert second.name == "github.com/astral-sh/ruff"
+
+
 def test_add_source_records_the_change(session: Session) -> None:
     source = add_source(session, "https://github.com/a/b/releases.atom", actor="user")
 
     assert (source.name, source.status, source.origin, source.kind) == (
-        "github.com",
+        "github.com/a/b",
         SourceStatus.ACTIVE,
         SourceOrigin.MANUAL,
         SourceKind.RELEASE,

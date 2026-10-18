@@ -40,9 +40,9 @@ class SourceRepository:
         return self.session.scalars(query).all()
 
     def get_by_name(self, name: str) -> Source | None:
-        """Names are compared ignoring case, as people type them."""
-        query = select(Source).where(func.lower(Source.name) == name.lower())
-        return self.session.scalars(query).first()
+        """Names are compared ignoring case, as people type them (and unique that way)."""
+        query = select(Source).where(func.lower(Source.name) == func.lower(name))
+        return self.session.scalars(query).one_or_none()
 
     def count_by_status(self) -> dict[SourceStatus, int]:
         query = select(Source.status, func.count()).group_by(Source.status)

@@ -17,9 +17,17 @@ def is_release_feed(url: str) -> bool:
 
 
 def default_name(url: str) -> str:
-    """A readable name from the feed URL: its host without `www.`."""
-    host = urlsplit(url).hostname or url
-    return host.removeprefix("www.")
+    """A readable name from the feed URL: its host without `www.`.
+
+    Release feeds keep the project path (`github.com/<owner>/<repo>`), since
+    many of them share one host.
+    """
+    parts = urlsplit(url)
+    host = (parts.hostname or url).removeprefix("www.")
+    if is_release_feed(url):
+        project = parts.path.rstrip("/").removesuffix("/releases.atom")
+        return f"{host}{project}"
+    return host
 
 
 def find_source(session: Session, ref: str) -> Source:

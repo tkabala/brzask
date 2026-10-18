@@ -56,7 +56,7 @@ class Source(TimestampMixin, Base):
     __tablename__ = "sources"
 
     id: Mapped[int] = _id()
-    name: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str] = mapped_column(comment="Unique ignoring case, as people type names.")
     url: Mapped[str] = mapped_column(unique=True, comment="Feed URL.")
     site_url: Mapped[str | None] = mapped_column(comment="Home page, used to match opened links.")
     kind: Mapped[SourceKind] = mapped_column(
@@ -73,7 +73,10 @@ class Source(TimestampMixin, Base):
 
     articles: Mapped[list["Article"]] = relationship(back_populates="source")
 
-    __table_args__ = (Index(None, "status"),)
+    __table_args__ = (
+        Index(None, "status"),
+        Index("uq_sources_lower_name", func.lower(name), unique=True),
+    )
 
 
 # --- Interests -------------------------------------------------------------------

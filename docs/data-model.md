@@ -62,6 +62,8 @@ columns set together.
 instead of being dropped as noise. `origin` (`manual`, `discovery`, `visited`,
 `opml`) and `origin_detail` record where a source came from, so it is possible
 to measure which ways of finding sources produce feeds you keep reading.
+Source names are unique ignoring case, so a name typed in any case finds
+exactly one source.
 
 ### Why statistics join on `source_id`
 

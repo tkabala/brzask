@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from brzask.db.models import ArticleState, SourceKind, SourceOrigin, SourceStatus
@@ -59,6 +61,13 @@ def test_get_by_name_ignores_case(session: Session, make: Factories) -> None:
 
     assert sources.get_by_name("hacker news") is source
     assert sources.get_by_name("Lobsters") is None
+
+
+def test_names_are_unique_ignoring_case(session: Session, make: Factories) -> None:
+    make.source("Hacker News")
+
+    with pytest.raises(IntegrityError, match="uq_sources_lower_name"):
+        make.source("hacker news")
 
 
 def test_count_by_status(session: Session, make: Factories) -> None:
