@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 import feedparser
 import httpx2
 
-from brzask import PROJECT_URL, __version__
+from brzask.clients.http import USER_AGENT, ResponseTooLargeError, read_limited
 from brzask.log import get_logger
 from brzask.text import from_struct_time, strip_html
 
@@ -28,7 +28,6 @@ TIMEOUT = httpx2.Timeout(30.0, connect=10.0)
 # Large feeds are a few MB; anything bigger is not a feed worth reading.
 MAX_BYTES = 10 * 1024 * 1024
 
-USER_AGENT = f"brzask/{__version__} (+{PROJECT_URL})"
 ACCEPT = (
     "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.1"
 )
@@ -66,10 +65,6 @@ class FeedResult:
     etag: str | None = None
     last_modified: str | None = None
     error: str | None = None
-
-
-class FeedTooLargeError(Exception):
-    pass
 
 
 class FeedFetcher:
@@ -120,12 +115,12 @@ class FeedFetcher:
                         last_modified=request.last_modified,
                     )
                 response.raise_for_status()
-                body = _read_limited(response)
+                body = read_limited(response, MAX_BYTES)
                 final_url = str(response.url)
                 content_type = response.headers.get("Content-Type", "")
                 etag = response.headers.get("ETag")
                 last_modified = response.headers.get("Last-Modified")
-        except (httpx2.HTTPError, FeedTooLargeError) as error:
+        except (httpx2.HTTPError, ResponseTooLargeError) as error:
             return self._failed(request.url, f"{type(error).__name__}: {error}")
 
         # The final URL resolves relative links; the content type helps detect the encoding.
@@ -189,14 +184,3 @@ def _published(entry: Mapping[str, Any], now: datetime) -> datetime | None:
         if moment is not None:
             return moment
     return None
-
-
-def _read_limited(response: httpx2.Response) -> bytes:
-    chunks: list[bytes] = []
-    size = 0
-    for chunk in response.iter_bytes():
-        size += len(chunk)
-        if size > MAX_BYTES:
-            raise FeedTooLargeError(f"larger than {MAX_BYTES // (1024 * 1024)} MB")
-        chunks.append(chunk)
-    return b"".join(chunks)

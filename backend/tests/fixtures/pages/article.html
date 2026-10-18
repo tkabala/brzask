@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Why we moved our queue to Postgres | Example Engineering</title>
+  <meta name="author" content="Ada Example">
+  <meta property="article:published_time" content="2026-10-16T09:00:00Z">
+  <meta property="og:title" content="Why we moved our queue to Postgres">
+</head>
+<body>
+  <header><nav><a href="/">Home</a> <a href="/blog">Blog</a> <a href="/jobs">Jobs</a></nav></header>
+  <main>
+    <article>
+      <h1>Why we moved our queue to Postgres</h1>
+      <p>For three years our background jobs ran on a dedicated message broker. It worked, but every
+      incident review ended with the same question: why does a system with one database need a second
+      stateful service just to remember which jobs are left?</p>
+      <h2>What we tried</h2>
+      <p>We replaced the broker with a jobs table and <code>SELECT ... FOR UPDATE SKIP LOCKED</code>.
+      Workers claim a batch, process it and delete the rows in the same transaction, so a crash simply
+      releases the lock and another worker picks the job up.</p>
+      <ul>
+        <li>One fewer service to deploy, monitor and back up.</li>
+        <li>Jobs are enqueued in the same transaction as the data they refer to.</li>
+      </ul>
+      <p>Throughput stayed well above what we need, and the on-call rotation got noticeably quieter.</p>
+    </article>
+  </main>
+  <footer><p>&copy; 2026 Example Engineering. All rights reserved.</p><a href="/privacy">Privacy</a></footer>
+</body>
+</html>

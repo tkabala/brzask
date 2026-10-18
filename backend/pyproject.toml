@@ -9,12 +9,14 @@ dependencies = [
     "feedparser>=6.0.11",
     "httpx2>=2.14",
     "openai>=3.35",
+    "opentelemetry-api>=1.30",
     "pgvector>=0.4",
     "psycopg[binary]>=3.2",
     "pydantic>=2.9",
     "pydantic-settings>=2.11",
     "sqlalchemy>=2.0.40",
     "structlog>=25.4",
+    "trafilatura>=2.0",
     "typer>=0.15",
 ]
 
@@ -27,6 +29,7 @@ brzask = "brzask.cli:app"
 [dependency-groups]
 dev = [
     "mypy>=1.15",
+    "opentelemetry-sdk>=1.30",
     "pytest>=8.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.11",
