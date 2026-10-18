@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
+from brzask.clients.usage import CallUsage
 from brzask.db.models import RunKind, RunStatus
 from brzask.repositories import RunRepository
 from brzask.services.errors import ServiceError
@@ -90,3 +91,22 @@ def test_unknown_pipeline(sessions: sessionmaker[Session], session: Session) -> 
         run_pipeline(sessions, RunKind.DISCOVERY, pipelines={})
 
     assert RunRepository(session).recent(5) == []
+
+
+def test_usage_of_paid_calls_is_added_to_the_stats(sessions: sessionmaker[Session]) -> None:
+    def call_llm(context: RunContext) -> None:
+        context.stats["selected"] = 7
+        context.usage.add(CallUsage("m", "ranking", 1000, 200, 0.003, 4000))
+
+    run = run_pipeline(sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: call_llm})
+
+    assert run.stats["selected"] == 7
+    assert run.stats["usage"]["calls"] == 1
+    assert run.stats["usage"]["cost_usd"] == 0.003
+    assert run.stats["usage"]["by_purpose"]["ranking"]["input_tokens"] == 1000
+
+
+def test_runs_without_paid_calls_have_no_usage(sessions: sessionmaker[Session]) -> None:
+    run = run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed})
+
+    assert "usage" not in run.stats

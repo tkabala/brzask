@@ -203,6 +203,11 @@ class LLMSettings(SettingsGroup):
         "deepseek/deepseek-v4-flash", description="Model used for ranking and selection."
     )
     api_key: OptionalSecret = Field(None, description="API key; leave empty for local servers.")
+    timeout_seconds: float = Field(
+        300,
+        gt=0,
+        description="How long one request may take; ranking prompts are long.",
+    )
 
 
 class EmbeddingSettings(SettingsGroup):

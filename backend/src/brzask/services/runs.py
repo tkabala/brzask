@@ -1,8 +1,9 @@
 """Running a pipeline and recording the run.
 
 Every run gets a row in `runs` before the pipeline starts, so a long or stuck
-run is visible, and the row is completed with the outcome, stats and stage
-timings. The run ID is the same as the `run_id` on every log line of the run.
+run is visible, and the row is completed with the outcome, stats (including
+tokens and cost of LLM and embedding calls) and stage timings. The run ID is
+the same as the `run_id` on every log line of the run.
 """
 
 import time
@@ -15,6 +16,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from brzask.clients.usage import UsageMeter
 from brzask.db.models import Run, RunKind, RunStatus
 from brzask.log import logged_run
 from brzask.repositories import RunRepository
@@ -41,6 +43,7 @@ class RunContext:
     force: bool = False  # run even when paused or already done today
     stats: dict[str, Any] = field(default_factory=dict)
     timings: dict[str, int] = field(default_factory=dict)
+    usage: UsageMeter = field(default_factory=UsageMeter)  # pass to LLM and embedding calls
 
     @contextmanager
     def stage(self, name: str) -> Iterator[None]:
@@ -111,8 +114,15 @@ def _finish(context: RunContext, status: RunStatus, error: str | None = None) ->
             run,
             status,
             datetime.now(UTC),
-            stats=context.stats,
+            stats=_with_usage(context),
             timings=dict(context.timings),
             error=error,
         )
     return run
+
+
+def _with_usage(context: RunContext) -> dict[str, Any]:
+    """The pipeline's stats, plus token and cost totals when it called paid APIs."""
+    if not context.usage.calls:
+        return context.stats
+    return {**context.stats, "usage": context.usage.summary()}

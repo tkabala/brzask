@@ -1,0 +1,215 @@
+"""Chat completions over any OpenAI-compatible API (OpenRouter, Ollama, OpenAI, ...)."""
+
+import json
+import random
+import re
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Self
+from urllib.parse import urlsplit
+
+import openai
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
+
+from brzask.clients.usage import CallUsage, UsageMeter
+from brzask.config.settings import LLMSettings
+from brzask.log import get_logger
+
+log = get_logger(__name__)
+
+# One call plus three retries; with the delays below a call gives up after about
+# 14 s of waiting, which covers short provider hiccups without stalling a run.
+ATTEMPTS = 4
+BASE_DELAY_SECONDS = 2.0
+MAX_DELAY_SECONDS = 30.0
+
+# Errors worth another attempt: the request may succeed unchanged.
+_RETRYABLE = (openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError)
+
+_FENCE = re.compile(r"^```[a-zA-Z]*\s*\n?(.*?)\n?```", re.DOTALL)
+
+
+class LLMError(Exception):
+    """The API failed or kept failing; the message says why."""
+
+
+class InvalidJSONError(LLMError):
+    """The model answered, but not with JSON. `content` keeps the answer for the logs."""
+
+    def __init__(self, content: str) -> None:
+        super().__init__(f"model did not return JSON: {content[:200]!r}")
+        self.content = content
+
+
+@dataclass(frozen=True, slots=True)
+class Completion:
+    content: str
+    usage: CallUsage
+
+
+def parse_json(content: str) -> Any:
+    """The first JSON value in a model answer.
+
+    Models wrap JSON in code fences or add a sentence before or after it, even
+    in JSON mode; both are tolerated. Raises `InvalidJSONError` otherwise.
+    """
+    text = content.strip()
+    fenced = _FENCE.search(text)
+    if fenced:
+        text = fenced.group(1).strip()
+    decoder = json.JSONDecoder()
+    for start, char in enumerate(text):
+        if char in "{[":
+            try:
+                value, _ = decoder.raw_decode(text, start)
+            except json.JSONDecodeError:
+                continue
+            return value
+    raise InvalidJSONError(content)
+
+
+class LLMClient:
+    def __init__(
+        self,
+        client: openai.OpenAI,
+        model: str,
+        *,
+        report_cost: bool = False,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.client = client
+        self.model = model
+        self.report_cost = report_cost
+        self._sleep = sleep
+
+    @classmethod
+    def from_settings(cls, settings: LLMSettings) -> Self:
+        api_key = settings.api_key.get_secret_value() if settings.api_key else None
+        client = openai.OpenAI(
+            base_url=str(settings.base_url),
+            # Local servers need no key, but the SDK requires one.
+            api_key=api_key or "unused",
+            timeout=settings.timeout_seconds,
+            max_retries=0,  # retried here, with logging and accounting per attempt
+        )
+        # OpenRouter reports the cost of a call only when asked; other APIs reject the field.
+        is_openrouter = urlsplit(str(settings.base_url)).hostname == "openrouter.ai"
+        return cls(client, settings.model, report_cost=is_openrouter)
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        purpose: str,
+        system: str | None = None,
+        json_mode: bool = False,
+        meter: UsageMeter | None = None,
+    ) -> Completion:
+        """Send one prompt and return the answer; retries temporary failures."""
+        messages: list[ChatCompletionMessageParam] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        for attempt in range(1, ATTEMPTS + 1):
+            started = time.perf_counter()
+            try:
+                response = self._create(messages, json_mode=json_mode)
+                content = _content(response)
+            except (*_RETRYABLE, _EmptyResponseError) as error:
+                if attempt == ATTEMPTS:
+                    raise LLMError(
+                        f"{purpose}: gave up after {ATTEMPTS} attempts: {error}"
+                    ) from error
+                delay = _delay(attempt, error)
+                log.warning(
+                    "llm call failed, retrying",
+                    purpose=purpose,
+                    attempt=attempt,
+                    delay_s=round(delay, 1),
+                    error=str(error),
+                )
+                self._sleep(delay)
+                continue
+            except openai.APIError as error:
+                raise LLMError(f"{purpose}: {error}") from error
+
+            usage = _usage(response, self.model, purpose, started)
+            if meter is not None:
+                meter.add(usage)
+            log.info(
+                "llm call",
+                purpose=purpose,
+                model=usage.model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cost_usd=usage.cost_usd,
+                duration_ms=usage.duration_ms,
+            )
+            return Completion(content, usage)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def complete_json(
+        self,
+        prompt: str,
+        *,
+        purpose: str,
+        system: str | None = None,
+        meter: UsageMeter | None = None,
+    ) -> tuple[Any, Completion]:
+        """Like `complete` in JSON mode, returning the parsed value and the raw completion."""
+        completion = self.complete(
+            prompt, purpose=purpose, system=system, json_mode=True, meter=meter
+        )
+        return parse_json(completion.content), completion
+
+    def _create(
+        self, messages: list[ChatCompletionMessageParam], *, json_mode: bool
+    ) -> ChatCompletion:
+        return self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format={"type": "json_object"} if json_mode else openai.omit,
+            extra_body={"usage": {"include": True}} if self.report_cost else None,
+        )
+
+
+class _EmptyResponseError(Exception):
+    """A 200 response without an answer; providers send these when an upstream model fails."""
+
+
+def _content(response: ChatCompletion) -> str:
+    # `choices` is required by the schema, but some providers send an error object instead.
+    choices = response.choices or []
+    content = choices[0].message.content if choices else None
+    if not content or not content.strip():
+        error = (response.model_extra or {}).get("error")
+        raise _EmptyResponseError(f"empty answer{f': {error}' if error else ''}")
+    return content
+
+
+def _usage(response: ChatCompletion, model: str, purpose: str, started: float) -> CallUsage:
+    usage = response.usage
+    cost = (usage.model_extra or {}).get("cost") if usage else None
+    return CallUsage(
+        model=response.model or model,
+        purpose=purpose,
+        input_tokens=usage.prompt_tokens if usage else 0,
+        output_tokens=usage.completion_tokens if usage else 0,
+        cost_usd=float(cost) if isinstance(cost, int | float) else None,
+        duration_ms=round((time.perf_counter() - started) * 1000),
+    )
+
+
+def _delay(attempt: int, error: Exception) -> float:
+    """The server's Retry-After when given (capped), else exponential backoff with jitter."""
+    if isinstance(error, openai.APIStatusError):
+        retry_after = error.response.headers.get("retry-after")
+        try:
+            if retry_after is not None:
+                return min(float(retry_after), MAX_DELAY_SECONDS)
+        except ValueError:
+            pass  # an HTTP date; fall back to backoff
+    delay: float = min(BASE_DELAY_SECONDS * 2 ** (attempt - 1), MAX_DELAY_SECONDS)
+    return delay * random.uniform(0.8, 1.2)  # noqa: S311  (jitter, not security)
