@@ -84,7 +84,7 @@ def add_source(
     sources = SourceRepository(session)
     ensure_unknown(session, url)
     release = is_release_feed(url)
-    name = (name or (None if release else title) or default_name(url)).strip()
+    name = ((name or "").strip() or (None if release else title) or default_name(url)).strip()
     if sources.get_by_name(name) is not None:
         raise ConflictError(f"a source named {name!r} already exists; choose another name")
     source = sources.add(

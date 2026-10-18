@@ -206,3 +206,10 @@ def test_non_http_scopes_pass_through() -> None:
     asyncio.run(RequestContextMiddleware(app)({"type": "lifespan"}, receive, send))
 
     assert seen == ["lifespan"]
+
+
+def test_http_client_request_lines_are_quiet(output: io.StringIO) -> None:
+    logging.getLogger("httpx2").info("HTTP Request: GET https://example.com 200")
+    logging.getLogger("httpcore2.http11").info("receive_response_headers")
+
+    assert lines(output) == []

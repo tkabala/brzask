@@ -153,3 +153,11 @@ def test_release_feeds_ignore_the_generic_feed_title(session: Session) -> None:
     )
 
     assert source.name == "github.com/astral-sh/uv"
+
+
+def test_a_blank_name_falls_back_to_the_feed_title(session: Session) -> None:
+    source = add_source(
+        session, "https://blank.example/feed", actor="user", name="   ", title="Blank Blog"
+    )
+
+    assert source.name == "Blank Blog"

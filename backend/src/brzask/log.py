@@ -22,7 +22,7 @@ from structlog.typing import Processor
 LogFormat = Literal["auto", "json", "console"]
 
 # Libraries that log every request at INFO; their warnings still come through.
-_QUIET_LOGGERS = ("httpx", "httpcore", "apscheduler.executors.default")
+_QUIET_LOGGERS = ("httpx2", "httpcore2", "apscheduler.executors.default")
 
 
 def configure_logging(
