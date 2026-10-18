@@ -75,7 +75,7 @@ def run_pipeline(
         raise ServiceError(f"the {kind.value} pipeline is not available")
 
     run_id = uuid.uuid4()
-    with logged_run(kind.value, run_id.hex):
+    with logged_run(kind.value, str(run_id)):
         context = RunContext(
             run_id=run_id,
             kind=kind,
@@ -93,6 +93,10 @@ def run_pipeline(
             return _finish(context, RunStatus.SKIPPED)
         except Exception as error:
             _finish(context, RunStatus.FAILED, error=f"{type(error).__name__}: {error}")
+            raise
+        except BaseException as error:
+            # Ctrl-C or a worker shutdown: close the row so it does not stay 'running'.
+            _finish(context, RunStatus.FAILED, error=f"interrupted ({type(error).__name__})")
             raise
         return _finish(context, RunStatus.OK)
 

@@ -72,7 +72,7 @@ def run(
         finished = run_pipeline(common.get_sessions(), pipeline, dry_run=dry_run, force=force)
     reason = finished.stats.get("reason")
     suffix = f": {reason}" if finished.status is RunStatus.SKIPPED and reason else ""
-    typer.echo(f"{pipeline.value} {finished.status.value}{suffix} (run {finished.id.hex})")
+    typer.echo(f"{pipeline.value} {finished.status.value}{suffix} (run {finished.id})")
 
 
 @app.command()

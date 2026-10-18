@@ -55,6 +55,20 @@ def test_failed_run_is_recorded_and_raised(
     )
 
 
+def test_interrupted_run_is_closed_and_raised(
+    sessions: sessionmaker[Session], session: Session
+) -> None:
+    def interrupt(context: RunContext) -> None:
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_pipeline(sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: interrupt})
+
+    [run] = RunRepository(session).recent(5)
+    assert (run.status, run.error) == (RunStatus.FAILED, "interrupted (KeyboardInterrupt)")
+    assert run.finished_at is not None
+
+
 def test_a_run_is_visible_while_in_progress(
     sessions: sessionmaker[Session], session: Session
 ) -> None:
