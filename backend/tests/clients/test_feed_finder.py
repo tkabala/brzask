@@ -191,6 +191,28 @@ def test_common_paths_under_the_page_directory_first() -> None:
     assert found.url == "https://site.example/blog/index.xml"
 
 
+COMMENTS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>Komentarze do: Post</title>
+<item><title>By Ann</title><link>https://site.example/blog/post/#comment-2</link></item>
+<item><title>By Bob</title><link>https://site.example/blog/post/#comment-1</link></item>
+</channel></rss>"""
+
+
+def test_a_feed_of_comments_on_one_post_is_not_the_sites_feed() -> None:
+    web = Web(
+        {
+            "https://site.example/blog/post/": page("<html>no links</html>"),
+            "https://site.example/blog/post/feed": feed(COMMENTS),
+            "https://site.example/feed": feed(ATOM),
+        }
+    )
+
+    found = web.finder().find("https://site.example/blog/post/")
+
+    assert found is not None
+    assert found.url == "https://site.example/feed"
+    assert found.entries
+
+
 def test_redirects_are_followed_before_looking_for_feeds() -> None:
     web = Web(
         {

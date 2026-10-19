@@ -5,11 +5,12 @@ working feed, never a guess.
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-from brzask.clients.feeds import FeedFetcher, FeedRequest, FetchStatus
+from brzask.clients.feeds import FeedEntry, FeedFetcher, FeedRequest, FetchStatus
 from brzask.clients.http import REQUEST_ERRORS, read_limited
 from brzask.log import get_logger
 from brzask.urls import host_matches, host_of, is_http_url
@@ -52,6 +53,7 @@ class FoundFeed:
     url: str
     title: str | None
     site_url: str
+    entries: tuple[FeedEntry, ...] = ()  # as parsed when the feed was checked
 
 
 class FeedFinder:
@@ -102,9 +104,9 @@ class FeedFinder:
     def _feed(self, url: str, site_url: str) -> FoundFeed | None:
         # Most candidates are expected to fail; that is not worth a warning.
         result = self.fetcher.fetch(FeedRequest(url), log_failure=False)
-        if result.status is not FetchStatus.OK:
+        if result.status is not FetchStatus.OK or is_comment_feed(result.entries):
             return None
-        return FoundFeed(url, result.title, site_url)
+        return FoundFeed(url, result.title, site_url, tuple(result.entries))
 
     def _download(self, url: str, headers: dict[str, str] | None = None) -> tuple[str | None, str]:
         try:
@@ -205,6 +207,15 @@ def common_feed_urls(page_url: str) -> list[str]:
         for base in bases
         for path in COMMON_PATHS
     ]
+
+
+def is_comment_feed(entries: Sequence[FeedEntry]) -> bool:
+    """A feed of comments on one post, such as WordPress's `<post>/feed/`.
+
+    Its entries link to the comments (`.../#comment-123`); the feed's title
+    gives it away too, but in the site's language.
+    """
+    return bool(entries) and all("#comment" in entry.link for entry in entries)
 
 
 def youtube_channel_id(html: str) -> str | None:
