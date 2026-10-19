@@ -191,6 +191,12 @@ def test_unsafe_request_id_is_replaced(output: io.StringIO) -> None:
     assert len(response_request_id(sent)) == 32
 
 
+def test_request_id_with_a_trailing_newline_is_replaced(output: io.StringIO) -> None:
+    sent = call(RequestContextMiddleware(logging_app), headers=[(b"x-request-id", b"abc\n")])
+
+    assert len(response_request_id(sent)) == 32
+
+
 def test_non_http_scopes_pass_through() -> None:
     seen: list[str] = []
 

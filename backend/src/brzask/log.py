@@ -116,7 +116,7 @@ ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 REQUEST_ID_HEADER = b"x-request-id"
 # Incoming IDs end up in every log line, so only plain tokens are accepted.
-_VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_VALID_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 
 
 class RequestContextMiddleware:
@@ -150,5 +150,5 @@ def _incoming_request_id(scope: Scope) -> str | None:
     for name, value in scope.get("headers", []):
         if name.lower() == REQUEST_ID_HEADER:
             candidate = value.decode("latin-1")
-            return candidate if _VALID_REQUEST_ID.match(candidate) else None
+            return candidate if _VALID_REQUEST_ID.fullmatch(candidate) else None
     return None
