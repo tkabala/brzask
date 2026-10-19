@@ -10,7 +10,7 @@ permissions:
 # Both checks run the commit-msg hook from .pre-commit-config.yaml, so the
 # allowed types and the checker version live in one place.
 env:
-  PREK: uvx --from "prek>=0.5,<0.6" prek # keep in sync with mise.toml
+  PREK_VERSION: prek>=0.5,<0.6 # keep in sync with mise.toml
 
 jobs:
   pr-title:
@@ -24,7 +24,7 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
           printf '%s\n' "$TITLE" > "$RUNNER_TEMP/msg"
-          $PREK run conventional-pre-commit --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/msg"
+          uvx --from "$PREK_VERSION" prek run conventional-pre-commit --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/msg"
 
   commits:
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
           status=0
           for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
             git log -1 --format=%B "$sha" > "$RUNNER_TEMP/msg"
-            if ! $PREK run conventional-pre-commit --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/msg"; then
+            if ! uvx --from "$PREK_VERSION" prek run conventional-pre-commit --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/msg"; then
               echo "::error::Commit $sha does not follow Conventional Commits"
               status=1
             fi
