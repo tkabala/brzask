@@ -102,23 +102,26 @@ class SourceRepository:
         source.last_modified = last_modified
         self.session.flush()
 
+    def reset_fetch_health(self, source: Source) -> None:
+        """Forget past fetch failures; the next fetch starts a new record."""
+        source.failing_since = None
+        source.permanent_failing_since = None
+        source.fetch_failures = 0
+        source.fetch_error = None
+        self.session.flush()
+
     def record_fetch(
         self, source: Source, at: datetime, *, error: str | None = None, temporary: bool = False
     ) -> None:
         """Update fetch health: a success (no `error`) clears the run of failures."""
         if error is None:
             source.fetched_at = at
-            source.failing_since = None
-            source.permanent_failing_since = None
-            source.fetch_failures = 0
-            source.fetch_error = None
-        else:
-            source.failing_since = source.failing_since or at
-            source.permanent_failing_since = (
-                None if temporary else source.permanent_failing_since or at
-            )
-            source.fetch_failures += 1
-            source.fetch_error = error
+            self.reset_fetch_health(source)
+            return
+        source.failing_since = source.failing_since or at
+        source.permanent_failing_since = None if temporary else source.permanent_failing_since or at
+        source.fetch_failures += 1
+        source.fetch_error = error
         self.session.flush()
 
     def stats(self, since: datetime) -> dict[int, SourceStats]:

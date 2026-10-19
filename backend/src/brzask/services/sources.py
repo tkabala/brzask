@@ -117,25 +117,46 @@ def add_source(
 
 def mute_source(session: Session, ref: str, *, actor: str, reason: str | None = None) -> bool:
     """Stop fetching a source. False when it was already muted."""
-    return _set_status(session, ref, SourceStatus.MUTED, actor=actor, reason=reason)
+    return change_status(
+        session, find_source(session, ref), SourceStatus.MUTED, actor=actor, reason=reason
+    )
 
 
 def enable_source(session: Session, ref: str, *, actor: str) -> bool:
-    """Fetch a source again, whatever its status. False when it was already active."""
-    return _set_status(session, ref, SourceStatus.ACTIVE, actor=actor, reason=None)
+    """Fetch a source again, whatever its status. False when it was already active.
+
+    Its fetch failures are forgotten, so a revived dead source gets the full
+    grace period again before the review can mark it dead.
+    """
+    return change_status(session, find_source(session, ref), SourceStatus.ACTIVE, actor=actor)
 
 
-def _set_status(
-    session: Session, ref: str, status: SourceStatus, *, actor: str, reason: str | None
+_STATUS_ACTIONS = {
+    SourceStatus.MUTED: "source.mute",
+    SourceStatus.ACTIVE: "source.enable",
+    SourceStatus.DEAD: "source.dead",
+}
+
+
+def change_status(
+    session: Session,
+    source: Source,
+    status: SourceStatus,
+    *,
+    actor: str,
+    reason: str | None = None,
 ) -> bool:
-    source = find_source(session, ref)
+    """Set a source's status and record the change. False when it already had that status."""
     before = source.status
     if before is status:
         return False
-    SourceRepository(session).set_status(source, status, reason)
+    sources = SourceRepository(session)
+    sources.set_status(source, status, reason)
+    if status is SourceStatus.ACTIVE:
+        sources.reset_fetch_health(source)
     ChangeRepository(session).record(
         actor=actor,
-        action="source.mute" if status is SourceStatus.MUTED else "source.enable",
+        action=_STATUS_ACTIONS.get(status, f"source.{status.value}"),
         entity_type="source",
         entity_id=str(source.id),
         status=ChangeStatus.APPLIED,

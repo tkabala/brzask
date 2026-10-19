@@ -2,9 +2,11 @@
 
 from brzask.db.models import RunKind
 from brzask.services.digest.pipeline import run_digest
+from brzask.services.review import review_sources
 from brzask.services.runs import Pipeline
 
 # Filled in as pipelines are added.
 PIPELINES: dict[RunKind, Pipeline] = {
     RunKind.DIGEST: run_digest,
+    RunKind.REVIEW: review_sources,
 }
