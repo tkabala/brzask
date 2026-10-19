@@ -7,29 +7,24 @@ on:
 permissions:
   contents: read
 
+# Both checks run the commit-msg hook from .pre-commit-config.yaml, so the
+# allowed types and the checker version live in one place.
+env:
+  PREK: uvx --from "prek>=0.5,<0.6" prek # keep in sync with mise.toml
+
 jobs:
   pr-title:
     # The PR title becomes the commit message when a PR is squash-merged.
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
     steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Check the PR title
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            chore
-            docs
-            test
-            refactor
-            ci
-            build
-            perf
-            style
-            revert
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$TITLE" > "$RUNNER_TEMP/msg"
+          $PREK run conventional-pre-commit --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/msg"
 
   commits:
     runs-on: ubuntu-latest
@@ -46,9 +41,7 @@ jobs:
           status=0
           for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
             git log -1 --format=%B "$sha" > "$RUNNER_TEMP/msg"
-            if ! uvx conventional-pre-commit@4.4.0 --strict \
-                feat fix chore docs test refactor ci build perf style revert \
-                "$RUNNER_TEMP/msg"; then
+            if ! $PREK run conventional-pre-commit --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/msg"; then
               echo "::error::Commit $sha does not follow Conventional Commits"
               status=1
             fi
