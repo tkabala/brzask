@@ -6,7 +6,7 @@ default:
 
 # Install dependencies and git hooks
 setup:
-    cd backend && uv sync
+    cd backend && uv sync --locked
     cd frontend && pnpm install --frozen-lockfile
     prek install --install-hooks
 
@@ -38,11 +38,11 @@ migrate:
 
 # Generate a migration from model changes, e.g. just migration "add source health"
 migration message: migrate
-    cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run alembic revision --autogenerate -m "{{message}}"
+    cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run alembic revision --autogenerate -m {{quote(message)}}
 
 # Regenerate .env.example from the settings
 env-example:
-    cd backend && uv run python -m brzask.config.env_example > ../.env.example
+    cd backend && uv run python -m brzask.config.env_example > ../.env.example.tmp && mv ../.env.example.tmp ../.env.example
 
 # Run all tests
 test:
