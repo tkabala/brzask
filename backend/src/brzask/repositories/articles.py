@@ -12,8 +12,8 @@ from sqlalchemy.orm.util import identity_key
 
 from brzask.db.models import Article, ArticleState, Source
 
-# Rows per INSERT in `add_new`: five bind parameters each, far below the 65,535
-# parameters Postgres accepts in one statement.
+# Rows per INSERT in `add_new`: six bind parameters each (five fields and the state
+# default), far below the 65,535 parameters Postgres accepts in one statement.
 _INSERT_BATCH = 1000
 
 
