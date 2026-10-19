@@ -76,6 +76,7 @@ class Candidate:
     published_at: datetime | None  # None when the feed gave no plausible date
     content: str | None = None  # full text from the feed; carried-over articles have none
     article_id: int | None = None  # set once stored; fresh entries have none in a dry run
+    rank: int | None = None  # position in the ranking, set for the top candidates
 
 
 @dataclass(frozen=True, slots=True)
