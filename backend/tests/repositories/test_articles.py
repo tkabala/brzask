@@ -72,6 +72,10 @@ def test_shown_links_within_the_window(session: Session, make: Factories) -> Non
     links = ArticleRepository(session).shown_links(since=NOW - timedelta(days=60))
 
     assert links == {"https://a.example/recent"}
+    assert ArticleRepository(session).shown_links() == {
+        "https://a.example/recent",
+        "https://a.example/old",
+    }
 
 
 def test_carry_over_is_unshown_articles_seen_since(session: Session, make: Factories) -> None:

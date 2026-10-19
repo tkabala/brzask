@@ -1,6 +1,5 @@
-import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -8,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.llm import Completion, InvalidJSONError
 from brzask.clients.usage import CallUsage, UsageMeter
-from brzask.db.models import Article, RunKind
+from brzask.db.models import Article
 from brzask.repositories.articles import OpenedArticle
 from brzask.services.digest.pool import Candidate
 from brzask.services.digest.ranking import (
@@ -21,10 +20,8 @@ from brzask.services.digest.ranking import (
     ranking_prompt,
     select_top,
 )
-from brzask.services.runs import RunContext
 from tests.factories import Factories
-
-NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
+from tests.services.digest.fakes import NOW, context
 
 
 def candidate(n: int, source_id: int | None = None, **fields: Any) -> Candidate:
@@ -181,16 +178,6 @@ class FakeModel:
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer, Completion("{}", usage)
-
-
-def context(sessions: sessionmaker[Session], *, dry_run: bool = False) -> RunContext:
-    return RunContext(
-        run_id=uuid.uuid4(),
-        kind=RunKind.DIGEST,
-        started_at=NOW,
-        sessions=sessions,
-        dry_run=dry_run,
-    )
 
 
 def stored_pool(make: Factories, size: int) -> list[Candidate]:

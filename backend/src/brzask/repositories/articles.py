@@ -108,10 +108,11 @@ class ArticleRepository:
             ids.update(dict(self.session.execute(query).all()))
         return ids
 
-    def shown_links(self, since: datetime) -> set[str]:
-        query = select(Article.link).where(
-            Article.state == ArticleState.SHOWN, Article.shown_at >= since
-        )
+    def shown_links(self, since: datetime | None = None) -> set[str]:
+        """Links of articles shown at or after `since`, or ever."""
+        query = select(Article.link).where(Article.state == ArticleState.SHOWN)
+        if since is not None:
+            query = query.where(Article.shown_at >= since)
         return set(self.session.scalars(query))
 
     def carry_over(self, since: datetime) -> Sequence[Article]:

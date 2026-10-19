@@ -10,7 +10,7 @@ from brzask.cli import app, common
 from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import RunKind, RunStatus, SourceStatus
 from brzask.repositories import RunRepository
-from brzask.services import runs
+from brzask.services import pipelines
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
 from tests.factories import Factories
@@ -247,7 +247,7 @@ def test_run_passes_options_and_reports_the_outcome(
         received.append((context.dry_run, context.force))
         raise SkipRunError("today's digest already exists")
 
-    monkeypatch.setitem(runs.PIPELINES, RunKind.DIGEST, pipeline)
+    monkeypatch.setitem(pipelines.PIPELINES, RunKind.DIGEST, pipeline)
 
     result = cli("run", "digest", "--dry-run", "--force")
 

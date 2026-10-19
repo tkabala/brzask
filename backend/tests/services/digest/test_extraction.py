@@ -1,63 +1,16 @@
 import threading
-import uuid
-from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.clients.embeddings import EmbeddingError, EmbeddingKind
+from brzask.clients.embeddings import EmbeddingError
 from brzask.clients.extractors import SNIPPET, ExtractionInput, ExtractionResult
-from brzask.clients.usage import UsageMeter
-from brzask.db.models import Article, RunKind
+from brzask.db.models import Article
 from brzask.services.digest.extraction import STORED_CHARS, TEXT_CHARS, extract_and_embed
 from brzask.services.digest.pool import Candidate
-from brzask.services.runs import RunContext
-from tests.factories import TEST_MODEL, Factories, unit_vector
-
-NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
-
-
-class FakeExtractor:
-    """Returns `texts[url]` as extracted by trafilatura, else falls back to the snippet."""
-
-    def __init__(self, texts: dict[str, str]) -> None:
-        self.texts = texts
-        self.inputs: list[ExtractionInput] = []
-        self.threads: set[int] = set()
-        self._lock = threading.Lock()
-
-    def extract(self, item: ExtractionInput) -> ExtractionResult:
-        with self._lock:
-            self.inputs.append(item)
-            self.threads.add(threading.get_ident())
-        if item.url in self.texts:
-            return ExtractionResult(self.texts[item.url], "trafilatura")
-        if item.snippet:
-            return ExtractionResult(item.snippet, SNIPPET)
-        return ExtractionResult(None, None)
-
-
-class FakeEmbedder:
-    model = TEST_MODEL
-
-    def __init__(self, error: Exception | None = None) -> None:
-        self.calls: list[tuple[list[str], EmbeddingKind]] = []
-        self.error = error
-
-    def embed(
-        self,
-        texts: Sequence[str],
-        kind: EmbeddingKind,
-        *,
-        purpose: str = "embedding",
-        meter: UsageMeter | None = None,
-    ) -> list[list[float]]:
-        self.calls.append((list(texts), kind))
-        if self.error is not None:
-            raise self.error
-        return [unit_vector(1, len(text)) for text in texts]
+from tests.factories import TEST_MODEL, Factories
+from tests.services.digest.fakes import NOW, FakeEmbedder, FakeExtractor, context
 
 
 def candidate(link: str, **fields: Any) -> Candidate:
@@ -69,16 +22,6 @@ def candidate(link: str, **fields: Any) -> Candidate:
         source_name="Source",
         release=False,
         **(defaults | fields),
-    )
-
-
-def context(sessions: sessionmaker[Session], *, dry_run: bool = False) -> RunContext:
-    return RunContext(
-        run_id=uuid.uuid4(),
-        kind=RunKind.DIGEST,
-        started_at=NOW,
-        sessions=sessions,
-        dry_run=dry_run,
     )
 
 
@@ -111,7 +54,7 @@ def test_texts_are_cut_embedded_as_documents_and_stored(
     assert second.text == "A short teaser"
     assert (third.text, third.embedding) == (None, None)
     assert embedder.calls == [([first.text, "A short teaser"], "document")]
-    assert first.embedding == pytest.approx(unit_vector(1, len(first.text or "")))
+    assert first.embedding == embedder.vectors[first.text or ""]
     assert [c.rank for c in result] == [1, 1, 1]
 
     session.expire_all()

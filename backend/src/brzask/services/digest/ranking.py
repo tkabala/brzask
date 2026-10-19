@@ -11,6 +11,8 @@ from dataclasses import replace
 from datetime import timedelta
 from typing import Any, Protocol
 
+from sqlalchemy.orm import Session
+
 from brzask import prompts
 from brzask.clients.llm import Completion, InvalidJSONError
 from brzask.clients.usage import UsageMeter
@@ -140,10 +142,7 @@ def rank_candidates(
         return []
     since = context.started_at - OPENS_WINDOW
     with context.sessions.begin() as session:
-        interests = [
-            {"topic": interest.topic, "keywords": interest.keywords, "notes": interest.notes}
-            for interest in InterestRepository(session).find(active_only=True)
-        ]
+        interests = interest_context(session)
         opens = ArticleRepository(session).recent_opens(since, OPENS_LIMIT)
 
     prompt = ranking_prompt(candidates, interests, opens)
@@ -174,6 +173,14 @@ def rank_candidates(
     }
     log.info("candidates ranked", **context.stats["ranking"])
     return top
+
+
+def interest_context(session: Session) -> list[dict[str, Any]]:
+    """Active interests as prompts take them."""
+    return [
+        {"topic": interest.topic, "keywords": interest.keywords, "notes": interest.notes}
+        for interest in InterestRepository(session).find(active_only=True)
+    ]
 
 
 def _tally(names: Iterable[str | None]) -> list[dict[str, Any]]:

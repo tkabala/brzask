@@ -32,7 +32,9 @@ fetched ──► seen ──► ranked (rank set) ──► shown (in a digest)
   candidates get one, so `rank IS NOT NULL` means "made the top of the ranking".
 - **`state = shown`**: picked for a digest. `digest_date` and
   `digest_position` say where it appeared; a constraint keeps both set or both
-  empty, and only shown articles can have them.
+  empty, and only shown articles can have them. A row records one appearance,
+  so a link is shown at most once: a shown link that turns up in a feed again
+  is never a candidate.
 - **`opened_at`**: the first time you opened the article. Opening is the only
   preference signal brzask uses, so this column drives learning, source review
   and measurement.

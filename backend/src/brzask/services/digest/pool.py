@@ -1,7 +1,7 @@
 """The candidate pool: what the day's ranking chooses from.
 
 Fresh entries from every active feed, plus articles seen in the last days that
-no digest has shown yet, without stale entries and links shown recently. The
+no digest has shown yet, without stale entries and links already shown. The
 pool is capped, taking sources in turns so one chatty feed cannot fill it.
 """
 
@@ -27,8 +27,6 @@ log = get_logger(__name__)
 MAX_AGE = timedelta(days=10)
 # An article seen but not shown stays a candidate for a week.
 CARRY_OVER = timedelta(days=7)
-# A link shown in a digest is not offered again within this window.
-SHOWN_WINDOW = timedelta(days=60)
 # Candidates in the ranking prompt; a week of carry-over alone can pass 300.
 POOL_CAP = 200
 # Characters of entry text kept as the snippet the ranking prompt shows.
@@ -88,7 +86,9 @@ class PoolCounts:
     fresh: int = 0  # entries from today's fetch
     carried_over: int = 0
     stale: int = 0  # published more than MAX_AGE ago
-    already_shown: int = 0  # shown within SHOWN_WINDOW
+    # In an earlier digest. An article row records one digest appearance, so a
+    # link is shown at most once, however long ago that was.
+    already_shown: int = 0
     source_inactive: int = 0  # carried over from a source no longer fetched
     unique: int = 0  # candidates after the filters, before the cap
 
@@ -146,7 +146,7 @@ def filter_candidates(
     shown_links: set[str],
     now: datetime,
 ) -> tuple[list[Candidate], PoolCounts]:
-    """Drop stale entries and links shown recently; one candidate per link.
+    """Drop stale entries and links already shown; one candidate per link.
 
     A fresh entry wins over the carried-over copy of the same link, since only
     the fresh one has the feed's full content. An entry without a date is
@@ -217,7 +217,7 @@ def gather_candidates(context: RunContext, fetcher: FeedReader) -> list[Candidat
             for source in SourceRepository(session).find(SourceStatus.ACTIVE)
         }
         articles = ArticleRepository(session)
-        shown_links = articles.shown_links(now - SHOWN_WINDOW)
+        shown_links = articles.shown_links()
         carried, source_inactive = carried_candidates(
             articles.carry_over(now - CARRY_OVER), sources
         )

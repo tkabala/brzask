@@ -57,9 +57,6 @@ class RunContext:
 
 Pipeline = Callable[[RunContext], None]
 
-# Filled in as pipelines are added.
-PIPELINES: dict[RunKind, Pipeline] = {}
-
 
 def run_pipeline(
     sessions: sessionmaker[Session],
@@ -71,9 +68,15 @@ def run_pipeline(
 ) -> Run:
     """Run one pipeline and return its finished run row.
 
-    A pipeline error is recorded on the run and raised again.
+    `pipelines` defaults to `brzask.services.pipelines.PIPELINES`. A pipeline
+    error is recorded on the run and raised again.
     """
-    pipeline = (PIPELINES if pipelines is None else pipelines).get(kind)
+    if pipelines is None:
+        # Imported here: the pipelines themselves import this module.
+        from brzask.services.pipelines import PIPELINES
+
+        pipelines = PIPELINES
+    pipeline = pipelines.get(kind)
     if pipeline is None:
         raise ServiceError(f"the {kind.value} pipeline is not available")
 

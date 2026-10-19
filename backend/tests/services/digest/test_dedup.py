@@ -1,12 +1,11 @@
 import math
-import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.db.models import EMBEDDING_DIMENSIONS, RunKind
+from brzask.db.models import EMBEDDING_DIMENSIONS
 from brzask.services.digest.dedup import (
     DEFAULT_MODEL,
     MIN_SURVIVORS,
@@ -19,10 +18,9 @@ from brzask.services.digest.dedup import (
     thresholds_for,
 )
 from brzask.services.digest.pool import Candidate
-from brzask.services.runs import RunContext
 from tests.factories import TEST_MODEL, Factories
+from tests.services.digest.fakes import NOW, context
 
-NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
 GEMINI = THRESHOLDS["gemini-embedding-001"]
 
 
@@ -200,7 +198,7 @@ def test_the_stage_compares_with_recent_articles_of_the_same_model(
         candidate(3, axis(2)),
         *distinct(4, 9),
     ]
-    run = RunContext(run_id=uuid.uuid4(), kind=RunKind.DIGEST, started_at=NOW, sessions=sessions)
+    run = context(sessions)
 
     survivors = deduplicate_candidates(run, candidates, TEST_MODEL)
 

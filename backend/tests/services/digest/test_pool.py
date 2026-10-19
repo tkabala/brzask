@@ -1,12 +1,11 @@
-import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.clients.feeds import FeedEntry, FeedRequest, FeedResult, FetchStatus
-from brzask.db.models import Article, RunKind, SourceKind, SourceStatus
+from brzask.clients.feeds import FeedEntry, FeedResult, FetchStatus
+from brzask.db.models import Article, SourceKind, SourceStatus
 from brzask.services.digest.pool import (
     MAX_AGE,
     SNIPPET_CHARS,
@@ -18,10 +17,9 @@ from brzask.services.digest.pool import (
     gather_candidates,
     take_in_turns,
 )
-from brzask.services.runs import RunContext
 from tests.factories import Factories
+from tests.services.digest.fakes import NOW, FakeFeeds, context, entry
 
-NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
 HOUR = timedelta(hours=1)
 
 
@@ -168,30 +166,6 @@ def test_the_cap_cuts_the_last_round_not_a_source() -> None:
 # --- The stage against the database -------------------------------------------------
 
 
-class FakeFeeds:
-    def __init__(self, results: dict[str, FeedResult]) -> None:
-        self.results = results
-        self.requests: list[FeedRequest] = []
-
-    def fetch_all(self, requests: Sequence[FeedRequest]) -> list[FeedResult]:
-        self.requests.extend(requests)
-        return [self.results[request.url] for request in requests]
-
-
-def entry(link: str, published_at: datetime | None = NOW) -> FeedEntry:
-    return FeedEntry(link, link.rsplit("/", 1)[-1], "Summary", "Content", published_at)
-
-
-def context(sessions: sessionmaker[Session], *, dry_run: bool = False) -> RunContext:
-    return RunContext(
-        run_id=uuid.uuid4(),
-        kind=RunKind.DIGEST,
-        started_at=NOW,
-        sessions=sessions,
-        dry_run=dry_run,
-    )
-
-
 def article_count(session: Session) -> int:
     return session.scalar(select(func.count()).select_from(Article)) or 0
 
@@ -205,7 +179,9 @@ def test_gather_stores_the_pool_and_each_sources_fetch_outcome(
     make.source(url="https://muted.example/feed", status=SourceStatus.MUTED)
     carried = make.article(unchanged, first_seen_at=NOW - timedelta(days=2))
     make.article(unchanged, first_seen_at=NOW - timedelta(days=8))  # past the carry-over
-    shown = make.article(ok, digest_date=(NOW - timedelta(days=3)).date())
+    shown = make.article(  # long ago: a link is shown once, however old
+        ok, first_seen_at=NOW - timedelta(days=90), digest_date=(NOW - timedelta(days=90)).date()
+    )
     feeds = FakeFeeds(
         {
             ok.url: FeedResult(
