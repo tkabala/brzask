@@ -12,15 +12,14 @@ pipeline to finish, so no run is left half done.
 
 import logging
 import signal
+import threading
 from collections.abc import Callable, Sequence
-from contextlib import suppress
 from dataclasses import dataclass
 from types import FrameType
 from zoneinfo import ZoneInfo
 
 from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.schedulers import SchedulerNotRunningError
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -85,10 +84,10 @@ def run_job(kinds: Sequence[RunKind], run: Callable[[RunKind], object]) -> None:
 
 def build_scheduler(
     settings: SchedulerSettings, run: Callable[[RunKind], object]
-) -> BlockingScheduler:
+) -> BackgroundScheduler:
     # One job at a time: runs are long and share the LLM budget; a second job
     # due meanwhile starts when the first finishes.
-    scheduler = BlockingScheduler(
+    scheduler = BackgroundScheduler(
         executors={"default": ThreadPoolExecutor(max_workers=1)},
         job_defaults={
             "coalesce": True,
@@ -120,20 +119,24 @@ def run_worker(settings: SchedulerSettings, sessions: sessionmaker[Session]) -> 
     log.info("worker stopped")
 
 
-def serve(scheduler: BlockingScheduler) -> None:
+def serve(scheduler: BackgroundScheduler) -> None:
     """Run `scheduler` until SIGTERM or SIGINT, then wait for the running job.
 
-    Must be called from the main thread, where Python delivers signals.
+    The scheduler runs in its own thread; this one only waits for a signal and
+    then shuts it down, holding none of the scheduler's locks. Must be called
+    from the main thread, where Python delivers signals.
     """
+    stop_requested = threading.Event()
 
     def stop(signum: int, _frame: FrameType | None) -> None:
         log.info("worker stopping; waiting for a running pipeline", signal=signum)
-        with suppress(SchedulerNotRunningError):  # a second signal while waiting
-            scheduler.shutdown(wait=True)
+        stop_requested.set()
 
     previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
-        scheduler.start()  # blocks until shut down
+        scheduler.start()
+        stop_requested.wait()
+        scheduler.shutdown(wait=True)
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)

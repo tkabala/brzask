@@ -8,7 +8,7 @@ from datetime import time as clock
 from zoneinfo import ZoneInfo
 
 import pytest
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -97,8 +97,9 @@ def test_a_signal_stops_the_worker_after_the_running_job() -> None:
         time.sleep(0.5)
         finished.set()
 
-    scheduler = BlockingScheduler()
-    scheduler.add_job(long_job)  # no trigger: runs at once
+    scheduler = BackgroundScheduler()
+    # Recurring, like the real jobs, and due at once.
+    scheduler.add_job(long_job, "interval", hours=1, next_run_time=datetime.now(UTC))
 
     def send_sigterm() -> None:
         started.wait(5)
