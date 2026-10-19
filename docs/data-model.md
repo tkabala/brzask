@@ -65,6 +65,24 @@ to measure which ways of finding sources produce feeds you keep reading.
 Source names are unique ignoring case, so a name typed in any case finds
 exactly one source.
 
+### Fetch health
+
+Every digest run records how each active source's fetch went:
+
+| Column | Meaning |
+|---|---|
+| `fetched_at` | Last successful fetch, including "not modified" (HTTP 304) |
+| `failing_since` | First failure of the current run of failures; empty while fetches succeed |
+| `permanent_failing_since` | First failure of the current run of permanent errors (404, 410, 403, not a feed); empty when the last error was temporary (429, 5xx, timeout, network error) |
+| `fetch_failures` | Failed fetches in a row |
+| `fetch_error` | Error of the last failed fetch |
+
+A successful fetch clears the failure columns. Temporary errors are told apart
+from permanent ones because rate limits and outages go away by themselves,
+while a feed answering 404 for weeks has moved or ended. `etag` and
+`last_modified` are saved from each successful fetch and sent back on the next
+one, so unchanged feeds answer 304.
+
 ### Why statistics join on `source_id`
 
 Each article points to its source with a foreign key. Per-source statistics

@@ -1,6 +1,6 @@
 """Feeds and their per-source statistics."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -28,6 +28,13 @@ class SourceRepository:
 
     def get(self, source_id: int) -> Source | None:
         return self.session.get(Source, source_id)
+
+    def get_many(self, source_ids: Collection[int]) -> dict[int, Source]:
+        """Sources by ID; IDs that do not exist are left out."""
+        if not source_ids:
+            return {}
+        query = select(Source).where(Source.id.in_(source_ids))
+        return {source.id: source for source in self.session.scalars(query)}
 
     def get_by_url(self, url: str) -> Source | None:
         return self.session.scalars(select(Source).where(Source.url == url)).one_or_none()
@@ -93,6 +100,25 @@ class SourceRepository:
         """Remember the feed's validators, sent back on the next fetch."""
         source.etag = etag
         source.last_modified = last_modified
+        self.session.flush()
+
+    def record_fetch(
+        self, source: Source, at: datetime, *, error: str | None = None, temporary: bool = False
+    ) -> None:
+        """Update fetch health: a success (no `error`) clears the run of failures."""
+        if error is None:
+            source.fetched_at = at
+            source.failing_since = None
+            source.permanent_failing_since = None
+            source.fetch_failures = 0
+            source.fetch_error = None
+        else:
+            source.failing_since = source.failing_since or at
+            source.permanent_failing_since = (
+                None if temporary else source.permanent_failing_since or at
+            )
+            source.fetch_failures += 1
+            source.fetch_error = error
         self.session.flush()
 
     def stats(self, since: datetime) -> dict[int, SourceStats]:

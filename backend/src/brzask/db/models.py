@@ -75,6 +75,25 @@ class Source(TimestampMixin, Base):
         comment="Last-Modified of the last fetch, for conditional GET."
     )
 
+    # Fetch health, updated by every digest run; the source review marks a source
+    # dead from it.
+    fetched_at: Mapped[datetime | None] = mapped_column(
+        comment="Last successful fetch, including 'not modified'."
+    )
+    failing_since: Mapped[datetime | None] = mapped_column(
+        comment="First failed fetch of the current run of failures; null while fetches succeed."
+    )
+    permanent_failing_since: Mapped[datetime | None] = mapped_column(
+        comment="First fetch of the current run of permanent errors (404, 410, 403, not a feed);"
+        " null when the last error was temporary."
+    )
+    fetch_failures: Mapped[int] = mapped_column(
+        default=0, server_default=text("0"), comment="Failed fetches in a row."
+    )
+    fetch_error: Mapped[str | None] = mapped_column(
+        comment="Error of the last failed fetch; null while fetches succeed."
+    )
+
     articles: Mapped[list["Article"]] = relationship(back_populates="source")
 
     __table_args__ = (

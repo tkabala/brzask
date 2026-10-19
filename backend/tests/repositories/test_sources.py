@@ -112,6 +112,64 @@ def test_set_fetch_validators(session: Session, make: Factories) -> None:
     assert (source.etag, source.last_modified) == ('"abc"', "Sat, 17 Oct 2026 06:00:00 GMT")
 
 
+def test_get_many_skips_unknown_ids(session: Session, make: Factories) -> None:
+    first, second = make.source(), make.source()
+
+    found = SourceRepository(session).get_many([first.id, second.id, 999_999])
+
+    assert found == {first.id: first, second.id: second}
+    assert SourceRepository(session).get_many([]) == {}
+
+
+def test_record_fetch_tracks_a_run_of_failures(session: Session, make: Factories) -> None:
+    source = make.source()
+    sources = SourceRepository(session)
+    day = timedelta(days=1)
+
+    sources.record_fetch(source, NOW)
+    sources.record_fetch(source, NOW + day, error="HTTPStatusError: 404")
+    sources.record_fetch(source, NOW + 2 * day, error="HTTPStatusError: 410")
+    session.expire_all()
+
+    assert source.fetched_at == NOW
+    assert source.failing_since == NOW + day
+    assert source.permanent_failing_since == NOW + day
+    assert source.fetch_failures == 2
+    assert source.fetch_error == "HTTPStatusError: 410"
+
+
+def test_a_temporary_error_ends_the_run_of_permanent_ones(
+    session: Session, make: Factories
+) -> None:
+    source = make.source()
+    sources = SourceRepository(session)
+    day = timedelta(days=1)
+
+    sources.record_fetch(source, NOW, error="HTTPStatusError: 404")
+    sources.record_fetch(source, NOW + day, error="HTTPStatusError: 503", temporary=True)
+    session.expire_all()
+    assert (source.failing_since, source.permanent_failing_since) == (NOW, None)
+
+    sources.record_fetch(source, NOW + 2 * day, error="not a feed")
+    session.expire_all()
+    assert (source.failing_since, source.permanent_failing_since) == (NOW, NOW + 2 * day)
+    assert source.fetch_failures == 3
+
+
+def test_a_successful_fetch_clears_the_failures(session: Session, make: Factories) -> None:
+    source = make.source()
+    sources = SourceRepository(session)
+    sources.record_fetch(source, NOW, error="HTTPStatusError: 404")
+
+    sources.record_fetch(source, NOW + timedelta(days=1))
+    session.expire_all()
+
+    assert source.fetched_at == NOW + timedelta(days=1)
+    assert source.failing_since is None
+    assert source.permanent_failing_since is None
+    assert (source.fetch_failures, source.fetch_error) == (0, None)
+
+
 def test_stats_count_by_source_id_within_the_window(session: Session, make: Factories) -> None:
     busy = make.source("Busy")
     renamed = make.source("Old name")

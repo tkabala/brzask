@@ -65,6 +65,9 @@ class FeedResult:
     etag: str | None = None
     last_modified: str | None = None
     error: str | None = None
+    # Whether a failure may go away by itself (429, 5xx, timeouts, network errors),
+    # as opposed to a feed that is gone or broken (404, 410, 403, not a feed).
+    temporary: bool = False
 
 
 class FeedFetcher:
@@ -121,7 +124,12 @@ class FeedFetcher:
                 etag = response.headers.get("ETag")
                 last_modified = response.headers.get("Last-Modified")
         except REQUEST_ERRORS as error:
-            return self._failed(request.url, f"{type(error).__name__}: {error}", log_failure)
+            return self._failed(
+                request.url,
+                f"{type(error).__name__}: {error}",
+                log_failure,
+                temporary=is_temporary(error),
+            )
 
         # The final URL resolves relative links; the content type helps detect the encoding.
         parsed = feedparser.parse(
@@ -140,10 +148,23 @@ class FeedFetcher:
             last_modified=last_modified,
         )
 
-    def _failed(self, url: str, error: str, log_failure: bool) -> FeedResult:
+    def _failed(
+        self, url: str, error: str, log_failure: bool, *, temporary: bool = False
+    ) -> FeedResult:
         if log_failure:
-            log.warning("feed failed", url=url, error=error)
-        return FeedResult(url, FetchStatus.FAILED, error=error)
+            log.warning("feed failed", url=url, error=error, temporary=temporary)
+        return FeedResult(url, FetchStatus.FAILED, error=error, temporary=temporary)
+
+
+def is_temporary(error: Exception) -> bool:
+    """Rate limits, server errors, timeouts and network errors may go away by themselves."""
+    if isinstance(error, httpx2.HTTPStatusError):
+        status = error.response.status_code
+        return status in {408, 429} or status >= 500
+    # A scheme httpx2 cannot speak (a redirect to ftp:) will not start working later.
+    return isinstance(error, httpx2.TransportError) and not isinstance(
+        error, httpx2.UnsupportedProtocol
+    )
 
 
 def parse_entries(entries: Sequence[Mapping[str, Any]], now: datetime) -> list[FeedEntry]:

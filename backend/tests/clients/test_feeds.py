@@ -162,23 +162,32 @@ def test_an_html_page_is_not_a_feed() -> None:
     assert result.status is FetchStatus.FAILED
     assert result.error is not None
     assert result.error.startswith("not a feed")
+    assert not result.temporary
 
 
 @pytest.mark.parametrize(
-    ("route", "error"),
+    ("route", "error", "temporary"),
     [
-        (httpx2.Response(404), "HTTPStatusError"),
-        (httpx2.Response(500), "HTTPStatusError"),
-        (httpx2.ConnectError("refused"), "ConnectError"),
-        (httpx2.ReadTimeout("slow"), "ReadTimeout"),
+        (httpx2.Response(404), "HTTPStatusError", False),
+        (httpx2.Response(410), "HTTPStatusError", False),
+        (httpx2.Response(403), "HTTPStatusError", False),
+        (httpx2.Response(429), "HTTPStatusError", True),
+        (httpx2.Response(500), "HTTPStatusError", True),
+        (httpx2.Response(503), "HTTPStatusError", True),
+        (httpx2.ConnectError("refused"), "ConnectError", True),
+        (httpx2.ReadTimeout("slow"), "ReadTimeout", True),
+        (httpx2.UnsupportedProtocol("ftp"), "UnsupportedProtocol", False),
     ],
 )
-def test_download_failures_are_reported(route: httpx2.Response | Exception, error: str) -> None:
+def test_download_failures_are_reported(
+    route: httpx2.Response | Exception, error: str, temporary: bool
+) -> None:
     result = fetch("broken", FakeServer({"/broken": route}))
 
     assert result.status is FetchStatus.FAILED
     assert result.error is not None
     assert result.error.startswith(error)
+    assert result.temporary is temporary
     assert result.entries == []
 
 
@@ -187,6 +196,7 @@ def test_a_url_httpx_refuses_is_a_failure() -> None:
 
     assert result.status is FetchStatus.FAILED
     assert (result.error or "").startswith("InvalidURL")
+    assert not result.temporary
 
 
 def test_oversized_responses_are_refused() -> None:
@@ -196,6 +206,7 @@ def test_oversized_responses_are_refused() -> None:
 
     assert result.status is FetchStatus.FAILED
     assert "larger than" in (result.error or "")
+    assert not result.temporary
 
 
 # --- Requests ------------------------------------------------------------------
