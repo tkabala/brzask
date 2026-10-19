@@ -23,6 +23,7 @@ from brzask.services import pause as pausing
 from brzask.services.runs import run_pipeline
 from brzask.services.status import get_status
 from brzask.telemetry import setup_telemetry
+from brzask.worker import run_worker
 
 app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
 app.add_typer(sources.app, name="sources")
@@ -37,6 +38,7 @@ def _print_version(value: bool) -> None:
 
 @app.callback()
 def main(
+    context: typer.Context,
     version: Annotated[
         bool | None,
         typer.Option(
@@ -50,13 +52,20 @@ def main(
     """Self-hosted daily news digest."""
     settings = get_settings()
     configure_logging(settings.logging.level, settings.logging.format)
-    setup_telemetry(settings.telemetry, component="cli")
+    component = "worker" if context.invoked_subcommand == "worker" else "cli"
+    setup_telemetry(settings.telemetry, component=component)
 
 
 @app.command()
 def migrate() -> None:
     """Create or upgrade the database schema. Safe to run repeatedly."""
     migrations.migrate()
+
+
+@app.command()
+def worker() -> None:
+    """Run the pipelines on their schedule (DIGEST_AT, REVIEW_AT, ...) until stopped."""
+    run_worker(get_settings().scheduler, common.get_sessions())
 
 
 @app.command()
