@@ -77,6 +77,10 @@ class Candidate:
     content: str | None = None  # full text from the feed; carried-over articles have none
     article_id: int | None = None  # set once stored; fresh entries have none in a dry run
     rank: int | None = None  # position in the ranking, set for the top candidates
+    # Set by extraction, for the top candidates only.
+    text: str | None = None  # article text for embeddings and prompts, cut to length
+    extracted_by: str | None = None
+    embedding: list[float] | None = None
 
 
 @dataclass(frozen=True, slots=True)
