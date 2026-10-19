@@ -92,6 +92,11 @@ SAMPLES: dict[str, dict[str, Any]] = {
         ],
     },
     "web_search": {"query": "blogs about Postgres internals", "limit": 10},
+    "discovery_search": {
+        "topic": "Postgres",
+        "keywords": ["pgvector", "replication"],
+        "conversational": True,
+    },
 }
 
 
@@ -208,3 +213,15 @@ def test_json_examples_are_valid_shapes() -> None:
     keys = re.findall(r'"(\w+)": string', line)
     assert keys == ["link", "title", "summary", "whyItMatters", "topic"]
     assert json.loads('{"ranking": [1, 2]}')  # the ranking answer format parses
+
+
+def test_discovery_search_in_plain_language_or_keywords() -> None:
+    sample = SAMPLES["discovery_search"]
+    request = prompts.render("discovery_search", **sample)
+    keywords = prompts.render("discovery_search", **{**sample, "conversational": False})
+    bare = prompts.render("discovery_search", **{**sample, "keywords": [], "conversational": False})
+
+    assert request.startswith("Currently active, high-quality blogs")
+    assert "staying up to date on Postgres (pgvector, replication), plus" in request
+    assert keywords == "Postgres pgvector replication blog\n"
+    assert bare == "Postgres blog\n"
