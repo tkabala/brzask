@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy.orm import Session
 
+from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import ChangeStatus, SourceKind, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
@@ -11,6 +12,9 @@ from brzask.services.sources import (
     find_source,
     is_release_feed,
     mute_source,
+    name_from_feed,
+    propose_source,
+    unique_name,
 )
 from tests.factories import Factories
 
@@ -187,3 +191,71 @@ def test_numeric_names_are_rejected_since_they_read_as_ids(session: Session) -> 
     titled = add_source(session, "https://digits.example/feed", actor="user", title="2600")
 
     assert titled.name == "digits.example"
+
+
+# --- Sources found by pipelines ---------------------------------------------------------
+
+
+def test_name_from_feed() -> None:
+    assert name_from_feed("https://blog.example/feed", " Blog ") == "Blog"
+    assert name_from_feed("https://blog.example/feed", "2026") == "blog.example"
+    assert name_from_feed("https://blog.example/feed", None) == "blog.example"
+    assert (
+        name_from_feed("https://github.com/a/b/releases.atom", "Release notes") == "github.com/a/b"
+    )
+
+
+def test_unique_name_adds_the_host_then_a_number(session: Session, make: Factories) -> None:
+    url = "https://www.other.example/feed"
+    assert unique_name(session, "Blog", url) == "Blog"
+
+    make.source("blog")
+    assert unique_name(session, "Blog", url) == "Blog (other.example)"
+
+    make.source("Blog (other.example)")
+    assert unique_name(session, "Blog", url) == "Blog (2)"
+
+    make.source("Blog (2)")
+    assert unique_name(session, "Blog", url) == "Blog (3)"
+
+
+def test_propose_source_records_the_change(session: Session, make: Factories) -> None:
+    make.source("Blog")
+    found = FoundFeed("https://blog.other/feed", "Blog", "https://blog.other")
+
+    source = propose_source(
+        session,
+        found,
+        status=SourceStatus.PENDING,
+        origin=SourceOrigin.DISCOVERY,
+        actor="pipeline:discovery",
+        origin_detail="interest:Rust",
+        note="Suggested for Rust",
+    )
+
+    assert source is not None
+    assert (source.name, source.status, source.kind, source.site_url) == (
+        "Blog (blog.other)",
+        SourceStatus.PENDING,
+        SourceKind.FEED,
+        "https://blog.other",
+    )
+    [change] = ChangeRepository(session).find(limit=5, entity_id=str(source.id))
+    assert (change.actor, change.action, change.reason) == (
+        "pipeline:discovery",
+        "source.propose",
+        "Suggested for Rust",
+    )
+
+
+def test_propose_source_skips_a_known_url_whatever_its_status(
+    session: Session, make: Factories
+) -> None:
+    make.source(url="https://blog.other/feed", status=SourceStatus.REJECTED)
+    found = FoundFeed("https://blog.other/feed", "Blog", "https://blog.other")
+
+    source = propose_source(
+        session, found, status=SourceStatus.PENDING, origin=SourceOrigin.VISITED, actor="x"
+    )
+
+    assert source is None

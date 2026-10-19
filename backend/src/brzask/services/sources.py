@@ -31,6 +31,80 @@ def default_name(url: str) -> str:
     return host
 
 
+def name_from_feed(url: str, title: str | None) -> str:
+    """The feed's title, or the name `default_name` gives.
+
+    Release feeds are named after their project, which tells them apart
+    better; a numeric title would read as an ID, so the host names it instead.
+    """
+    feed_title = "" if is_release_feed(url) else (title or "").strip()
+    return (feed_title if as_id(feed_title) is None else "") or default_name(url)
+
+
+def unique_name(session: Session, name: str, url: str) -> str:
+    """`name`, or `name (host)`, or `name (2)`, ...: the first not taken, ignoring case."""
+    sources = SourceRepository(session)
+    host = urlsplit(url).hostname or ""
+    tried = [name, f"{name} ({host.removeprefix('www.')})"] if host else [name]
+    for candidate in tried:
+        if sources.get_by_name(candidate) is None:
+            return candidate
+    number = 2
+    while sources.get_by_name(f"{name} ({number})") is not None:
+        number += 1
+    return f"{name} ({number})"
+
+
+_PROPOSAL_ACTIONS = {
+    SourceStatus.ACTIVE: "source.add",
+    SourceStatus.PENDING: "source.propose",
+    SourceStatus.REJECTED: "source.reject",
+}
+
+
+def propose_source(
+    session: Session,
+    found: FoundFeed,
+    *,
+    status: SourceStatus,
+    origin: SourceOrigin,
+    actor: str,
+    origin_detail: str | None = None,
+    note: str | None = None,
+) -> Source | None:
+    """Add a source found by a pipeline, under a free name; None when its URL is known.
+
+    A known URL counts whatever its status, so a rejected feed is never
+    proposed again.
+    """
+    sources = SourceRepository(session)
+    if sources.get_by_url(found.url) is not None:
+        return None
+    name = unique_name(session, name_from_feed(found.url, found.title), found.url)
+    source = sources.add(
+        name=name,
+        url=found.url,
+        status=status,
+        origin=origin,
+        kind=SourceKind.RELEASE if is_release_feed(found.url) else SourceKind.FEED,
+        site_url=found.site_url,
+        origin_detail=origin_detail,
+        note=note,
+    )
+    if source is None:  # added by another process since the check above
+        return None
+    ChangeRepository(session).record(
+        actor=actor,
+        action=_PROPOSAL_ACTIONS.get(status, f"source.{status.value}"),
+        entity_type="source",
+        entity_id=str(source.id),
+        status=ChangeStatus.APPLIED,
+        after={"name": source.name, "url": source.url, "status": status.value},
+        reason=note,
+    )
+    return source
+
+
 def find_source(session: Session, ref: str) -> Source:
     """A source by ID, feed URL or name (ignoring case)."""
     sources = SourceRepository(session)
@@ -87,9 +161,7 @@ def add_source(
     name = (name or "").strip()
     if as_id(name) is not None:
         raise ServiceError(f"a source name cannot be a number ({name}); it would read as an ID")
-    feed_title = "" if release else (title or "").strip()
-    # A numeric feed title would read as an ID too; the host names the source instead.
-    name = name or (feed_title if as_id(feed_title) is None else "") or default_name(url)
+    name = name or name_from_feed(url, title)
     if sources.get_by_name(name) is not None:
         raise ConflictError(f"a source named {name!r} already exists; choose another name")
     source = sources.add(
