@@ -15,7 +15,6 @@ from functools import cached_property, lru_cache
 from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, get_args
-from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
@@ -34,6 +33,7 @@ from pydantic_settings import (
     SettingsConfigDict,
     SettingsError,
 )
+from sqlalchemy.engine import URL
 
 # --- Helpers -----------------------------------------------------------------
 
@@ -140,7 +140,8 @@ class SecretFilesSource(PydanticBaseSettingsSource):
             path = os.environ.get(f"{variable}_FILE")
             if path is None:
                 continue
-            if variable in os.environ:
+            # An empty variable counts as not set, like `LLM_API_KEY=` in .env.example.
+            if os.environ.get(variable):
                 raise SettingsError(f"set either {variable} or {variable}_FILE, not both")
             try:
                 # Secret files usually end with a newline that is not part of the secret.
@@ -164,7 +165,9 @@ class SettingsGroup(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return init_settings, env_settings, SecretFilesSource(settings_cls)
+        # Secret files come before the environment so a file wins over an empty variable;
+        # a non-empty variable together with its file is rejected by SecretFilesSource.
+        return init_settings, SecretFilesSource(settings_cls), env_settings
 
 
 # --- Groups --------------------------------------------------------------------
@@ -184,10 +187,16 @@ class DatabaseSettings(SettingsGroup):
     @property
     def url(self) -> str:
         """SQLAlchemy URL for the psycopg driver."""
-        credentials = (
-            f"{quote(self.user, safe='')}:{quote(self.password.get_secret_value(), safe='')}"
+        # URL.create escapes the parts and brackets IPv6 hosts.
+        url = URL.create(
+            "postgresql+psycopg",
+            username=self.user,
+            password=self.password.get_secret_value(),
+            host=self.host,
+            port=self.port,
+            database=self.name,
         )
-        return f"postgresql+psycopg://{credentials}@{self.host}:{self.port}/{quote(self.name)}"
+        return url.render_as_string(hide_password=False)
 
 
 class LLMSettings(SettingsGroup):

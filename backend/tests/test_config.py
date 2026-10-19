@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 from datetime import time
 from decimal import Decimal
 from ipaddress import ip_network
@@ -28,17 +27,6 @@ from brzask.config.settings import (
 
 ARGON2_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHQ$aGFzaGhhc2hoYXNoaGFzaA"
 SESSION_SECRET = "s" * 32
-
-
-@pytest.fixture(autouse=True)
-def clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Hide any brzask variables set in the developer's shell."""
-    for group in GROUPS:
-        for name in group.model_fields:
-            variable = env_name(group, name)
-            monkeypatch.delenv(variable, raising=False)
-            monkeypatch.delenv(f"{variable}_FILE", raising=False)
-    yield
 
 
 # --- Sources: defaults, environment, files -------------------------------------
@@ -88,6 +76,20 @@ def test_secret_and_secret_file_together_are_rejected(
         LLMSettings()
 
 
+def test_secret_file_wins_over_an_empty_variable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    secret = tmp_path / "key"
+    secret.write_text("from-file")
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.setenv("LLM_API_KEY_FILE", str(secret))
+
+    api_key = LLMSettings().api_key
+
+    assert api_key is not None
+    assert api_key.get_secret_value() == "from-file"
+
+
 def test_missing_secret_file_is_reported(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("DB_PASSWORD_FILE", str(tmp_path / "missing"))
 
@@ -130,6 +132,13 @@ def test_database_url_escapes_credentials(monkeypatch: pytest.MonkeyPatch) -> No
     url = DatabaseSettings().url
 
     assert url == "postgresql+psycopg://brzask:p%40ss%3Aw%2Frd@db:5432/brzask"
+
+
+def test_database_url_brackets_ipv6_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DB_PASSWORD", "x")
+    monkeypatch.setenv("DB_HOST", "::1")
+
+    assert DatabaseSettings().url == "postgresql+psycopg://brzask:x@[::1]:5432/brzask"
 
 
 def test_database_port_must_be_valid(monkeypatch: pytest.MonkeyPatch) -> None:
