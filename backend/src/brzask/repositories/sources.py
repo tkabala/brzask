@@ -60,9 +60,10 @@ class SourceRepository:
         origin_detail: str | None = None,
         note: str | None = None,
     ) -> Source | None:
-        """Insert a source; None when the feed URL is already known, whatever its status.
+        """Insert a source; None when its feed URL or name is already taken.
 
-        Rejected sources keep their row, so a URL is never proposed twice.
+        A known URL counts whatever its status: rejected sources keep their row,
+        so a URL is never proposed twice.
         """
         statement = (
             insert(Source)
@@ -76,7 +77,7 @@ class SourceRepository:
                 origin_detail=origin_detail,
                 note=note,
             )
-            .on_conflict_do_nothing(index_elements=[Source.url])
+            .on_conflict_do_nothing()
             .returning(Source)
         )
         return self.session.scalars(statement).one_or_none()

@@ -84,7 +84,12 @@ def add_source(
     sources = SourceRepository(session)
     ensure_unknown(session, url)
     release = is_release_feed(url)
-    name = ((name or "").strip() or (None if release else title) or default_name(url)).strip()
+    name = (name or "").strip()
+    if as_id(name) is not None:
+        raise ServiceError(f"a source name cannot be a number ({name}); it would read as an ID")
+    feed_title = "" if release else (title or "").strip()
+    # A numeric feed title would read as an ID too; the host names the source instead.
+    name = name or (feed_title if as_id(feed_title) is None else "") or default_name(url)
     if sources.get_by_name(name) is not None:
         raise ConflictError(f"a source named {name!r} already exists; choose another name")
     source = sources.add(
@@ -95,8 +100,10 @@ def add_source(
         kind=SourceKind.RELEASE if release else SourceKind.FEED,
         site_url=site_url,
     )
-    if source is None:  # added by another process since the check above
-        raise ConflictError(f"{url} is already a source")
+    if source is None:  # added by another process since the checks above
+        if sources.get_by_url(url) is not None:
+            raise ConflictError(f"{url} is already a source")
+        raise ConflictError(f"a source named {name!r} already exists; choose another name")
     ChangeRepository(session).record(
         actor=actor,
         action="source.add",

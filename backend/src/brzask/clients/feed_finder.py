@@ -64,7 +64,7 @@ class FeedFinder:
 
     def find(self, url: str) -> FoundFeed | None:
         """The feed for the site of `url`, or None when none can be found."""
-        page = _with_scheme(url.strip())
+        page = with_scheme(url)
         host = host_of(page)
         if not host:
             return None
@@ -214,7 +214,9 @@ def youtube_channel_id(html: str) -> str | None:
     return None
 
 
-def _with_scheme(url: str) -> str:
+def with_scheme(url: str) -> str:
+    """`url` without surrounding blanks, with `https://` added when it has no scheme."""
+    url = url.strip()
     return url if re.match(r"^[a-z][a-z0-9+.-]*://", url, re.IGNORECASE) else f"https://{url}"
 
 

@@ -43,6 +43,19 @@ def test_add_skips_a_known_url_even_when_rejected(session: Session, make: Factor
     assert again is None
 
 
+def test_add_skips_a_name_taken_ignoring_case(session: Session, make: Factories) -> None:
+    make.source("Hacker News")
+
+    again = SourceRepository(session).add(
+        name="hacker news",
+        url="https://other.example/feed.xml",
+        status=SourceStatus.PENDING,
+        origin=SourceOrigin.VISITED,
+    )
+
+    assert again is None
+
+
 def test_find_filters_by_status_and_sorts_by_name(session: Session, make: Factories) -> None:
     make.source("b")
     make.source("a")

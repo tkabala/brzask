@@ -130,6 +130,18 @@ def test_a_known_url_is_reported_without_a_lookup(
     assert finder.asked == []
 
 
+def test_a_known_url_typed_without_a_scheme_is_reported_without_a_lookup(
+    cli: Invoke, finder: FakeFinder, make: Factories
+) -> None:
+    make.source(url="https://known.example/feed")
+
+    result = cli("sources", "add", " known.example/feed ")
+
+    assert result.exit_code == 1
+    assert "already a source (active)" in result.stderr
+    assert finder.asked == []
+
+
 def test_sources_errors_exit_with_a_message(cli: Invoke, make: Factories) -> None:
     make.source("Known", url="https://known.example/feed")
 

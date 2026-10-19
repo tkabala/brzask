@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from brzask.db.models import ChangeStatus, SourceKind, SourceOrigin, SourceStatus
-from brzask.repositories import ChangeRepository
+from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.sources import (
     add_source,
@@ -80,6 +80,17 @@ def test_add_source_reports_a_known_url_before_its_default_name(
 
     with pytest.raises(ConflictError, match="already a source \\(muted\\)"):
         add_source(session, "https://known.example/feed", actor="user")
+
+
+def test_add_source_reports_a_name_taken_after_the_check(
+    session: Session, make: Factories, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    make.source("Known", url="https://known.example/feed")
+    # Another process adds the name between the service's check and the insert.
+    monkeypatch.setattr(SourceRepository, "get_by_name", lambda _self, _name: None)
+
+    with pytest.raises(ConflictError, match="named 'known'"):
+        add_source(session, "https://new.example/feed", actor="user", name="known")
 
 
 @pytest.mark.parametrize("url", ["ftp://example.com/feed", "example.com/feed", "https://"])
@@ -161,3 +172,18 @@ def test_a_blank_name_falls_back_to_the_feed_title(session: Session) -> None:
     )
 
     assert source.name == "Blank Blog"
+
+
+def test_a_blank_feed_title_falls_back_to_the_host(session: Session) -> None:
+    source = add_source(session, "https://blank.example/feed", actor="user", title="  \n ")
+
+    assert source.name == "blank.example"
+
+
+def test_numeric_names_are_rejected_since_they_read_as_ids(session: Session) -> None:
+    with pytest.raises(ServiceError, match="cannot be a number"):
+        add_source(session, "https://digits.example/feed", actor="user", name="42")
+
+    titled = add_source(session, "https://digits.example/feed", actor="user", title="2600")
+
+    assert titled.name == "digits.example"

@@ -6,6 +6,7 @@ import typer
 
 from brzask.cli import common
 from brzask.cli.common import ACTOR, errors_as_messages, local, table, unit_of_work
+from brzask.clients.feed_finder import with_scheme
 from brzask.db.models import SourceStatus
 from brzask.services import sources
 
@@ -45,7 +46,8 @@ def add(
 ) -> None:
     """Add a feed; it is read from the next digest on."""
     with unit_of_work() as session:
-        sources.ensure_unknown(session, url)  # before any request to the site
+        # Before any request to the site, as the finder will read the URL.
+        sources.ensure_unknown(session, with_scheme(url))
     finder = common.get_feed_finder()
     try:
         with errors_as_messages():
