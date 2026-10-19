@@ -9,6 +9,7 @@ from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
 from brzask.config import get_settings
+from brzask.config.settings import GROUPS, env_name
 from brzask.db.migrations import migrate
 from brzask.db.session import create_db_engine
 from tests.factories import Factories
@@ -17,8 +18,17 @@ POSTGRES_IMAGE = "pgvector/pgvector:pg17"
 
 
 @pytest.fixture(autouse=True)
-def fresh_settings() -> Iterator[None]:
-    """Settings are cached per process; each test reads its own environment."""
+def fresh_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Settings are cached per process; each test reads its own environment.
+
+    Settings variables from the shell or a loaded .env are removed, so tests see
+    only the defaults and what they set themselves.
+    """
+    for group in GROUPS:
+        for name in group.model_fields:
+            variable = env_name(group, name)
+            monkeypatch.delenv(variable, raising=False)
+            monkeypatch.delenv(f"{variable}_FILE", raising=False)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
