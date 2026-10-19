@@ -58,7 +58,9 @@ jobs:
       - run: uv run ruff check --output-format=github
       - run: uv run ruff format --check
       - run: uv run mypy
+      # The suite takes about 20 seconds; a hanging test should fail the job, not run for hours.
       - run: uv run pytest --cov --cov-report=xml
+        timeout-minutes: 10
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
