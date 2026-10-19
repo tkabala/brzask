@@ -29,6 +29,14 @@
       "groupSlug": "{{manager}}-minor-patch"
     },
     {
+      "description": "pnpm is pinned in mise.toml and in frontend/package.json (packageManager); update both in one PR",
+      "matchDepNames": [
+        "pnpm"
+      ],
+      "groupName": "pnpm",
+      "groupSlug": "pnpm"
+    },
+    {
       "description": "Python versions are upgraded deliberately (3.13 to 3.14 is a new language version)",
       "matchDepNames": [
         "python"
@@ -40,9 +48,10 @@
       "enabled": false
     },
     {
-      "description": "Node major versions are upgraded deliberately",
+      "description": "Node major versions are upgraded deliberately; @types/node follows the Node major in use",
       "matchDepNames": [
-        "node"
+        "node",
+        "@types/node"
       ],
       "matchUpdateTypes": [
         "major"
