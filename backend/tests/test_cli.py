@@ -259,7 +259,11 @@ def test_run_passes_options_and_reports_the_outcome(
     assert (run.status, run.dry_run) == (RunStatus.SKIPPED, True)
 
 
-def test_run_of_a_pipeline_that_is_not_available(cli: Invoke) -> None:
+def test_run_of_a_pipeline_that_is_not_available(
+    cli: Invoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delitem(pipelines.PIPELINES, RunKind.DISCOVERY)
+
     result = cli("run", "discovery")
 
     assert result.exit_code == 1
