@@ -90,7 +90,7 @@ class Interest(TimestampMixin, Base):
     __tablename__ = "interests"
 
     id: Mapped[int] = _id()
-    topic: Mapped[str] = mapped_column(unique=True)
+    topic: Mapped[str] = mapped_column(comment="Unique ignoring case, as people type topics.")
     keywords: Mapped[list[str]] = mapped_column(
         server_default=text("'{}'"), comment="Can only widen the topic."
     )
@@ -99,6 +99,8 @@ class Interest(TimestampMixin, Base):
         comment="Free-text reader notes ('want: ..., skip: ...'); override keywords in prompts.",
     )
     active: Mapped[bool] = mapped_column(server_default=text("true"))
+
+    __table_args__ = (Index("uq_interests_lower_topic", func.lower(topic), unique=True),)
 
 
 # --- Articles --------------------------------------------------------------------

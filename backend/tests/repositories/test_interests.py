@@ -1,3 +1,5 @@
+import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from brzask.repositories import InterestRepository
@@ -32,4 +34,12 @@ def test_get_by_topic(session: Session, make: Factories) -> None:
     interests = InterestRepository(session)
 
     assert interests.get_by_topic("Postgres") is interest
+    assert interests.get_by_topic("postgres") is interest
     assert interests.get_by_topic("MySQL") is None
+
+
+def test_topics_are_unique_ignoring_case(session: Session, make: Factories) -> None:
+    make.interest("Postgres")
+
+    with pytest.raises(IntegrityError, match="uq_interests_lower_topic"):
+        make.interest("postgres")

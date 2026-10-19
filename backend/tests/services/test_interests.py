@@ -30,6 +30,8 @@ def test_add_interest_rejects_duplicates_and_blank_topics(
 
     with pytest.raises(ConflictError):
         add_interest(session, "Rust", actor="user")
+    with pytest.raises(ConflictError):
+        add_interest(session, "rust", actor="user")
     with pytest.raises(ServiceError, match="empty"):
         add_interest(session, "  ", actor="user")
 
@@ -63,6 +65,16 @@ def test_edit_interest_rename_conflict(session: Session, make: Factories) -> Non
         edit_interest(session, "ML", actor="user", topic="AI")
 
 
+def test_edit_interest_can_change_the_case_of_its_own_topic(
+    session: Session, make: Factories
+) -> None:
+    interest = make.interest("Ai")
+
+    edit_interest(session, "ai", actor="user", topic="AI")
+
+    assert interest.topic == "AI"
+
+
 def test_find_interest(session: Session, make: Factories) -> None:
     interest = make.interest("Postgres")
 
@@ -72,3 +84,14 @@ def test_find_interest(session: Session, make: Factories) -> None:
         find_interest(session, "MySQL")
     with pytest.raises(NotFoundError):
         find_interest(session, "9" * 30)  # larger than any ID
+
+
+def test_numeric_topics_are_rejected_since_they_read_as_ids(
+    session: Session, make: Factories
+) -> None:
+    interest = make.interest("Postgres")
+
+    with pytest.raises(ServiceError, match="cannot be a number"):
+        add_interest(session, "2026", actor="user")
+    with pytest.raises(ServiceError, match="cannot be a number"):
+        edit_interest(session, str(interest.id), actor="user", topic=" 7 ")

@@ -91,6 +91,8 @@ def _clean_topic(topic: str) -> str:
     topic = topic.strip()
     if not topic:
         raise ServiceError("the topic must not be empty")
+    if as_id(topic) is not None:
+        raise ServiceError(f"a topic cannot be a number ({topic}); it would read as an ID")
     return topic
 
 

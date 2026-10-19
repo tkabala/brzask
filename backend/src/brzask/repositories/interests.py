@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Interest
@@ -16,7 +16,8 @@ class InterestRepository:
         return self.session.get(Interest, interest_id)
 
     def get_by_topic(self, topic: str) -> Interest | None:
-        query = select(Interest).where(Interest.topic == topic)
+        """Topics are compared ignoring case, as people type them (and unique that way)."""
+        query = select(Interest).where(func.lower(Interest.topic) == func.lower(topic))
         return self.session.scalars(query).one_or_none()
 
     def find(self, *, active_only: bool = False) -> Sequence[Interest]:
