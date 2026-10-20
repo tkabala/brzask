@@ -74,9 +74,17 @@ class Deduplicated:
 
 
 def cosine(a: Sequence[float], b: Sequence[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    norms = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
-    return dot / norms if norms else 0.0
+    return _dot(_unit(a), _unit(b))
+
+
+def _unit(vector: Sequence[float]) -> list[float]:
+    """`vector` scaled to length 1; a zero vector stays zero (cosine 0 with anything)."""
+    norm = math.sqrt(sum(x * x for x in vector))
+    return [x / norm for x in vector] if norm else [0.0] * len(vector)
+
+
+def _dot(a: Sequence[float], b: Sequence[float]) -> float:
+    return sum(x * y for x, y in zip(a, b, strict=True))
 
 
 def deduplicate(
@@ -113,10 +121,13 @@ def _cross_day(
     ranked, so the survivor floor keeps the most defensible candidates.
     """
     hits: list[tuple[float, float, Candidate]] = []
+    # Normalized once: each candidate is compared with every shown vector.
+    shown_units = [_unit(vector) for vector in shown]
     for candidate in candidates:
-        if candidate.embedding is None or not shown:
+        if candidate.embedding is None or not shown_units:
             continue
-        best = max(cosine(candidate.embedding, vector) for vector in shown)
+        unit = _unit(candidate.embedding)
+        best = max(_dot(unit, vector) for vector in shown_units)
         if best >= threshold:
             hits.append((best, _rank(candidate), candidate))
     hits.sort(key=lambda hit: (-hit[0], -hit[1]))
