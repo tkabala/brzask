@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.config.settings import Schedule, SchedulerSettings
@@ -164,3 +164,24 @@ def test_two_concurrent_runs_of_a_pipeline_run_it_once(own_database: Engine) -> 
     # Once the first run is over, the lock is free again.
     third = run_pipeline(sessions, RunKind.DIGEST, pipelines=pipelines)
     assert third.status is RunStatus.OK
+
+
+def test_a_lost_lock_connection_does_not_fail_a_finished_run(own_database: Engine) -> None:
+    sessions: sessionmaker[Session] = session_factory(own_database)
+
+    def drop_lock_connection(context: RunContext) -> None:
+        # As when the database restarts mid-run: the session holding the lock ends.
+        with own_database.connect() as connection:
+            connection.execute(
+                text(
+                    "SELECT pg_terminate_backend(pid) FROM pg_locks"
+                    " WHERE locktype = 'advisory' AND pid <> pg_backend_pid()"
+                )
+            )
+
+    pipelines = {RunKind.DIGEST: drop_lock_connection}
+
+    run = run_pipeline(sessions, RunKind.DIGEST, pipelines=pipelines)
+
+    assert run.status is RunStatus.OK
+    assert run_pipeline(sessions, RunKind.DIGEST, pipelines=pipelines).status is RunStatus.OK

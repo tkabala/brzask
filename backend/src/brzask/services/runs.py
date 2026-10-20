@@ -20,13 +20,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Connection, Engine, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.usage import UsageMeter
 from brzask.db.models import Run, RunKind, RunStatus
-from brzask.log import logged_run
+from brzask.log import get_logger, logged_run
 from brzask.repositories import RunRepository
 from brzask.services.errors import ServiceError
+
+log = get_logger(__name__)
 
 
 class SkipRunError(Exception):
@@ -79,7 +82,10 @@ def pipeline_lock(bind: Engine | Connection, kind: RunKind) -> Iterator[bool]:
     """Hold the pipeline's advisory lock; yields False when another process holds it.
 
     The lock lives on a connection of its own in autocommit mode, so it is not
-    tied to a transaction and is released if the process dies.
+    tied to a transaction and is released if the process dies. When that
+    connection breaks (the database restarted), the lock is already gone: the
+    failed unlock is logged, and neither replaces the run's own outcome nor
+    puts the connection back in the pool.
     """
     owned = isinstance(bind, Engine)
     connection = (
@@ -94,7 +100,13 @@ def pipeline_lock(bind: Engine | Connection, kind: RunKind) -> Iterator[bool]:
             yield acquired
         finally:
             if acquired:
-                connection.scalar(select(func.pg_advisory_unlock(*key)))
+                try:
+                    connection.scalar(select(func.pg_advisory_unlock(*key)))
+                except SQLAlchemyError as error:
+                    if not owned:
+                        raise
+                    log.warning("pipeline lock not released", kind=kind.value, error=str(error))
+                    connection.invalidate()
     finally:
         if owned:
             connection.close()
