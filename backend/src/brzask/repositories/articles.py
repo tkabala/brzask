@@ -160,6 +160,16 @@ class ArticleRepository:
         query = select(Article).where(Article.opened_at >= since).order_by(Article.opened_at.desc())
         return self.session.scalars(query).all()
 
+    def first_seen_since(self, since: datetime) -> Sequence[Article]:
+        """Articles first seen at or after `since` that have a source, with sources loaded."""
+        query = (
+            select(Article)
+            .options(joinedload(Article.source))
+            .where(Article.first_seen_at >= since, Article.source_id.is_not(None))
+            .order_by(Article.first_seen_at, Article.id)
+        )
+        return self.session.scalars(query).all()
+
     def seen_between(self, since: datetime, until: datetime) -> Sequence[Article]:
         """Articles first seen in [`since`, `until`] and not shown before `until`, with sources.
 

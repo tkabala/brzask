@@ -15,7 +15,9 @@ PAGE_TIMEOUT = httpx2.Timeout(30.0, connect=10.0)
 # Hosted readers render pages in a browser, which takes longer than a plain fetch.
 READER_TIMEOUT = httpx2.Timeout(60.0, connect=10.0)
 # Feeds often carry only a teaser of a few hundred characters; below this the
-# page is likely to have more. A starting point, to be checked with extract-bench.
+# page is likely to have more. Measured with extract-bench on 25 links with feed
+# content and a usable page: all 22 at or above it matched the page's length
+# (the shortest 1,729 characters), 2 of the 3 below it were teasers.
 FEED_MIN_CHARS = 1500
 
 
@@ -99,10 +101,13 @@ class JinaExtractor:
         data = _json(self.client, "GET", self.endpoint + item.url, headers=headers).get("data")
         if not isinstance(data, dict) or not data.get("content"):
             return None
+        usage = data.get("usage")
+        tokens = usage.get("tokens") if isinstance(usage, dict) else None
         return Extracted(
             str(data["content"]),
             title=_str(data.get("title")),
             published=_str(data.get("publishedTime")),
+            tokens=tokens if isinstance(tokens, int) else None,
         )
 
 

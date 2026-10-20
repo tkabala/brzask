@@ -27,6 +27,7 @@ def test_exactly_the_minimum_is_usable() -> None:
         "Are you a human? Please complete the check below.",
         "Please enable JavaScript and cookies to continue.",
         "Complete the CAPTCHA to proceed.",
+        "JavaScript is disabled\nIn order to continue, we need to verify that you're not a robot.",
     ],
 )
 def test_block_pages_are_not_usable(page: str) -> None:

@@ -88,7 +88,10 @@ def test_an_invalid_setting_is_reported_by_its_variable(
 def test_help_lists_the_commands() -> None:
     result = runner.invoke(app, ["--help"])
 
-    top_level = ("migrate", "run", "status", "sources", "interests", "pause", "resume", "replay")
+    top_level = (
+        "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
+        "extract-bench",
+    )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
     for group, commands in {
@@ -368,3 +371,27 @@ def test_replay_rejects_a_bad_config_or_prompt_dir(
     assert "top_m" in bad_config.stderr
     assert bad_prompts.exit_code == 2
     assert "rankng.md" in bad_prompts.stderr
+
+
+# --- extract-bench ---------------------------------------------------------------
+
+
+def test_extract_bench_checks_the_extractors(cli: Invoke) -> None:
+    unknown = cli("extract-bench", "--extractors", "trafilatura,readability")
+    unconfigured = cli("extract-bench", "--extractors", "crawl4ai")
+
+    assert unknown.exit_code == 2
+    assert "unknown extractor readability" in unknown.stderr
+    assert unconfigured.exit_code == 2
+    assert "CRAWL4AI_BASE_URL is not set" in unconfigured.stderr
+
+
+def test_extract_bench_without_stored_links(
+    cli: Invoke, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(common, "get_read_only_sessions", lambda: sessions)
+
+    result = cli("extract-bench", "--extractors", "trafilatura")
+
+    assert result.exit_code == 0
+    assert "No stored links in that period." in result.stdout

@@ -35,10 +35,11 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Data model: data-model.md
-  - Measuring with replay: replay.md
+  - Measuring changes: measuring.md
   - Decisions:
       - decisions/index.md
       - decisions/0001-record-architecture-decisions.md
+      - decisions/0002-trafilatura-as-the-default-page-extractor.md
       - Template: decisions/0000-template.md
 
 validation:

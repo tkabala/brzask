@@ -120,7 +120,12 @@ def test_jina_reads_markdown_with_an_optional_key() -> None:
             200,
             json={
                 "code": 200,
-                "data": {"title": "T", "content": "# T\n\nBody", "publishedTime": "2026-10-16"},
+                "data": {
+                    "title": "T",
+                    "content": "# T\n\nBody",
+                    "publishedTime": "2026-10-16",
+                    "usage": {"tokens": 5372},
+                },
             },
         )
     )
@@ -128,10 +133,11 @@ def test_jina_reads_markdown_with_an_optional_key() -> None:
     extracted = JinaExtractor(server.client, api_key="jina-key").extract(ExtractionInput(URL))
 
     assert extracted is not None
-    assert (extracted.text, extracted.title, extracted.published) == (
+    assert (extracted.text, extracted.title, extracted.published, extracted.tokens) == (
         "# T\n\nBody",
         "T",
         "2026-10-16",
+        5372,
     )
     request = server.requests[0]
     assert str(request.url) == f"https://r.jina.ai/{URL}"

@@ -1,6 +1,10 @@
-# Measuring changes with replay
+# Measuring changes
 
-Thresholds, limits and prompts are not tuned by feel. `brzask replay` chooses past digests again with the current code, or with a candidate change, and compares the picks with what the reader actually opened.
+Thresholds, limits, prompts and extractors are not tuned by feel. Two commands measure a change on real data before it is made.
+
+## Digest choices: replay
+
+`brzask replay` chooses past digests again with the current code, or with a candidate change, and compares the picks with what the reader actually opened.
 
 ```console
 $ brzask replay --days 30
@@ -17,7 +21,7 @@ Replay: opened 10 of 194 picks (5%); shown: opened 19 of 202 (9%); 67 picks also
 
 For each day with a digest, replay rebuilds the candidate pool from the articles stored by the end of that day's run, ranks it, deduplicates the top and selects the digest again, exactly as the daily run does. It writes nothing: its database transactions are read-only.
 
-## Columns
+### Columns
 
 | Column | Meaning |
 |---|---|
@@ -29,7 +33,7 @@ For each day with a digest, replay rebuilds the candidate pool from the articles
 
 `--json FILE` also writes every day, every pick and the stage statistics (ranking, deduplication drops, selection) to a file.
 
-## Trying a change
+### Trying a change
 
 A configuration file overrides any of the digest's limits; everything left out keeps its current value:
 
@@ -62,7 +66,7 @@ $ brzask replay --days 30 --prompt-dir my-prompts/   # e.g. my-prompts/ranking.m
 
 `--prompt-dir` takes a directory with only the prompts being changed, named like the packaged ones (`ranking.md`, `selection.md`, …); the others stay as they are. A file named like no prompt is an error rather than silently ignored.
 
-## Reading the result
+### Reading the result
 
 - **Only shown articles could be opened.** A pick that was never shown counts as not opened, even if the reader would have liked it. A replay matches the real digest by picking the articles that were opened; it can hardly beat it, and a clear drop means a change loses what the reader reads.
 - **The model is not deterministic.** Replaying the same setup twice gives different picks. Run the current setup more than once to see the spread before reading anything into a difference.
@@ -70,10 +74,33 @@ $ brzask replay --days 30 --prompt-dir my-prompts/   # e.g. my-prompts/ranking.m
 - **Interests and reader notes are today's.** Opens shown to the ranking are only those from before the replayed run.
 - **Each day is replayed against the real history**: what earlier real digests showed, not what the replay picked, so one article can be picked on two replayed days.
 
-## Baseline
+### Baseline
 
 Over 28 days of daily use (2026-09-21 to 2026-10-20, `deepseek/deepseek-v4-flash`), the digests actually shown were opened 19 times out of 202 articles (9%). Replaying the same days with the current setup picked 194 articles, 67 of them the same as shown, and 10 of them had been opened (5%). The pools held 28 opened articles in total. A change is worth keeping when it moves the replay's number up beyond the spread of repeated replays, not when it beats the shown digests, which the replay can hardly do.
 
 One opened article (2026-09-30) is in no rebuilt pool: it was published two months before it was shown, and the 10-day age limit drops it.
 
 Each day costs two model calls (ranking and selection). `--workers` (default 4) replays several days at once.
+
+## Extractors: extract-bench
+
+`brzask extract-bench` runs every extractor on the same sample of stored links and compares them: how often each gets usable text, how long the text is, how fast and at what cost, in total and per site.
+
+```console
+$ brzask extract-bench --extractors feed,trafilatura,jina --sample 60 --per-site 3
+```
+
+The sample is drawn at random from links first seen in the last `--days` (10), at most `--per-site` from one site, so one large site cannot dominate. The sampled sources' feeds are fetched again, so the `feed` extractor sees the content it would have had. Each extractor runs on its own, through the same robots.txt, per-site and usable-text rules as a digest run.
+
+| Column | Meaning |
+|---|---|
+| `TRIED` | Links the extractor was allowed to fetch (`SKIPPED`: a site rule or robots.txt said no). |
+| `USABLE`, `SHORT`, `BLOCKED`, `EMPTY`, `FAILED` | Outcomes, by the rule every digest run uses. |
+| `MEDIAN WORDS` | Of usable texts, without Markdown link targets and images. |
+| `UNDER HALF` | Usable, but under half the words another extractor got for the link: either it missed part of the article, or the other one kept the page around it. Look at both texts. |
+| `ONLY ONE` | Links no other extractor got. |
+| `TOKENS` | Billed by a hosted reader. |
+
+A last line checks the feed threshold: feed content long enough to be taken as the article, against the page text a chain would have used instead.
+
+The bench fetches real pages. Keep `--workers` low and runs infrequent: sites start answering with bot checks when hit repeatedly. Jina Reader without a key is paced to its 20 requests a minute. The current default order is explained in [ADR 0002](decisions/0002-trafilatura-as-the-default-page-extractor.md).
