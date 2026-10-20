@@ -394,6 +394,7 @@ def _prompt_question(name: str, question: Question) -> dict[str, Any]:
                 "instructions": _json_text(instructions),
                 "criteria": _json_text(criteria) if criteria else None,
                 "options": [],
+                "levels": [],
             }
         case Choice(instructions, options):
             return {
@@ -402,14 +403,16 @@ def _prompt_question(name: str, question: Question) -> dict[str, Any]:
                 "instructions": _json_text(instructions),
                 "criteria": _json_text(dict(options)),
                 "options": list(options),
+                "levels": [],
             }
         case Score(instructions, levels):
             return {
                 "name": name,
                 "kind": "score",
                 "instructions": _json_text(instructions),
-                "criteria": _json_text(list(levels)),
+                "criteria": None,
                 "options": [str(level) for level in range(len(levels))],
+                "levels": [_json_text(level) for level in levels],
             }
 
 
@@ -429,13 +432,32 @@ def _llm_answer(question: Question, raw: object) -> Answer:
             )
         case Score(_, levels):
             keys = [str(level) for level in range(len(levels))]
-            distribution = _distribution(raw.get("probabilities"), keys)
+            keyed = _level_keys(raw.get("probabilities"), levels)
+            distribution = _distribution(keyed, keys)
             per_level = tuple(distribution[key] for key in keys)
             return ScoreAnswer(
                 score=sum(level * p for level, p in enumerate(per_level)),
                 probabilities=per_level,
                 confidence=score_confidence(per_level),
             )
+
+
+def _level_keys(raw: object, levels: Sequence[Text]) -> object:
+    """Probabilities keyed by level number, also when the model keyed them by the level's text.
+
+    Asked for numbers, chat models sometimes answer `{"Mixed": 0.8, ...}`
+    with the levels' own words instead; keys that match no level stay as they are.
+    """
+    if not isinstance(raw, dict):
+        return raw
+    by_text = {
+        _json_text(level).strip().lower(): str(number) for number, level in enumerate(levels)
+    }
+    keyed: dict[str, object] = {}
+    for key, value in raw.items():
+        text = str(key).strip().lower()
+        keyed[by_text.get(text, text)] = value
+    return keyed
 
 
 def _distribution(raw: object, keys: list[str]) -> dict[str, float]:

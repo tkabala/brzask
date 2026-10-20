@@ -1,12 +1,15 @@
-"""Discovery: new sources from a web search per interest, vetted by an LLM judge.
+"""Discovery: new sources from a web search per interest, vetted by a judge.
 
 For each active interest the web search proposes sites; each is resolved to a
 feed (blog, YouTube channel, GitHub releases), feeds without recent items are
-dropped, and the judge scores the rest on what they actually publish:
+dropped, and the judge scores the rest on what they actually publish: how
+regularly it serves an interest, and how much of it is substance rather than
+marketing. Code turns the two scores into a status:
 
-  >= 7      the source is enabled at once,
-  4 - 6.9   it waits as `pending` for a person,
-  < 4       it is stored as `rejected`, so the URL is never proposed again.
+  enabled at once     fit >= 2 of 3 and substance >= 1.5 of 2,
+  rejected            fit < 1: it does not serve the interests (never proposed again),
+  pending             anything else, such as a relevant feed full of sponsor
+                      posts, for a person to decide.
 
 A missing verdict leaves the feed pending: nothing is enabled or rejected on
 no evidence.
@@ -25,13 +28,14 @@ from sqlalchemy.orm import Session
 from brzask import prompts
 from brzask.clients.feed_finder import FeedFinder, FoundFeed
 from brzask.clients.feeds import FeedEntry, FeedFetcher
-from brzask.clients.llm import InvalidJSONError, LLMClient
+from brzask.clients.judge import Judge, JudgeError, Score, build_judge
+from brzask.clients.usage import UsageMeter
 from brzask.clients.web_search import WebSearch, WebSearchError, build_web_search
 from brzask.config import get_settings
 from brzask.db.models import SourceOrigin, SourceStatus
 from brzask.log import get_logger
 from brzask.repositories import SourceRepository
-from brzask.services.digest.ranking import ChatModel, interest_context
+from brzask.services.digest.ranking import interest_context
 from brzask.services.runs import RunContext, SkipRunError
 from brzask.services.sources import propose_source
 from brzask.services.visited import FindsFeeds, known_hosts
@@ -46,15 +50,44 @@ SEARCH_RESULTS = 10
 # Newest feed items sampled, and how many of them the judge sees.
 SAMPLE_ITEMS = 10
 SAMPLE_IN_PROMPT = 8
+# Characters of each sampled item's summary the judge sees.
+SNIPPET_CHARS = 200
 # A feed with no item this recent is not worth judging.
 RECENT_WINDOW = timedelta(days=60)
-# Candidates per judge call, keeping each prompt a manageable size.
-JUDGE_BATCH = 15
-# Judge scores, out of 10.
-ENABLE_AT = 7.0
-PENDING_AT = 4.0
-# Sites resolved to feeds at once.
+# Sites resolved to feeds, and feeds judged, at once.
 WORKERS = 5
+
+QUESTIONS: dict[str, Score] = {
+    "interest_fit": Score(
+        "How regularly do the items in `feed.recent_items` serve the reader's interests "
+        "(`reader.interests`)? An interest's notes are the reader's own words and outrank "
+        "its keywords. Judge the feed by its items and its own title, never by the name it "
+        "was proposed under (`feed.proposed_as`), which came from a web search and is "
+        "sometimes wrong.",
+        [
+            "Never: its items serve none of the interests",
+            "Now and then, among mostly unrelated items",
+            "Often: a good share of its items serve an interest",
+            "Mostly: the feed is focused on an interest",
+        ],
+    ),
+    "substance": Score(
+        "How much of `feed.recent_items` is substance (news, analysis, technical writing, "
+        "release notes with real changes) rather than marketing, sponsor posts, SEO filler "
+        "or announcements without content?",
+        [
+            "Mostly marketing, sponsor posts or filler",
+            "Mixed",
+            "Mostly substance",
+        ],
+    ),
+}
+# Scores (probability-weighted levels) a feed needs to be enabled without a person,
+# and below which it is rejected. Compared on one real run of 16 feeds (2026-10-20)
+# with a 0-10 LLM judge, Jev answering: the same four enabled, 12 of 16 statuses the
+# same, and every difference a feed one of the two left pending, the other rejected.
+ENABLE_FIT, ENABLE_SUBSTANCE = 2.0, 1.5
+REJECT_FIT = 1.0
 
 _WORD = re.compile(r"\w{4,}")
 
@@ -85,7 +118,7 @@ class Candidate:
 class Verdict:
     candidate: Candidate
     status: SourceStatus
-    score: float | None  # None when the judge gave no usable verdict
+    scores: dict[str, float] | None  # by question; None when the judge gave no verdict
     reason: str
 
 
@@ -142,70 +175,65 @@ def to_candidate(proposal: Proposal, feed: FoundFeed, now: datetime) -> Candidat
     )
 
 
-def judge_prompt(candidates: Sequence[Candidate], interests: Sequence[dict[str, Any]]) -> str:
-    return prompts.render(
-        "discovery_judge",
-        interests=interests,
-        recent_days=RECENT_WINDOW.days,
-        candidates=[
-            {
-                "url": c.feed.url,
-                "proposed_as": c.proposal.title or c.proposal.url,
-                "feed_title": c.feed.title,
-                "name_mismatch": c.name_mismatch,
-                "reason": c.proposal.reason or None,
-                "item_count": len(c.feed.entries),
-                "recent_count": c.recent_count,
-                "latest": c.latest.date().isoformat() if c.latest else None,
-                "sample": [
-                    {
-                        "title": entry.title,
-                        "date": entry.published_at.date().isoformat() if entry.published_at else "",
-                        "snippet": entry.summary or "",
-                    }
-                    for entry in c.sample[:SAMPLE_IN_PROMPT]
-                ],
-            }
-            for c in candidates
-        ],
-    )
+def judge_state(candidate: Candidate, interests: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """What the judge reads about one feed."""
+    c = candidate
+    return {
+        "reader": {"interests": [dict(interest) for interest in interests]},
+        "feed": {
+            "url": c.feed.url,
+            "title": c.feed.title,
+            "proposed_as": c.proposal.title or c.proposal.url,
+            "title_differs_from_proposed_name": c.name_mismatch,
+            "suggested_because": c.proposal.reason or None,
+            "items": len(c.feed.entries),
+            f"items_in_last_{RECENT_WINDOW.days}_days": c.recent_count,
+            "latest": c.latest.date().isoformat() if c.latest else None,
+            "recent_items": [
+                {
+                    "title": entry.title,
+                    "date": entry.published_at.date().isoformat() if entry.published_at else None,
+                    "summary": (entry.summary or "")[:SNIPPET_CHARS],
+                }
+                for entry in c.sample[:SAMPLE_IN_PROMPT]
+            ],
+        },
+    }
 
 
-def status_for(score: float) -> SourceStatus:
-    if score >= ENABLE_AT:
+def status_for(fit: float, substance: float) -> SourceStatus:
+    if fit >= ENABLE_FIT and substance >= ENABLE_SUBSTANCE:
         return SourceStatus.ACTIVE
-    if score >= PENDING_AT:
-        return SourceStatus.PENDING
-    return SourceStatus.REJECTED
+    if fit < REJECT_FIT:
+        return SourceStatus.REJECTED
+    return SourceStatus.PENDING
 
 
-def parse_verdicts(answer: Any, candidates: Sequence[Candidate]) -> list[Verdict]:
-    """One verdict per candidate, matched by feed URL; pending where none is usable."""
-    items = answer.get("verdicts") if isinstance(answer, dict) else answer
-    by_url: dict[str, dict[str, Any]] = {}
-    for item in items if isinstance(items, list) else []:
-        if isinstance(item, dict) and isinstance(item.get("url"), str):
-            by_url.setdefault(item["url"].strip(), item)
-    verdicts: list[Verdict] = []
-    for candidate in candidates:
-        item = by_url.get(candidate.feed.url, {})
-        score = item.get("score")
-        reason = item.get("reason")
-        reason = reason.strip() if isinstance(reason, str) else ""
-        if isinstance(score, bool) or not isinstance(score, int | float) or not 0 <= score <= 10:
-            verdicts.append(
-                Verdict(candidate, SourceStatus.PENDING, None, "no usable verdict from the judge")
-            )
-        else:
-            verdicts.append(Verdict(candidate, status_for(float(score)), float(score), reason))
-    return verdicts
+def judge_feed(
+    candidate: Candidate,
+    judge: Judge,
+    interests: Sequence[dict[str, Any]],
+    meter: UsageMeter | None = None,
+) -> Verdict:
+    """The judge's verdict on one feed; pending when it cannot give one."""
+    try:
+        judgement = judge.ask(
+            judge_state(candidate, interests), QUESTIONS, purpose="discovery", meter=meter
+        )
+    except JudgeError as error:
+        log.warning("feed not judged", url=candidate.feed.url, error=str(error))
+        return Verdict(candidate, SourceStatus.PENDING, None, "no usable verdict from the judge")
+    scores = {name: round(judgement.score(name).score, 2) for name in QUESTIONS}
+    fit, substance = scores["interest_fit"], scores["substance"]
+    reason = f"interest fit {fit:g}/3, substance {substance:g}/2"
+    return Verdict(candidate, status_for(fit, substance), scores, reason)
 
 
 def discover_sources(
     context: RunContext,
     search: WebSearch | None,
     finder: FindsFeeds,
-    llm: ChatModel,
+    judge: Judge,
 ) -> None:
     """Search, resolve, sample and judge; store verdicts outside a dry run."""
     if search is None:
@@ -245,18 +273,8 @@ def discover_sources(
             candidates.append(to_candidate(proposal, feed, now))
     active = [c for c in candidates if c.recent_count > 0]
 
-    verdicts: list[Verdict] = []
-    with context.stage("judge"):
-        for start in range(0, len(active), JUDGE_BATCH):
-            batch = active[start : start + JUDGE_BATCH]
-            try:
-                answer, _ = llm.complete_json(
-                    judge_prompt(batch, interests), purpose="discovery", meter=context.usage
-                )
-            except InvalidJSONError as error:
-                log.warning("judge answer is not JSON", answer=error.content[:500])
-                answer = None
-            verdicts.extend(parse_verdicts(answer, batch))
+    with context.stage("judge"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        verdicts = list(pool.map(lambda c: judge_feed(c, judge, interests, context.usage), active))
 
     if not context.dry_run:
         with context.sessions.begin() as session:
@@ -273,7 +291,7 @@ def discover_sources(
             "judged": len(verdicts),
             **{
                 status.value: [
-                    {"url": v.candidate.feed.url, "score": v.score}
+                    {"url": v.candidate.feed.url, "scores": v.scores}
                     for v in verdicts
                     if v.status is status
                 ]
@@ -293,21 +311,19 @@ def run_discovery(context: RunContext) -> None:
     """Discovery with clients built from the settings."""
     settings = get_settings()
     finder = FeedFinder(FeedFetcher())
-    llm = LLMClient.from_settings(settings.llm)
+    judge = build_judge(settings)
     search = build_web_search(settings)
     try:
-        discover_sources(context, search, finder, llm)
+        discover_sources(context, search, finder, judge)
     finally:
         finder.close()
-        llm.client.close()
+        judge.close()
         if search is not None:
             search.close()
 
 
 def _store(session: Session, verdict: Verdict, adapter: str) -> None:
     candidate = verdict.candidate
-    score = f"{verdict.score:g}/10" if verdict.score is not None else "no score"
-    note = f"discovery judge {score}"
     propose_source(
         session,
         candidate.feed,
@@ -316,7 +332,7 @@ def _store(session: Session, verdict: Verdict, adapter: str) -> None:
         actor=ACTOR,
         # Which search found it and for which interest, for source survival stats.
         origin_detail=f"{adapter}: {candidate.proposal.interest}",
-        note=f"{note}: {verdict.reason}" if verdict.reason else note,
+        note=f"discovery judge: {verdict.reason}",
     )
 
 

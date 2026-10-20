@@ -4,8 +4,9 @@ Answer typed questions about a piece of state, as probabilities.
 Context:
   state       str     JSON of the state the questions are about
   questions   [{name, kind: noul|choice|score, instructions: str (JSON),
-                criteria: str (JSON) | None, options: [str]}]
+                criteria: str (JSON) | None, options: [str], levels: [str]}]
               options: choice option names, or score level numbers from 0
+              levels: what each score level means, lowest first
 #}
 You answer questions about the state below. Answer each question independently, from the state alone. Questions may refer to parts of the state by their path, such as `article.title`.
 
@@ -26,8 +27,11 @@ Answer with the probability that the answer is yes (true), from 0 to 1.
 Options (name: meaning): {{ question.criteria }}
 Answer with a probability for each option ({{ question.options | join(", ") }}); they sum to 1.
 {% else %}
-Levels, from 0 upwards: {{ question.criteria }}
-Answer with a probability for each level ({{ question.options | join(", ") }}); they sum to 1.
+Levels, lowest first:
+{% for level in question.levels %}
+  {{ loop.index0 }}: {{ level }}
+{% endfor %}
+Answer with a probability for each level number ({{ question.options | join(", ") }}), keyed by the number; they sum to 1.
 {% endif %}
 {% endfor %}
 

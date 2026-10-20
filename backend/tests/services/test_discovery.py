@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FoundFeed
 from brzask.clients.feeds import FeedEntry
-from brzask.clients.llm import Completion, InvalidJSONError
+from brzask.clients.judge import JudgeError, Judgement, ScoreAnswer, Text
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.clients.web_search import SearchResult, WebSearchError
 from brzask.db.models import Source, SourceOrigin, SourceStatus
@@ -19,9 +19,9 @@ from brzask.services.discovery import (
     SAMPLE_ITEMS,
     Proposal,
     discover_sources,
-    judge_prompt,
+    judge_feed,
+    judge_state,
     name_mismatch,
-    parse_verdicts,
     run_discovery,
     search_query,
     status_for,
@@ -132,66 +132,60 @@ def test_inactive_feeds_have_no_recent_items() -> None:
 
 
 @pytest.mark.parametrize(
-    ("score", "status"),
+    ("fit", "substance", "status"),
     [
-        (10, SourceStatus.ACTIVE),
-        (7, SourceStatus.ACTIVE),
-        (6.9, SourceStatus.PENDING),
-        (4, SourceStatus.PENDING),
-        (3.9, SourceStatus.REJECTED),
-        (0, SourceStatus.REJECTED),
+        (3, 2, SourceStatus.ACTIVE),
+        (2, 1.5, SourceStatus.ACTIVE),
+        (1.99, 2, SourceStatus.PENDING),
+        (3, 1.49, SourceStatus.PENDING),
+        (3, 0, SourceStatus.PENDING),  # relevant, but a person decides about the noise
+        (1, 0, SourceStatus.PENDING),
+        (0.99, 2, SourceStatus.REJECTED),
     ],
 )
-def test_status_for_score(score: float, status: SourceStatus) -> None:
-    assert status_for(score) is status
+def test_status_for_scores(fit: float, substance: float, status: SourceStatus) -> None:
+    assert status_for(fit, substance) is status
 
 
-def test_verdicts_are_matched_by_url_and_missing_ones_stay_pending() -> None:
-    candidates = [
-        to_candidate(proposal(f"https://{n}.example/"), feed(f"https://{n}.example/feed"), NOW)
-        for n in range(5)
-    ]
-    answer = {
-        "verdicts": [
-            {"url": "https://0.example/feed", "score": 8, "reason": " Deep posts "},
-            {"url": "https://1.example/feed", "score": 2, "reason": "Spam"},
-            {"url": "https://2.example/feed", "score": True},
-            {"url": "https://3.example/feed", "score": 11},
-            {"url": "https://0.example/feed", "score": 1},  # a second verdict is ignored
-            {"score": 9},
-        ]
-    }
-
-    verdicts = parse_verdicts(answer, candidates)
-
-    assert [(v.status, v.score, v.reason) for v in verdicts] == [
-        (SourceStatus.ACTIVE, 8.0, "Deep posts"),
-        (SourceStatus.REJECTED, 2.0, "Spam"),
-        (SourceStatus.PENDING, None, "no usable verdict from the judge"),
-        (SourceStatus.PENDING, None, "no usable verdict from the judge"),
-        (SourceStatus.PENDING, None, "no usable verdict from the judge"),
-    ]
-    assert (
-        parse_verdicts([{"url": "https://0.example/feed", "score": 5}], candidates[:1])[0].status
-        is SourceStatus.PENDING
-    )
-    assert all(v.score is None for v in parse_verdicts("nonsense", candidates))
-
-
-def test_judge_prompt_shows_what_the_feed_publishes() -> None:
+def test_the_judge_reads_what_the_feed_publishes() -> None:
     candidate = to_candidate(
         proposal("https://x.example/", "AI Engineer"),
         feed("https://x.example/feed", "Street photography"),
         NOW,
     )
+    interests = [{"topic": "Rust", "keywords": [], "notes": "skip: crypto"}]
 
-    text = judge_prompt([candidate], [])
+    state = judge_state(candidate, interests)
 
-    assert "URL: https://x.example/feed" in text
-    assert "Proposed as: AI Engineer" in text
-    assert "Feed calls itself: Street photography (does NOT match" in text
-    assert f"Items: 3, in the last {RECENT_WINDOW.days} days: 3, latest: 2026-10-17" in text
-    assert "  - Post 0 (2026-10-17) | About 0" in text
+    assert state["reader"] == {"interests": interests}
+    assert state["feed"] == {
+        "url": "https://x.example/feed",
+        "title": "Street photography",
+        "proposed_as": "AI Engineer",
+        "title_differs_from_proposed_name": True,
+        "suggested_because": None,
+        "items": 3,
+        f"items_in_last_{RECENT_WINDOW.days}_days": 3,
+        "latest": "2026-10-17",
+        "recent_items": [
+            {"title": f"Post {n}", "date": f"2026-10-{17 - n}", "summary": f"About {n}"}
+            for n in range(3)
+        ],
+    }
+
+
+def test_a_verdict_names_the_scores_and_a_failed_judge_leaves_the_feed_pending() -> None:
+    candidate = to_candidate(proposal("https://x.example/"), feed("https://x.example/feed"), NOW)
+
+    verdict = judge_feed(candidate, FakeJudge({"https://x.example/feed": (2.5, 1.75)}), [])
+    unjudged = judge_feed(candidate, FakeJudge({}), [])
+
+    assert (verdict.status, verdict.scores, verdict.reason) == (
+        SourceStatus.ACTIVE,
+        {"interest_fit": 2.5, "substance": 1.75},
+        "interest fit 2.5/3, substance 1.75/2",
+    )
+    assert (unjudged.status, unjudged.scores) == (SourceStatus.PENDING, None)
 
 
 # --- The pipeline --------------------------------------------------------------------------
@@ -229,22 +223,33 @@ class FakeFinder:
 
 
 class FakeJudge:
-    def __init__(self, scores: dict[str, float] | Exception) -> None:
-        self.scores = scores
-        self.prompts: list[str] = []
+    """Scores feeds by URL as (interest fit, substance); unlisted feeds fail."""
 
-    def complete_json(
-        self, prompt: str, *, purpose: str, meter: UsageMeter | None = None
-    ) -> tuple[Any, Completion]:
-        self.prompts.append(prompt)
-        if isinstance(self.scores, Exception):
-            raise self.scores
-        verdicts = [
-            {"url": url, "score": score, "reason": f"judged {score}"}
-            for url, score in self.scores.items()
-            if f"URL: {url}\n" in prompt
-        ]
-        return {"verdicts": verdicts}, Completion("{}", CallUsage("m", purpose, 1, 1, None, 1))
+    model = "test/judge"
+
+    def __init__(self, scores: dict[str, tuple[float, float]]) -> None:
+        self.scores = scores
+        self.states: list[Any] = []
+
+    def ask(
+        self,
+        state: Text,
+        questions: Any,
+        *,
+        purpose: str,
+        meter: UsageMeter | None = None,
+    ) -> Judgement:
+        assert isinstance(state, dict)
+        self.states.append(state)
+        url = state["feed"]["url"]
+        if url not in self.scores:
+            raise JudgeError(f"{purpose}: no answer for {url}")
+        values = dict(zip(questions, self.scores[url], strict=True))
+        answers = {name: ScoreAnswer(value, (1.0,), 1.0) for name, value in values.items()}
+        return Judgement(answers, CallUsage(self.model, purpose, 1, 0, None, 1))
+
+    def close(self) -> None:
+        pass
 
 
 def result(url: str, title: str = "") -> SearchResult:
@@ -290,9 +295,9 @@ def setup(make: Factories) -> tuple[FakeSearch, FakeFinder]:
 
 
 SCORES = {
-    "https://great.example/feed": 8.5,
-    "https://meh.example/feed": 5,
-    "https://spam.example/feed": 1,
+    "https://great.example/feed": (2.5, 2.0),
+    "https://meh.example/feed": (1.5, 1.0),
+    "https://spam.example/feed": (0.2, 0.1),
 }
 
 
@@ -316,12 +321,12 @@ def test_discovery_stores_each_verdict(
         SourceOrigin.DISCOVERY,
         "llm-online: Rust",
     )
-    assert great.note == "discovery judge 8.5/10: judged 8.5"
+    assert great.note == "discovery judge: interest fit 2.5/3, substance 2/2"
     assert stored(session, "https://meh.example/feed").status is SourceStatus.PENDING
     assert stored(session, "https://spam.example/feed").status is SourceStatus.REJECTED
     unjudged = stored(session, "https://unjudged.example/feed")
     assert unjudged.status is SourceStatus.PENDING
-    assert unjudged.note == "discovery judge no score: no usable verdict from the judge"
+    assert unjudged.note == "discovery judge: no usable verdict from the judge"
     assert session.scalars(select(Source).where(Source.url.like("%stale%"))).all() == []
     assert "Knitting" not in search.queries[0] + search.queries[1]
     assert run.stats["proposed"] == 7
@@ -345,12 +350,12 @@ def test_a_failed_search_skips_only_its_interest(
     assert stored(session, "https://great.example/feed").status is SourceStatus.ACTIVE
 
 
-def test_an_answer_that_is_not_json_leaves_everything_pending(
+def test_a_failing_judge_leaves_everything_pending(
     sessions: sessionmaker[Session], session: Session, make: Factories
 ) -> None:
     search, finder = setup(make)
 
-    discover_sources(context(sessions), search, finder, FakeJudge(InvalidJSONError("hmm")))
+    discover_sources(context(sessions), search, finder, FakeJudge({}))
 
     assert stored(session, "https://great.example/feed").status is SourceStatus.PENDING
     assert stored(session, "https://spam.example/feed").status is SourceStatus.PENDING
@@ -365,7 +370,7 @@ def test_a_dry_run_judges_but_stores_nothing(
 
     discover_sources(run, search, finder, judge)
 
-    assert judge.prompts
+    assert judge.states
     assert [entry["url"] for entry in run.stats["active"]] == ["https://great.example/feed"]
     assert (
         session.scalars(select(Source).where(Source.origin == SourceOrigin.DISCOVERY)).all() == []

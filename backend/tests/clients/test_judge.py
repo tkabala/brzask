@@ -510,3 +510,18 @@ def test_build_judge_llm_backend_uses_the_llm_settings_with_overrides(
     assert isinstance(judge, LLMJudge)
     assert judge.model == "chat/model"
     assert str(judge.llm.client.base_url) == "http://ollama:11434/v1/"
+
+
+def test_llm_score_keyed_by_level_text_is_understood() -> None:
+    answers = {
+        "same_event": {"probability": 0.5},
+        "kind": {"probabilities": {"release": 1}},
+        "fit": {"probabilities": {"Unrelated": 0.0, " related, not wanted ": 1, "2": 3}},
+    }
+    judge, api = llm(lambda questions, model: chat({"answers": answers}, model))
+
+    fit = judge.ask(STATE, QUESTIONS, purpose="test").score("fit")
+
+    assert fit.probabilities == (0.0, 0.25, 0.75)
+    prompt = api.body()["messages"][-1]["content"]
+    assert "  0: Unrelated\n  1: Related, not wanted\n" in prompt

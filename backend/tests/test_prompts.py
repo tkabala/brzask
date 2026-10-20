@@ -50,6 +50,7 @@ SAMPLES: dict[str, dict[str, Any]] = {
                 "instructions": "Is `article` a release announcement?",
                 "criteria": None,
                 "options": [],
+                "levels": [],
             },
             {
                 "name": "kind",
@@ -57,13 +58,15 @@ SAMPLES: dict[str, dict[str, Any]] = {
                 "instructions": "What kind of article is it?",
                 "criteria": '{"release": "A new version", "news": "Anything else"}',
                 "options": ["release", "news"],
+                "levels": [],
             },
             {
                 "name": "fit",
                 "kind": "score",
                 "instructions": "How well does it fit Postgres?",
-                "criteria": '["Unrelated", "Related", "Exactly"]',
+                "criteria": None,
                 "options": ["0", "1", "2"],
+                "levels": ["Unrelated", "Related", "Exactly"],
             },
         ],
     },
@@ -91,34 +94,6 @@ SAMPLES: dict[str, dict[str, Any]] = {
         ],
         "digest_size": 7,
         "language": prompts.language("pl"),
-    },
-    "discovery_judge": {
-        "interests": INTERESTS,
-        "recent_days": 60,
-        "candidates": [
-            {
-                "url": "https://pg.example/feed",
-                "proposed_as": "PG Weekly",
-                "feed_title": "Cooking with Bob",
-                "name_mismatch": True,
-                "reason": "Weekly Postgres news",
-                "item_count": 10,
-                "recent_count": 0,
-                "latest": None,
-                "sample": [{"title": "Lasagne", "date": "2025-01-02", "snippet": "Layers " * 40}],
-            },
-            {
-                "url": "https://empty.example/rss",
-                "proposed_as": "Empty",
-                "feed_title": None,
-                "name_mismatch": False,
-                "reason": None,
-                "item_count": 0,
-                "recent_count": 0,
-                "latest": None,
-                "sample": [],
-            },
-        ],
     },
     "web_search": {"query": "blogs about Postgres internals", "limit": 10},
     "discovery_search": {
@@ -202,18 +177,6 @@ def test_selection_in_english() -> None:
 
     assert "the headline in English" in text
     assert 'if none fits, "General"' in text
-
-
-def test_discovery_judge_flags_mismatches_and_empty_feeds() -> None:
-    text = prompts.render("discovery_judge", **SAMPLES["discovery_judge"])
-
-    assert "Feed calls itself: Cooking with Bob (does NOT match what it was proposed as)\n" in text
-    assert "Items: 10, in the last 60 days: 0, latest: unknown" in text
-    assert "  - Lasagne (2025-01-02) | Layers" in text
-    assert "  (none)" in text
-    assert "Suggested because: n/a" in text
-    schema = text[text.index('{"verdicts"') :].strip()
-    assert schema.startswith('{"verdicts": [{"url":')
 
 
 def test_web_search() -> None:
