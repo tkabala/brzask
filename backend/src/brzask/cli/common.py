@@ -6,11 +6,13 @@ from datetime import datetime
 from functools import lru_cache
 
 import typer
+from pydantic import ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FeedFinder
 from brzask.clients.feeds import FeedFetcher
 from brzask.config import get_settings
+from brzask.config.settings import GROUPS, env_name
 from brzask.db.session import create_db_engine, session_factory
 from brzask.services.errors import ServiceError
 
@@ -35,6 +37,17 @@ def errors_as_messages() -> Iterator[None]:
     except ServiceError as error:
         typer.secho(f"Error: {error}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from error
+
+
+def configuration_problems(error: ValidationError) -> list[str]:
+    """One line per invalid setting, named by its environment variable."""
+    group = next((group for group in GROUPS if group.__name__ == error.title), None)
+    problems = []
+    for problem in error.errors():
+        field = str(problem["loc"][0]) if problem["loc"] else ""
+        name = env_name(group, field) if group and field in group.model_fields else field
+        problems.append(f"{name}: {problem['msg']}")
+    return problems
 
 
 @contextmanager

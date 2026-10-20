@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from typer.testing import CliRunner, Result
 
 from brzask import __version__
-from brzask.cli import app, common
+from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import RunKind, RunStatus, SourceStatus
 from brzask.repositories import RunRepository
@@ -62,6 +62,22 @@ def test_version_flag_prints_version() -> None:
 
     assert result.exit_code == 0
     assert result.stdout.strip() == f"brzask {__version__}"
+
+
+def test_an_invalid_setting_is_reported_by_its_variable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("LOG_FORMAT", "xml")
+    monkeypatch.setattr("sys.argv", ["brzask", "status"])
+
+    with pytest.raises(SystemExit) as exit_info:
+        run_cli()
+
+    assert exit_info.value.code == 1
+    error = capsys.readouterr().err
+    assert "Error: invalid configuration" in error
+    assert "  LOG_FORMAT: Input should be 'auto', 'json' or 'console'" in error
+    assert "Traceback" not in error
 
 
 def test_help_lists_the_commands() -> None:

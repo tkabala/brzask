@@ -4,11 +4,13 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
+from pydantic import ValidationError
 
 from brzask import __version__
 from brzask.cli import common, interests, sources
 from brzask.cli.common import (
     ACTOR,
+    configuration_problems,
     errors_as_messages,
     local,
     parse_moment,
@@ -28,6 +30,17 @@ from brzask.worker import run_worker
 app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
 app.add_typer(sources.app, name="sources")
 app.add_typer(interests.app, name="interests")
+
+
+def run_cli() -> None:
+    """The `brzask` command: an invalid setting is reported by name, not as a traceback."""
+    try:
+        app()
+    except ValidationError as error:
+        typer.secho("Error: invalid configuration", fg=typer.colors.RED, err=True)
+        for problem in configuration_problems(error):
+            typer.secho(f"  {problem}", fg=typer.colors.RED, err=True)
+        raise SystemExit(1) from error
 
 
 def _print_version(value: bool) -> None:

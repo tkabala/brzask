@@ -33,7 +33,7 @@ dependencies = [
 Homepage = "https://github.com/tkabala/brzask"
 
 [project.scripts]
-brzask = "brzask.cli:app"
+brzask = "brzask.cli:run_cli"
 
 [dependency-groups]
 dev = [
