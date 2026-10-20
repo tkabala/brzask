@@ -43,6 +43,7 @@ nav:
       - decisions/0003-paid-web-search-for-discovery-is-optional.md
       - decisions/0004-no-vector-index-until-history-needs-one.md
       - decisions/0005-system-one-judgements-over-one-http-client.md
+      - decisions/0006-llm-ranking-stays-the-default-over-composite-scores.md
       - Template: decisions/0000-template.md
 
 validation:
