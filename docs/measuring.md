@@ -109,6 +109,38 @@ $ brzask reembed --model provider/new-model               # embed what came in s
 
 `reembed` embeds every article that has a vector of another model again, from its stored text, in batches; it can be stopped and run again. Digests keep using the active model until the switch, which waits for no digest to be running. `brzask status` shows the active model and the stored vectors per model. Add the measured thresholds for the new model to `THRESHOLDS` before or right after switching; until then the digest uses the default ones and logs a warning. After the switch, set `EMBEDDING_MODEL` to the new model too: the active model wins, but every digest logs a warning while the two differ. A replay naming a model with no stored vectors stops with an error instead of deduplicating nothing.
 
+## Judge models: judge-bench
+
+`brzask judge-bench` scores every article the digests showed with one or more judges, using the questions of the composite ranking. It then reports how well each score tells the articles the reader opened from those they did not, as an AUC: the chance that an opened article scores above one that was not opened. 0.5 is chance. Because every scored article was shown, each could be opened, so the measure does not favour the ranking that chose the digests, as `replay` does.
+
+```console
+$ brzask judge-bench --days 30 --model typesafe/jev-1.13 --model liquid/d1 --model llm --json bench.json
+MODEL                       OPENED  FAILED  AUC COMPOSITE  AUC INTEREST_FIT  AUC NOVELTY  AUC DEPTH  AUC PROMOTION  AUC OPENED_SIMILARITY  COST     PER CALL
+typesafe/jev-1.13           19/195  0       0.51           0.45              0.48         0.42       0.33           0.49                   $0.0148  312 ms
+liquid/d1                   19/195  0       0.62           0.60              0.47         0.41       0.31           0.56                   $0.0059  310 ms
+deepseek/deepseek-v4-flash  19/195  0       0.47           0.54              0.49         0.48       0.47           0.53                   $0.2087  47266 ms
+```
+
+`--model llm` uses `LLM_MODEL` as the judge; without `--model`, the configured judge runs. `--json` writes every article's scores and whether it was opened, ready for fitting weights.
+
+An AUC below 0.5 means the reverse relation. For promotion it is the expected direction: opened articles were less promotional.
+
+### Judge models compared
+
+Measured on 2026-10-20, on daily use. Each row comes from its own measurement:
+
+| | Jev 1.13 | d1 | LLM judge (deepseek-v4-flash) |
+|---|---|---|---|
+| Opened vs. not opened among 195 shown articles (19 opened), composite AUC, 95% bootstrap interval | 0.51 (0.37–0.64) | 0.62 (0.49–0.74) | 0.47 (0.33–0.60) |
+| Same, promotion score alone | 0.33 (0.21–0.47) | 0.31 (0.20–0.44) | 0.47 (0.33–0.59) |
+| Same-day duplicate pairs judged right, of 12 labelled by hand | 12 | 11 | 10 |
+| Discovery: same status as a 0–10 LLM judge, of 16 feeds | 12 | 12 | 13 |
+| Discovery: feeds enabled that the 0–10 judge did not enable | 0 | 1 | 1 |
+| Cost per article (five ranking questions) | $0.000076 | $0.000030 | $0.0011 |
+| Time per call | 0.3 s | 0.3 s | 47 s |
+
+None of the three tells the opened articles from the rest better than chance with the composite score: every interval includes 0.5. The shown articles had already been ranked into the top 7 of about 200, so they differ little in what the dimensions measure. Promotion is the one clear signal, for Jev and d1. Jev and d1 cannot be told apart on these numbers. The LLM judge is no better, and is about 15 to 35 times as expensive and 150 times as slow. See [ADR 0008](decisions/0008-jev-stays-the-default-judge.md).
+
 ## Extractors: extract-bench
 
 `brzask extract-bench` runs every extractor on the same sample of stored links and compares them: how often each gets usable text, how long the text is, how fast and at what cost, in total and per site.

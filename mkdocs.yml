@@ -45,6 +45,7 @@ nav:
       - decisions/0005-system-one-judgements-over-one-http-client.md
       - decisions/0006-llm-ranking-stays-the-default-over-composite-scores.md
       - decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md
+      - decisions/0008-jev-stays-the-default-judge.md
       - Template: decisions/0000-template.md
 
 validation:
