@@ -11,6 +11,7 @@ import typer
 from brzask import prompts
 from brzask.cli import common
 from brzask.cli.common import table
+from brzask.clients.judge import build_judge
 from brzask.config import get_settings
 from brzask.services.embeddings import active_model
 from brzask.services.replay import (
@@ -32,8 +33,8 @@ def replay_command(
         Path | None,
         typer.Option(
             "--config",
-            help="TOML file with the values to try: llm_model, [pool], [ranking], "
-            "[deduplication], [selection].",
+            help="TOML file with the values to try: llm_model, judge_model, [pool], "
+            "[ranking] (method = judge, [ranking.weights]), [deduplication], [selection].",
         ),
     ] = None,
     prompt_dir: Annotated[
@@ -49,7 +50,8 @@ def replay_command(
 ) -> None:
     """Choose past digests again and compare the picks with what was opened.
 
-    Calls the LLM twice per day; writes nothing to the database.
+    Calls the LLM twice per day (with `method = "judge"`: the judge once per
+    pool article and the LLM once); writes nothing to the database.
     """
     try:
         config = ReplayConfig.load(config_file) if config_file else ReplayConfig()
@@ -74,11 +76,16 @@ def replay_command(
             embedding_model = config.embedding_model or active_model(
                 session, settings.embedding.model
             )
+        judge = None
+        if config.ranking.method == "judge":
+            judge = build_judge(settings, config.judge_model)
+            stack.callback(judge.close)
         clients = ReplayClients(
             llm=stack.enter_context(common.llm_client(llm_settings)),
             llm_model=llm_settings.model,
             embedding_model=embedding_model,
             language=prompts.language(settings.digest.language),
+            judge=judge,
         )
         with common.errors_as_messages():
             results = replay(sessions, clients, since, config, workers)

@@ -10,6 +10,7 @@ from brzask.clients.extractors import build_chain
 from brzask.clients.extractors.adapters import PAGE_TIMEOUT
 from brzask.clients.feeds import FeedFetcher
 from brzask.clients.http import new_client
+from brzask.clients.judge import Judge, build_judge
 from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
 from brzask.log import get_logger
@@ -36,6 +37,7 @@ class DigestClients:
     embedder: DocumentEmbedder
     language: Language
     timezone: tzinfo  # the digest date is the local date when the run starts
+    judge: Judge | None = None  # ranks by composite score instead of the LLM when set
 
 
 def build_digest(context: RunContext, clients: DigestClients) -> None:
@@ -58,7 +60,7 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
     pool = gather_candidates(context, clients.feeds)
     if not pool:
         raise SkipRunError("no candidates")
-    top = rank_candidates(context, pool, clients.llm)
+    top = rank_candidates(context, pool, clients.llm, judge=clients.judge)
     extracted = extract_and_embed(context, top, clients.extractor, clients.embedder)
     survivors = deduplicate_candidates(context, extracted, clients.embedder.model)
     picks = select_digest(context, survivors, clients.llm, clients.language)
@@ -92,6 +94,9 @@ def run_digest(context: RunContext) -> None:
         stack.callback(llm.client.close)
         embedder = Embedder.from_settings(settings, model)
         stack.callback(embedder.client.close)
+        judge = build_judge(settings) if settings.digest.ranking == "judge" else None
+        if judge is not None:
+            stack.callback(judge.close)
         build_digest(
             context,
             DigestClients(
@@ -101,6 +106,7 @@ def run_digest(context: RunContext) -> None:
                 embedder=embedder,
                 language=prompts.language(settings.digest.language),
                 timezone=settings.scheduler.timezone,
+                judge=judge,
             ),
         )
 

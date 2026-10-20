@@ -1,6 +1,7 @@
 """The digest pipeline end to end, on Postgres, with fake clients."""
 
 import re
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -22,7 +23,14 @@ from brzask.services.embeddings import switch_model
 from brzask.services.pause import pause
 from brzask.services.runs import RunContext, run_pipeline
 from tests.factories import TEST_MODEL, Factories
-from tests.services.digest.fakes import NOW, FakeEmbedder, FakeExtractor, FakeFeeds, context
+from tests.services.digest.fakes import (
+    NOW,
+    FakeEmbedder,
+    FakeExtractor,
+    FakeFeeds,
+    FakeJudge,
+    context,
+)
 
 WARSAW = ZoneInfo("Europe/Warsaw")
 # 07:00 UTC on 18 October is 09:00 in Warsaw: the digest date is the 18th.
@@ -217,3 +225,38 @@ def test_the_digest_embeds_with_the_active_model(
     run_digest(context(sessions))
 
     assert built == ["new/embedding"]
+
+
+@pytest.mark.parametrize(("ranking", "judge_model"), [("llm", None), ("judge", "liquid/d1")])
+def test_the_ranking_setting_decides_whether_a_judge_ranks(
+    sessions: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+    ranking: str,
+    judge_model: str | None,
+) -> None:
+    monkeypatch.setenv("DIGEST_RANKING", ranking)
+    monkeypatch.setenv("JUDGE_MODEL", "liquid/d1")
+    built: list[str | None] = []
+
+    def build(context: RunContext, clients: DigestClients) -> None:
+        built.append(clients.judge.model if clients.judge else None)
+
+    monkeypatch.setattr(pipeline, "build_digest", build)
+    run_digest(context(sessions))
+
+    assert built == [judge_model]
+
+
+def test_a_judge_ranks_the_pool_when_given(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel()
+    digest = replace(clients(feeds_for(sources), model), judge=FakeJudge())
+
+    finished = run(sessions, digest)
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert model.purposes == ["selection"]
+    assert finished.stats["ranking"]["method"] == "judge"
+    assert finished.stats["usage"]["by_purpose"]["ranking"]["calls"] == 6 * 4

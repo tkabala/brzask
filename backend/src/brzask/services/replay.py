@@ -29,19 +29,20 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, ValidationError, field_validator
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.clients.llm import LLMError
+from brzask.clients.judge import Judge
+from brzask.clients.retry import APIError
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, RunKind
 from brzask.log import get_logger
 from brzask.prompts import Language
 from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.repositories.articles import DigestRun
-from brzask.services.digest import pool, ranking, selection
+from brzask.services.digest import pool, ranking, scoring, selection
 from brzask.services.digest.dedup import Thresholds, deduplicate_candidates
 from brzask.services.digest.pool import (
     Candidate,
@@ -69,10 +70,23 @@ class PoolConfig(_Section):
 
 
 class RankingConfig(_Section):
+    method: Literal["llm", "judge"] = "llm"
     rank_limit: PositiveInt = ranking.RANK_LIMIT
     top_n: PositiveInt = ranking.TOP_N
     max_per_source: PositiveInt = ranking.MAX_PER_SOURCE
     min_candidates: PositiveInt = ranking.MIN_CANDIDATES
+    # Composite score weights (method = "judge"); dimensions left out keep theirs.
+    weights: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("weights")
+    @classmethod
+    def _known_dimensions(cls, weights: dict[str, float]) -> dict[str, float]:
+        unknown = sorted(set(weights) - set(scoring.DIMENSIONS))
+        if unknown:
+            raise ValueError(
+                f"unknown dimensions {', '.join(unknown)}; known: {', '.join(scoring.DIMENSIONS)}"
+            )
+        return weights
 
 
 class DeduplicationConfig(_Section):
@@ -91,6 +105,7 @@ class ReplayConfig(_Section):
     """
 
     llm_model: str | None = None  # None: LLM_MODEL
+    judge_model: str | None = None  # None: JUDGE_MODEL; used when ranking.method = "judge"
     # None: the active model. Another one compares its stored vectors, e.g. after
     # `brzask reembed --no-switch`, to check its thresholds before switching.
     embedding_model: str | None = None
@@ -110,7 +125,10 @@ class ReplayConfig(_Section):
             raise ValueError(f"{path}: {error}") from error
 
     def limits(self) -> RankingLimits:
-        return RankingLimits(**self.ranking.model_dump())
+        return RankingLimits(**self.ranking.model_dump(exclude={"method", "weights"}))
+
+    def weights(self) -> dict[str, float]:
+        return {**scoring.WEIGHTS, **self.ranking.weights}
 
     def thresholds(self) -> Thresholds | None:
         """The thresholds to try; None keeps the model's own, with a warning if unmeasured."""
@@ -125,6 +143,7 @@ class ReplayClients:
     llm_model: str  # reported with the results
     embedding_model: str  # stored vectors of other models are not used
     language: Language
+    judge: Judge | None = None  # required when the config ranks with a judge
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,7 +275,12 @@ def replay_day(
         dry_run=True,
     )
     try:
-        top = rank_candidates(context, candidates, clients.llm, config.limits())
+        judge = clients.judge if config.ranking.method == "judge" else None
+        if config.ranking.method == "judge" and judge is None:
+            raise ValueError("ranking.method = judge needs a judge client")
+        top = rank_candidates(
+            context, candidates, clients.llm, config.limits(), judge, config.weights()
+        )
         top = with_stored_text(top, by_id, vectors)
         survivors = deduplicate_candidates(
             context, top, clients.embedding_model, config.thresholds()
@@ -264,7 +288,7 @@ def replay_day(
         picks = select_digest(
             context, survivors, clients.llm, clients.language, config.selection.digest_size
         )
-    except (LLMError, SelectionError) as error:
+    except (APIError, SelectionError) as error:
         log.warning("replayed day failed", day=day.isoformat(), error=str(error))
         return replace(
             result,
@@ -350,6 +374,7 @@ def report(
     """Everything about a replay as JSON-ready data."""
     return {
         "llm_model": clients.llm_model,
+        "judge_model": clients.judge.model if clients.judge else None,
         "embedding_model": clients.embedding_model,
         "config": config.model_dump(mode="json"),
         "summary": asdict(summarize(days)),

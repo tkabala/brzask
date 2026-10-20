@@ -16,6 +16,7 @@ from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, Run
 from brzask.repositories import EmbeddingRepository
 from brzask.services.digest.pool import POOL_CAP
+from brzask.services.digest.scoring import WEIGHTS
 from brzask.services.errors import ServiceError
 from brzask.services.replay import (
     PoolConfig,
@@ -28,7 +29,7 @@ from brzask.services.replay import (
     with_stored_text,
 )
 from tests.factories import TEST_MODEL, Factories, unit_vector
-from tests.services.digest.fakes import NOW
+from tests.services.digest.fakes import NOW, FakeJudge
 
 TODAY = NOW.date()
 YESTERDAY = TODAY - timedelta(days=1)
@@ -57,12 +58,13 @@ class FakeModel:
         return {"articles": articles}, Completion("{}", usage)
 
 
-def clients(model: FakeModel) -> ReplayClients:
+def clients(model: FakeModel, judge: FakeJudge | None = None) -> ReplayClients:
     return ReplayClients(
         llm=model,
         llm_model="test/model",
         embedding_model=TEST_MODEL,
         language=prompts.language("en"),
+        judge=judge,
     )
 
 
@@ -257,10 +259,42 @@ def test_config_from_toml(tmp_path: Path) -> None:
     assert ReplayConfig().thresholds() is None  # left out: the embedding model's own
 
 
+def test_a_judge_config_ranks_with_the_judge_and_its_weights(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    model = FakeModel()
+    judge = FakeJudge({"Skipped": {"depth": 2}, "Unshown": {"interest_fit": 4}})
+    config = ReplayConfig.model_validate(
+        {"ranking": {"method": "judge", "weights": {"depth": 2.0}}}
+    )
+
+    days = replay(sessions, clients(model, judge), since=TODAY, config=config)
+
+    assert model.prompts["ranking"] == []
+    assert days[0].stats["ranking"]["method"] == "judge"
+    assert len(judge.states) == days[0].pool
+    # depth 2 x 2.0 beats interest fit 4 x 1.0: Skipped is ranked first.
+    assert days[0].stats["ranking"]["judged"] == 3
+    selection_prompt = model.prompts["selection"][0]
+    assert selection_prompt.index("Skipped") < selection_prompt.index("Unshown")
+    assert config.weights() == {**WEIGHTS, "depth": 2.0}
+
+
+def test_a_judge_config_without_a_judge_is_refused(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    config = ReplayConfig.model_validate({"ranking": {"method": "judge"}})
+
+    with pytest.raises(ValueError, match="judge client"):
+        replay(sessions, clients(FakeModel()), since=TODAY, config=config)
+
+
 @pytest.mark.parametrize(
     ("text", "message"),
     [
         ("[ranking]\ntop_m = 20\n", "top_m"),  # misspelt: never ignored
+        ("[ranking.weights]\nfit = 1.0\n", "unknown dimensions fit"),
+        ('[ranking]\nmethod = "votes"\n', "'llm' or 'judge'"),
         ("[ranking]\ntop_n = 0\n", "greater than 0"),
         ("[deduplication]\ncross_day = 0.95\n", "same_day"),
         ("[ranking\n", "Expected"),

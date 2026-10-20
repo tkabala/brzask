@@ -1,12 +1,14 @@
-"""Ranking: the LLM orders the pool, and the top of its order goes on to extraction.
+"""Ranking: the pool is ordered, and the top of the order goes on to extraction.
 
-The model ranks candidates against each other instead of scoring each one
-(see the ranking prompt for why). Candidates are numbered by their position in
-the pool, since fresh entries have no article ID in a dry run.
+By default the LLM ranks candidates against each other instead of scoring
+each one (see the ranking prompt for why); candidates are numbered by their
+position in the pool, since fresh entries have no article ID in a dry run.
+With a judge, each candidate is scored on several dimensions instead and the
+order follows the weighted sum (`scoring`).
 """
 
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any, Protocol
@@ -14,11 +16,13 @@ from typing import Any, Protocol
 from sqlalchemy.orm import Session
 
 from brzask import prompts
+from brzask.clients.judge import Judge
 from brzask.clients.llm import Completion, InvalidJSONError
 from brzask.clients.usage import UsageMeter
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository, InterestRepository
 from brzask.repositories.articles import OpenedArticle
+from brzask.services.digest import scoring
 from brzask.services.digest.pool import Candidate
 from brzask.services.runs import RunContext
 
@@ -153,12 +157,16 @@ def rank_candidates(
     candidates: Sequence[Candidate],
     llm: ChatModel,
     limits: RankingLimits = DEFAULT_LIMITS,
+    judge: Judge | None = None,
+    weights: Mapping[str, float] = scoring.WEIGHTS,
 ) -> list[Candidate]:
-    """The top of the LLM's ranking of the pool; stores the ranks outside a dry run.
+    """The top of the pool's ranking; stores the ranks outside a dry run.
 
-    An answer that is not a usable ranking is logged and the pool order is used
-    instead: a bad answer must not cost the day's digest. Only opens before
-    the run's start count, so a replayed day sees what that day's run saw.
+    The LLM ranks the pool, or, given a `judge`, each candidate is scored and
+    the `weights` order them. An answer that is not a usable ranking is logged
+    and the pool order is used instead: a bad answer must not cost the day's
+    digest. Only opens before the run's start count, so a replayed day sees
+    what that day's run saw.
     """
     if not candidates:
         return []
@@ -169,14 +177,25 @@ def rank_candidates(
             since, OPENS_LIMIT, before=context.started_at
         )
 
-    prompt = ranking_prompt(candidates, interests, opens, limits.rank_limit)
-    with context.stage("ranking"):
-        try:
-            answer, _ = llm.complete_json(prompt, purpose="ranking", meter=context.usage)
-        except InvalidJSONError as error:
-            log.warning("ranking answer is not JSON", answer=error.content[:500])
-            answer = None
-    ranking = parse_ranking(answer, len(candidates))
+    stats: dict[str, Any]
+    if judge is None:
+        prompt = ranking_prompt(candidates, interests, opens, limits.rank_limit)
+        with context.stage("ranking"):
+            try:
+                answer, _ = llm.complete_json(prompt, purpose="ranking", meter=context.usage)
+            except InvalidJSONError as error:
+                log.warning("ranking answer is not JSON", answer=error.content[:500])
+                answer = None
+        ranking = parse_ranking(answer, len(candidates))
+        stats = {"method": "llm", "prompt_chars": len(prompt)}
+    else:
+        opened_titles = [opened.title for opened in opens[:OPENED_TITLES]]
+        with context.stage("ranking"):
+            scored = scoring.score_candidates(
+                candidates, judge, interests, opened_titles, meter=context.usage
+            )
+        ranking = scoring.composite_ranking(scored, weights)
+        stats = {"method": "judge", "judge_model": judge.model, "judged": len(scored)}
     if not ranking:
         log.warning("no usable ranking; taking candidates in pool order")
     top = select_top(candidates, ranking, limits)
@@ -189,7 +208,7 @@ def rank_candidates(
             ArticleRepository(session).set_ranks(ranks)
 
     context.stats["ranking"] = {
-        "prompt_chars": len(prompt),
+        **stats,
         "ranked": len(ranking),
         "top": len(top),
         "top_ranked": sum((c.rank or 0) <= len(ranking) for c in top),

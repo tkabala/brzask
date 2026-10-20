@@ -143,6 +143,9 @@ class Judge(Protocol):
         """Answer every question about `state`; names are for code and never sent as meaning."""
         ...
 
+    def close(self) -> None:
+        """Close the judge's client."""
+
 
 def choice_confidence(probabilities: Sequence[float]) -> float:
     """How far the top option stands out: 1 when it has everything, 0 when all are even."""
@@ -162,11 +165,11 @@ def score_confidence(probabilities: Sequence[float]) -> float:
     return _clamp(1 - spread / even)
 
 
-def build_judge(settings: Settings) -> Judge:
-    """The judge configured by `JUDGE_BACKEND`."""
+def build_judge(settings: Settings, model: str | None = None) -> Judge:
+    """The judge configured by `JUDGE_BACKEND`; `model` replaces JUDGE_MODEL."""
     if settings.judge.backend == "system-one":
-        return SystemOneJudge.from_settings(settings)
-    return LLMJudge.from_settings(settings)
+        return SystemOneJudge.from_settings(settings, model)
+    return LLMJudge.from_settings(settings, model)
 
 
 # --- System One ------------------------------------------------------------------
@@ -191,7 +194,7 @@ class SystemOneJudge:
         self._sleep = sleep
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> Self:
+    def from_settings(cls, settings: Settings, model: str | None = None) -> Self:
         judge, llm = settings.judge, settings.llm
         secret = judge.api_key or llm.api_key
         # The OpenAI SDK sends the request: same errors, retries and tracing as the LLM.
@@ -201,7 +204,10 @@ class SystemOneJudge:
             timeout=REQUEST_TIMEOUT_SECONDS,
             max_retries=0,  # retried here, with a log line per retry
         )
-        return cls(client, judge.model or DEFAULT_SYSTEM_ONE_MODEL)
+        return cls(client, model or judge.model or DEFAULT_SYSTEM_ONE_MODEL)
+
+    def close(self) -> None:
+        self.client.close()
 
     def ask(
         self,
@@ -332,18 +338,21 @@ class LLMJudge:
         self.model = llm.model
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> Self:
+    def from_settings(cls, settings: Settings, model: str | None = None) -> Self:
         judge, llm = settings.judge, settings.llm
         overrides = {
             key: value
             for key, value in (
-                ("model", judge.model),
+                ("model", model or judge.model),
                 ("base_url", judge.base_url),
                 ("api_key", judge.api_key),
             )
             if value is not None
         }
         return cls(LLMClient.from_settings(llm.model_copy(update=overrides)))
+
+    def close(self) -> None:
+        self.llm.client.close()
 
     def ask(
         self,

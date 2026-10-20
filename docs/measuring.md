@@ -40,6 +40,7 @@ A configuration file overrides any of the digest's limits; everything left out k
 ```toml
 llm_model = "provider/another-model"  # left out: LLM_MODEL
 embedding_model = "provider/new-model"  # left out: the active model; its stored vectors are used
+judge_model = "liquid/d1"  # left out: JUDGE_MODEL; used when [ranking] method = "judge"
 
 [pool]
 max_age_days = 10
@@ -47,10 +48,18 @@ carry_over_days = 7
 cap = 200
 
 [ranking]
+method = "llm"  # or "judge": score every candidate with JUDGE_BACKEND (see below)
 rank_limit = 40
 top_n = 15
 max_per_source = 2
 min_candidates = 10
+
+[ranking.weights]  # method = "judge"; dimensions left out keep their weight
+interest_fit = 1.0
+novelty = 0.5
+depth = 0.3
+promotion = -0.5
+opened_similarity = 0.2
 
 [deduplication]  # left out: the embedding model's own thresholds
 cross_day = 0.96
@@ -64,6 +73,8 @@ digest_size = 7
 $ brzask replay --days 30 --config candidate.toml
 $ brzask replay --days 30 --prompt-dir my-prompts/   # e.g. my-prompts/ranking.md
 ```
+
+With `method = "judge"`, the LLM does not rank. Instead the judge scores every candidate on the dimensions above (how well it fits the interests, how new it is, how much substance it promises, how promotional it is, how close it is to what the reader opened), and the candidates are ordered by the weighted sum of the scores, each scaled to 0–1. The daily run does the same with `DIGEST_RANKING=judge`. This costs one judge call per candidate, about 200 a day.
 
 `--prompt-dir` takes a directory with only the prompts being changed, named like the packaged ones (`ranking.md`, `selection.md`, …); the others stay as they are. A file named like no prompt is an error rather than silently ignored.
 

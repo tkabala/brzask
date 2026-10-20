@@ -2,15 +2,17 @@
 
 import threading
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.embeddings import EmbeddingKind
 from brzask.clients.extractors import SNIPPET, ExtractionInput, ExtractionResult
 from brzask.clients.feeds import FeedEntry, FeedRequest, FeedResult
-from brzask.clients.usage import UsageMeter
+from brzask.clients.judge import JudgeError, Judgement, Question, Score, ScoreAnswer, Text
+from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import EMBEDDING_DIMENSIONS, RunKind
 from brzask.services.runs import RunContext
 from tests.factories import TEST_MODEL
@@ -93,3 +95,51 @@ class FakeEmbedder:
                 vector[len(self.vectors)] = 1.0
                 self.vectors[text] = vector
         return [self.vectors[text] for text in texts]
+
+
+class FakeJudge:
+    """Answers every Score with a sure level: `levels[title][dimension]`, else 0.
+
+    Articles whose title is in `fail` raise `JudgeError`; states are kept.
+    """
+
+    model = "test/judge"
+
+    def __init__(
+        self,
+        levels: Mapping[str, Mapping[str, int]] | None = None,
+        fail: set[str] | None = None,
+    ) -> None:
+        self.levels = levels or {}
+        self.fail = fail or set()
+        self.states: list[Any] = []
+        self.closed = False
+        self._lock = threading.Lock()
+
+    def ask(
+        self,
+        state: Text,
+        questions: Mapping[str, Question],
+        *,
+        purpose: str,
+        meter: UsageMeter | None = None,
+    ) -> Judgement:
+        assert isinstance(state, dict)
+        title = state["article"]["title"]
+        with self._lock:
+            self.states.append(state)
+        if title in self.fail:
+            raise JudgeError(f"{purpose}: failed for {title}")
+        answers = {}
+        for name, question in questions.items():
+            assert isinstance(question, Score)
+            level = self.levels.get(title, {}).get(name, 0)
+            probabilities = tuple(float(i == level) for i in range(len(question.levels)))
+            answers[name] = ScoreAnswer(float(level), probabilities, 1.0)
+        usage = CallUsage(self.model, purpose, 500, 0, 0.00002, 1)
+        if meter is not None:
+            meter.add(usage)
+        return Judgement(answers, usage)
+
+    def close(self) -> None:
+        self.closed = True

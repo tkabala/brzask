@@ -408,6 +408,11 @@ class DigestSettings(SettingsGroup):
     language: Literal["en", "pl"] = Field(
         "en", description="Language of digest titles and summaries."
     )
+    ranking: Literal["llm", "judge"] = Field(
+        "llm",
+        description="llm (the LLM orders the pool) or judge (each article scored "
+        "on several dimensions by JUDGE_BACKEND, weighted in code).",
+    )
 
 
 PositiveAmount = Annotated[Annotated[Decimal, Field(gt=0)] | None, BeforeValidator(_empty_to_none)]

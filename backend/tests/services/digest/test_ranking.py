@@ -228,6 +228,7 @@ def test_rank_candidates_stores_the_ranks_of_the_top(
     assert "Too old to count" not in prompt
     assert run.usage.summary()["calls"] == 1
     assert run.stats["ranking"] == {
+        "method": "llm",
         "prompt_chars": len(prompt),
         "ranked": 2,
         "top": MIN_CANDIDATES,
