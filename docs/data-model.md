@@ -75,14 +75,16 @@ Every digest run records how each active source's fetch went:
 |---|---|
 | `fetched_at` | Last successful fetch, including "not modified" (HTTP 304) |
 | `failing_since` | First failure of the current run of failures; empty while fetches succeed |
-| `permanent_failing_since` | First failure of the current run of permanent errors (404, 410, 403, not a feed); empty when the last error was temporary (429, 5xx, timeout, network error) |
+| `permanent_failing_since` | First failure of the current run of permanent errors (404, 410, 403, not a feed); empty when the last error was temporary (429, 5xx, timeout, network error, a 404 from YouTube's feed endpoint) |
 | `failed_at` | Last failed fetch; empty while fetches succeed |
 | `fetch_failures` | Failed fetches in a row |
 | `fetch_error` | Error of the last failed fetch |
 
 A successful fetch clears the failure columns. Temporary errors are told apart
 from permanent ones because rate limits and outages go away by themselves,
-while a feed answering 404 for weeks has moved or ended. `etag` and
+while a feed answering 404 for weeks has moved or ended.
+YouTube's feed endpoint is the exception: during its outages it answers 404
+for every channel, so its 404 counts as temporary. `etag` and
 `last_modified` are saved from each successful fetch and sent back on the next
 one, so unchanged feeds answer 304.
 

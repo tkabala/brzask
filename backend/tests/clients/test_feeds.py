@@ -11,6 +11,7 @@ from brzask.clients.feeds import (
     FeedRequest,
     FeedResult,
     FetchStatus,
+    is_temporary,
     parse_entries,
 )
 
@@ -189,6 +190,21 @@ def test_download_failures_are_reported(
     assert result.error.startswith(error)
     assert result.temporary is temporary
     assert result.entries == []
+
+
+@pytest.mark.parametrize(
+    ("url", "temporary"),
+    [
+        ("https://www.youtube.com/feeds/videos.xml?channel_id=UC123", True),
+        ("https://feeds.test/videos.xml", False),
+    ],
+)
+def test_a_youtube_feed_404_is_temporary(url: str, temporary: bool) -> None:
+    request = httpx2.Request("GET", url)
+    response = httpx2.Response(404, request=request)
+    error = httpx2.HTTPStatusError("404", request=request, response=response)
+
+    assert is_temporary(error) is temporary
 
 
 def test_a_url_httpx_refuses_is_a_failure() -> None:

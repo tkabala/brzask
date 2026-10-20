@@ -160,6 +160,11 @@ def is_temporary(error: Exception) -> bool:
     """Rate limits, server errors, timeouts and network errors may go away by themselves."""
     if isinstance(error, httpx2.HTTPStatusError):
         status = error.response.status_code
+        if status == 404 and error.request.url.host == "www.youtube.com":
+            # YouTube's feed endpoint answers 404 for every channel during its
+            # outages (all 15 followed channels at once, 2026-10-20); a removed
+            # channel still goes dead through the longer rule for any failure.
+            return True
         return status in {408, 429} or status >= 500
     # A scheme httpx2 cannot speak (a redirect to ftp:) will not start working later.
     return isinstance(error, httpx2.TransportError) and not isinstance(
