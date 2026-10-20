@@ -53,6 +53,7 @@ def selection_prompt(
                     candidate.published_at.date().isoformat() if candidate.published_at else None
                 ),
                 "rank": candidate.rank,
+                "release": candidate.release,
                 "text": (candidate.text or candidate.snippet or "")[:PROMPT_TEXT_CHARS],
             }
             for candidate in candidates

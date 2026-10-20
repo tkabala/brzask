@@ -49,6 +49,7 @@ SAMPLES: dict[str, dict[str, Any]] = {
                 "source": "PG Weekly",
                 "published": "2026-10-16",
                 "rank": 1,
+                "release": False,
                 "text": "Postgres 18 can issue reads asynchronously.",
             },
             {
@@ -57,6 +58,7 @@ SAMPLES: dict[str, dict[str, Any]] = {
                 "source": "Rust Blog",
                 "published": None,
                 "rank": 2,
+                "release": True,
                 "text": "",
             },
         ],

@@ -23,13 +23,12 @@ POLISH = prompts.language("pl")
 
 
 def candidate(n: int, **fields: Any) -> Candidate:
-    defaults: dict[str, Any] = {"snippet": None, "published_at": NOW, "rank": n}
+    defaults: dict[str, Any] = {"snippet": None, "published_at": NOW, "rank": n, "release": False}
     return Candidate(
         link=f"https://news.example/{n}",
         title=f"Article {n}",
         source_id=n,
         source_name=f"Source {n}",
-        release=False,
         **(defaults | fields),
     )
 
@@ -121,6 +120,13 @@ def test_prompt_shows_the_text_cut_to_length_or_the_snippet() -> None:
     assert "   Only a snippet" in text
     assert "Published: unknown" in text
     assert "in Polish" in text
+
+
+def test_prompt_marks_release_notes() -> None:
+    text = selection_prompt([candidate(1, release=True), candidate(2)], [], ENGLISH)
+
+    assert text.count("Release notes: yes") == 1
+    assert text.index("Release notes: yes") < text.index("2. [Article 2]")
 
 
 class FakeModel:

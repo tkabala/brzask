@@ -4,7 +4,7 @@ digest language.
 
 Context:
   interests    [{topic, keywords: [str], notes}]
-  candidates   [{title, link, source, published, rank, text}]   best ranked first
+  candidates   [{title, link, source, published, rank, release, text}]   best ranked first
   digest_size  int
   language     {name, fallback_topic}
 #}
@@ -20,7 +20,7 @@ Answer with only a JSON object, no code fences or commentary:
 
 Rules:
 - "link": copied exactly from the list below; never change or invent a URL.
-- "title": the headline in {{ language.name }}, translated when it is in another language. Keep product names, company names and other proper nouns as they are.
+- "title": the headline in {{ language.name }}, translated when it is in another language. Keep product names, company names and other proper nouns as they are. For release notes whose headline is only a version or tag (e.g. "v2.8.0-rc.1"), name the project and the version, e.g. "Caddy 2.8.0, first release candidate".
 - "summary": 2-3 sentences in {{ language.name }}.
 - "whyItMatters": one sentence in {{ language.name }}, on why this reader should care.
 - "topic": the interest topic above that best matches the article, copied exactly; if none fits, "{{ language.fallback_topic }}". The digest groups articles by this field, so choose consistently.
@@ -32,6 +32,9 @@ Candidates:
    Source: {{ candidate.source }}
    Published: {{ candidate.published or "unknown" }}
    Rank: {{ candidate.rank }}
+{% if candidate.release %}
+   Release notes: yes
+{% endif %}
 {% if candidate.text %}
    {{ candidate.text }}
 {% endif %}
