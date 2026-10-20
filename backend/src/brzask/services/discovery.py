@@ -275,6 +275,10 @@ def discover_sources(
 
     with context.stage("judge"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
         verdicts = list(pool.map(lambda c: judge_feed(c, judge, interests, context.usage), active))
+    if verdicts and all(verdict.scores is None for verdict in verdicts):
+        # An unusable judge would store every feed as pending, and pending feeds
+        # are never proposed again; failing the run keeps them for the next one.
+        raise JudgeError(f"no verdict for any of {len(verdicts)} feeds")
 
     if not context.dry_run:
         with context.sessions.begin() as session:

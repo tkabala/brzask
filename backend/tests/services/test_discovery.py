@@ -350,15 +350,17 @@ def test_a_failed_search_skips_only_its_interest(
     assert stored(session, "https://great.example/feed").status is SourceStatus.ACTIVE
 
 
-def test_a_failing_judge_leaves_everything_pending(
+def test_a_judge_that_answers_nothing_fails_the_run_and_stores_nothing(
     sessions: sessionmaker[Session], session: Session, make: Factories
 ) -> None:
     search, finder = setup(make)
 
-    discover_sources(context(sessions), search, finder, FakeJudge({}))
+    with pytest.raises(JudgeError, match="no verdict"):
+        discover_sources(context(sessions), search, finder, FakeJudge({}))
 
-    assert stored(session, "https://great.example/feed").status is SourceStatus.PENDING
-    assert stored(session, "https://spam.example/feed").status is SourceStatus.PENDING
+    assert (
+        session.scalars(select(Source).where(Source.origin == SourceOrigin.DISCOVERY)).all() == []
+    )
 
 
 def test_a_dry_run_judges_but_stores_nothing(
