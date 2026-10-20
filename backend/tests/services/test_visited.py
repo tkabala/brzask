@@ -7,7 +7,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import Article, ChangeStatus, Source, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository
-from brzask.services.visited import ACTOR, known_hosts, new_hosts, propose_visited, related
+from brzask.services.visited import (
+    ACTOR,
+    known_hosts,
+    known_sites,
+    new_hosts,
+    propose_visited,
+    related,
+    site_of,
+)
 from tests.factories import Factories
 from tests.services.digest.fakes import NOW, context
 
@@ -53,6 +61,51 @@ def test_new_hosts_keep_one_entry_per_unknown_host_newest_first() -> None:
         ("newsite.dev", "https://www.newsite.dev/latest", "Title 0"),
         ("other.net", "https://other.net/x", "Title 5"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("url", "site"),
+    [
+        ("https://www.example.com/post?id=1", "example.com"),
+        ("https://github.com/owner/repo/releases/tag/v1", "github.com/owner/repo"),
+        ("https://github.com/owner/repo/releases.atom", "github.com/owner/repo"),
+        ("https://www.youtube.com/watch?v=abc", "youtube.com/watch?v=abc"),
+        ("https://youtu.be/abc", "youtu.be/abc"),
+        ("http://[broken", ""),
+    ],
+)
+def test_site_of(url: str, site: str) -> None:
+    assert site_of(url) == site
+
+
+def test_new_hosts_tell_github_repositories_and_youtube_videos_apart() -> None:
+    sources = ["https://github.com/known/repo/releases.atom", "https://youtube.com/feeds/x"]
+    articles = opened(
+        "https://github.com/known/repo/issues/1",
+        "https://github.com/other/tool",
+        "https://github.com/other/tool/releases",
+        "https://www.youtube.com/watch?v=one",
+        "https://www.youtube.com/watch?v=two",
+    )
+
+    found = new_hosts(articles, known_sites(sources))
+
+    assert [h.host for h in found] == [
+        "github.com/other/tool",
+        "youtube.com/watch?v=one",
+        "youtube.com/watch?v=two",
+    ]
+
+
+def test_new_hosts_skip_links_to_the_site_of_their_own_source() -> None:
+    channel = Source(url="https://www.youtube.com/feeds/videos.xml?channel_id=UC1")
+    aggregator = Source(url="https://news.ycombinator.com/rss")
+    own = Article(link="https://www.youtube.com/watch?v=own", title="Own", source=channel)
+    linked = Article(link="https://youtube.com/watch?v=hn", title="Linked", source=aggregator)
+
+    found = new_hosts([own, linked], known_sites([channel.url, aggregator.url]))
+
+    assert [h.link for h in found] == ["https://youtube.com/watch?v=hn"]
 
 
 class FakeFinder:
@@ -143,3 +196,21 @@ def test_a_dry_run_proposes_without_writing(
 
     assert run.stats["proposed"] == [{"host": "newsite.dev", "url": "https://newsite.dev/feed"}]
     assert session.scalars(select(Source)).all() == []
+
+
+def test_two_videos_of_one_channel_propose_it_once(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    make.article(link="https://youtube.com/watch?v=1", opened_at=NOW - timedelta(days=1))
+    make.article(link="https://youtube.com/watch?v=2", opened_at=NOW - timedelta(days=2))
+    channel = FoundFeed(
+        "https://www.youtube.com/feeds/videos.xml?channel_id=UC1", "Channel", "https://youtube.com"
+    )
+    finder = FakeFinder(
+        {"https://youtube.com/watch?v=1": channel, "https://youtube.com/watch?v=2": channel}
+    )
+    run = context(sessions, dry_run=True)
+
+    propose_visited(run, finder)
+
+    assert run.stats["proposed"] == [{"host": "youtube.com/watch?v=1", "url": channel.url}]

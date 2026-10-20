@@ -5,12 +5,16 @@ Most opened articles come from a site that is already a source. Aggregators
 a signal: the reader reads things from there, and it is not followed yet.
 Its feed becomes a `pending` source, without an LLM judge: there are a few a
 week, so a person can look at each one.
+
+On GitHub and YouTube one host holds many feeds (a repository's releases, a
+channel's videos), so there the repository or the video counts as the site.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from brzask.clients.feed_finder import FeedFinder, FoundFeed
 from brzask.clients.feeds import FeedFetcher
@@ -37,7 +41,7 @@ class FindsFeeds(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class NewHost:
-    host: str
+    host: str  # the site: a host, a GitHub repository or a YouTube video
     link: str  # the most recently opened article from it
     title: str
 
@@ -51,23 +55,57 @@ def related(host: str, known: str) -> bool:
     return host_matches(host, known) or host_matches(known, host)
 
 
-def new_hosts(opened: Iterable[Article], known_hosts: Iterable[str]) -> list[NewHost]:
-    """One entry per host no source covers, from articles newest opened first.
+def site_of(url: str) -> str:
+    """The site a link belongs to; empty for something that is not a URL.
 
-    A link without a host is skipped rather than turned into a broken candidate.
+    The host, except on GitHub, where it is the repository (`github.com/owner/repo`),
+    and on YouTube, where it is the video or channel page: which channel a
+    video belongs to is only known once its page is fetched.
     """
-    known = {host for host in known_hosts if host}
+    host = host_of(url)
+    if host == "github.com":
+        segments = [s for s in urlsplit(url).path.split("/") if s][:2]
+        return "/".join([host, *segments])
+    if host_matches(host, "youtube.com") or host == "youtu.be":
+        parts = urlsplit(url)
+        return f"{host}{parts.path}" + (f"?{parts.query}" if parts.query else "")
+    return host
+
+
+def new_hosts(opened: Iterable[Article], known_sites: Iterable[str]) -> list[NewHost]:
+    """One entry per site no source covers, from articles newest opened first.
+
+    An article that links to the site of its own source (a channel's video, a
+    repository's release) came through that source's feed and is skipped. So
+    is a link without a host, rather than turned into a broken candidate.
+    """
+    known = {site for site in known_sites if site}
     found: dict[str, NewHost] = {}
     for article in opened:
-        host = host_of(article.link)
-        if not host or host in found or any(related(host, other) for other in known):
+        site = site_of(article.link)
+        if not site or site in found or _from_own_source(article):
             continue
-        found[host] = NewHost(host, article.link, article.title)
+        if any(related(site, other) for other in known):
+            continue
+        found[site] = NewHost(site, article.link, article.title)
     return list(found.values())
 
 
 def known_hosts(urls: Iterable[str | None]) -> set[str]:
     return {host_of(url) for url in urls if url} - {""}
+
+
+def known_sites(urls: Iterable[str | None]) -> set[str]:
+    """The sites of source and site URLs, as `site_of` gives them."""
+    return {site_of(url) for url in urls if url} - {""}
+
+
+def _from_own_source(article: Article) -> bool:
+    source = article.source
+    if source is None:
+        return False
+    host = host_of(article.link)
+    return any(related(host, other) for other in known_hosts([source.url, source.site_url]))
 
 
 def propose_visited(context: RunContext, finder: FindsFeeds) -> None:
@@ -79,17 +117,21 @@ def propose_visited(context: RunContext, finder: FindsFeeds) -> None:
     since = context.started_at - OPENED_WINDOW
     with context.sessions.begin() as session:
         sources = SourceRepository(session).find()
-        hosts = known_hosts([s.url for s in sources] + [s.site_url for s in sources])
+        sites = known_sites([s.url for s in sources] + [s.site_url for s in sources])
         opened = ArticleRepository(session).opened_since(since)
-        candidates = new_hosts(opened, hosts)
+        candidates = new_hosts(opened, sites)
 
     proposed: list[dict[str, str]] = []
     without_feed: list[str] = []
+    feeds: set[str] = set()
     for candidate in candidates:
         found = finder.find(candidate.link)
         if found is None:
             without_feed.append(candidate.host)
             continue
+        if found.url in feeds:  # two videos of one channel
+            continue
+        feeds.add(found.url)
         if context.dry_run:
             proposed.append({"host": candidate.host, "url": found.url})
             continue
