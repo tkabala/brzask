@@ -11,6 +11,7 @@ import typer
 from brzask.cli import common
 from brzask.cli.common import table
 from brzask.clients.judge import Judge, LLMJudge, SystemOneJudge
+from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
 from brzask.config.settings import Settings
 from brzask.services.digest import scoring
@@ -64,7 +65,8 @@ def judge_bench_command(
 
 def _judge(settings: Settings, name: str | None) -> Judge:
     if name == LLM:
-        return LLMJudge.from_settings(settings, settings.llm.model)
+        # LLM_MODEL where it is served: JUDGE_BASE_URL and JUDGE_API_KEY may point elsewhere.
+        return LLMJudge(LLMClient.from_settings(settings.llm))
     if name is None and settings.judge.backend == "llm":
         return LLMJudge.from_settings(settings)
     return SystemOneJudge.from_settings(settings, name)

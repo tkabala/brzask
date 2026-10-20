@@ -101,3 +101,15 @@ def test_articles_the_judge_cannot_answer_are_counted(
 
     assert [row.title for row in result.rows] == ["B"]
     assert result.failed == 1
+
+
+def test_a_day_the_judge_cannot_answer_at_all_is_counted_not_fatal(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    source = make.source()
+    make.article(source, title="A", digest_date=TODAY, shown_at=NOW)
+
+    result = score_shown(sessions, FakeJudge(fail={"A"}), TODAY)
+
+    assert result.rows == []
+    assert result.failed == 1

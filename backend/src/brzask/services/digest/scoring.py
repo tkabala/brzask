@@ -96,11 +96,7 @@ class Scored:
 
     def composite(self, weights: Mapping[str, float]) -> float:
         """Weighted sum of each dimension's score scaled to 0..1."""
-        return sum(
-            weight * _scaled(self.answers[name])
-            for name, weight in weights.items()
-            if name in self.answers
-        )
+        return weighted({name: scaled(answer) for name, answer in self.answers.items()}, weights)
 
 
 def judge_state(
@@ -163,5 +159,11 @@ def composite_ranking(scored: Sequence[Scored], weights: Mapping[str, float]) ->
     return [item.position for item in ordered]
 
 
-def _scaled(answer: ScoreAnswer) -> float:
+def scaled(answer: ScoreAnswer) -> float:
+    """The answer's score scaled to 0..1."""
     return answer.score / (len(answer.probabilities) - 1)
+
+
+def weighted(scores: Mapping[str, float], weights: Mapping[str, float]) -> float:
+    """Weighted sum of scaled scores; a dimension without a score counts as 0."""
+    return sum(weight * scores.get(name, 0.0) for name, weight in weights.items())

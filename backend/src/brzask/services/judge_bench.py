@@ -19,7 +19,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.clients.judge import Judge
+from brzask.clients.judge import Judge, JudgeError
 from brzask.clients.usage import UsageMeter
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository
@@ -52,7 +52,7 @@ class BenchResult:
     usage: dict[str, Any] = field(default_factory=dict)
 
     def composite(self, weights: Mapping[str, float]) -> list[float]:
-        return [_weighted(row.scores, weights) for row in self.rows]
+        return [scoring.weighted(row.scores, weights) for row in self.rows]
 
     def aucs(self, weights: Mapping[str, float] = scoring.WEIGHTS) -> dict[str, float | None]:
         """AUC per dimension and of the composite; None without both kinds of article."""
@@ -100,9 +100,14 @@ def score_shown(
             candidates, _ = carried_candidates(shown, sources)
             by_id = {article.id: article for article in shown}
         titles = [opened.title for opened in opens[:OPENED_TITLES]]
-        scored = scoring.score_candidates(
-            candidates, judge, interests, titles, meter=meter, workers=workers
-        )
+        try:
+            scored = scoring.score_candidates(
+                candidates, judge, interests, titles, meter=meter, workers=workers
+            )
+        except JudgeError as error:
+            # Every call of this day failed; the other days are still worth scoring.
+            log.warning("day not scored", day=run.day.isoformat(), error=str(error))
+            scored = []
         failed += len(candidates) - len(scored)
         for item in scored:
             candidate = candidates[item.position]
@@ -113,10 +118,7 @@ def score_shown(
                     article_id=candidate.article_id,
                     title=candidate.title,
                     opened=by_id[candidate.article_id].opened_at is not None,
-                    scores={
-                        name: answer.score / (len(answer.probabilities) - 1)
-                        for name, answer in item.answers.items()
-                    },
+                    scores={name: scoring.scaled(answer) for name, answer in item.answers.items()},
                 )
             )
         log.info("day scored", day=run.day.isoformat(), articles=len(scored))
@@ -149,7 +151,3 @@ def report(results: Sequence[BenchResult]) -> dict[str, Any]:
             for result in results
         ],
     }
-
-
-def _weighted(scores: Mapping[str, float], weights: Mapping[str, float]) -> float:
-    return sum(weight * scores[name] for name, weight in weights.items() if name in scores)

@@ -110,8 +110,8 @@ def evaluate(
             continue
         weights = fit(training, l2)
         for example in held_out:
-            learned_scores.append(composite(example.scores, weights))
-            hand_scores.append(composite(example.scores, hand))
+            learned_scores.append(scoring.weighted(example.scores, weights))
+            hand_scores.append(scoring.weighted(example.scores, hand))
             labels.append(example.opened)
     return Evaluation(
         learned=fit(examples, l2),
@@ -121,10 +121,6 @@ def evaluate(
         examples=len(examples),
         opened=sum(example.opened for example in examples),
     )
-
-
-def composite(scores: Mapping[str, float], weights: Mapping[str, float]) -> float:
-    return sum(weight * scores.get(name, 0.0) for name, weight in weights.items())
 
 
 def _sigmoid(value: float) -> float:
