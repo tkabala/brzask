@@ -4,7 +4,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, Subquery, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -142,16 +142,7 @@ class SourceRepository:
 
     def records(self) -> list[SourceRecord]:
         """Every source with its article, shown and opened counts over all time."""
-        counts = (
-            select(
-                Article.source_id,
-                func.count().label("articles"),
-                func.count().filter(Article.state == ArticleState.SHOWN).label("shown"),
-                func.count(Article.opened_at).label("opened"),
-            )
-            .group_by(Article.source_id)
-            .subquery()
-        )
+        counts = _article_counts()
         query = (
             select(
                 Source.id,
@@ -174,18 +165,7 @@ class SourceRepository:
         Grouped by `source_id`, so renaming a source keeps its history. Every
         source is present, with zeros when it published nothing.
         """
-        window = (
-            select(
-                Article.source_id,
-                func.count().label("articles"),
-                func.count(Article.rank).label("ranked"),
-                func.count().filter(Article.state == ArticleState.SHOWN).label("shown"),
-                func.count(Article.opened_at).label("opened"),
-            )
-            .where(Article.first_seen_at >= since)
-            .group_by(Article.source_id)
-            .subquery()
-        )
+        window = _article_counts(Article.first_seen_at >= since)
         query = select(
             Source.id,
             func.coalesce(window.c.articles, 0),
@@ -197,3 +177,19 @@ class SourceRepository:
             source_id: SourceStats(source_id, articles, ranked, shown, opened)
             for source_id, articles, ranked, shown, opened in self.session.execute(query)
         }
+
+
+def _article_counts(*where: ColumnElement[bool]) -> Subquery:
+    """Per source: articles, ranked, shown and opened, of the articles matching `where`."""
+    return (
+        select(
+            Article.source_id,
+            func.count().label("articles"),
+            func.count(Article.rank).label("ranked"),
+            func.count().filter(Article.state == ArticleState.SHOWN).label("shown"),
+            func.count(Article.opened_at).label("opened"),
+        )
+        .where(*where)
+        .group_by(Article.source_id)
+        .subquery()
+    )
