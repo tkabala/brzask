@@ -413,6 +413,11 @@ class DigestSettings(SettingsGroup):
         description="llm (the LLM orders the pool) or judge (each article scored "
         "on several dimensions by JUDGE_BACKEND, weighted in code).",
     )
+    deduplication: Literal["threshold", "judge"] = Field(
+        "threshold",
+        description="threshold (same-day duplicates by an adaptive similarity threshold) "
+        "or judge (JUDGE_BACKEND decides pairs in the grey zone).",
+    )
 
 
 PositiveAmount = Annotated[Annotated[Decimal, Field(gt=0)] | None, BeforeValidator(_empty_to_none)]

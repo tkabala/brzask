@@ -260,3 +260,29 @@ def test_a_judge_ranks_the_pool_when_given(
     assert model.purposes == ["selection"]
     assert finished.stats["ranking"]["method"] == "judge"
     assert finished.stats["usage"]["by_purpose"]["ranking"]["calls"] == 6 * 4
+
+
+@pytest.mark.parametrize(
+    ("ranking", "deduplication", "expected"),
+    [("llm", "judge", (False, True)), ("judge", "judge", (True, True))],
+)
+def test_one_judge_serves_ranking_and_deduplication_as_set(
+    sessions: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+    ranking: str,
+    deduplication: str,
+    expected: tuple[bool, bool],
+) -> None:
+    monkeypatch.setenv("DIGEST_RANKING", ranking)
+    monkeypatch.setenv("DIGEST_DEDUPLICATION", deduplication)
+    built: list[tuple[bool, bool]] = []
+
+    def build(context: RunContext, clients: DigestClients) -> None:
+        built.append((clients.judge is not None, clients.dedup_judge is not None))
+        if clients.judge and clients.dedup_judge:
+            assert clients.judge is clients.dedup_judge
+
+    monkeypatch.setattr(pipeline, "build_digest", build)
+    run_digest(context(sessions))
+
+    assert built == [expected]

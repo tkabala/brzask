@@ -38,6 +38,7 @@ class DigestClients:
     language: Language
     timezone: tzinfo  # the digest date is the local date when the run starts
     judge: Judge | None = None  # ranks by composite score instead of the LLM when set
+    dedup_judge: Judge | None = None  # decides same-day grey-zone pairs when set
 
 
 def build_digest(context: RunContext, clients: DigestClients) -> None:
@@ -62,7 +63,9 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
         raise SkipRunError("no candidates")
     top = rank_candidates(context, pool, clients.llm, judge=clients.judge)
     extracted = extract_and_embed(context, top, clients.extractor, clients.embedder)
-    survivors = deduplicate_candidates(context, extracted, clients.embedder.model)
+    survivors = deduplicate_candidates(
+        context, extracted, clients.embedder.model, judge=clients.dedup_judge
+    )
     picks = select_digest(context, survivors, clients.llm, clients.language)
 
     if not context.dry_run:
@@ -94,8 +97,10 @@ def run_digest(context: RunContext) -> None:
         stack.callback(llm.client.close)
         embedder = Embedder.from_settings(settings, model)
         stack.callback(embedder.client.close)
-        judge = build_judge(settings) if settings.digest.ranking == "judge" else None
-        if judge is not None:
+        digest = settings.digest
+        judge = None
+        if "judge" in (digest.ranking, digest.deduplication):
+            judge = build_judge(settings)
             stack.callback(judge.close)
         build_digest(
             context,
@@ -106,7 +111,8 @@ def run_digest(context: RunContext) -> None:
                 embedder=embedder,
                 language=prompts.language(settings.digest.language),
                 timezone=settings.scheduler.timezone,
-                judge=judge,
+                judge=judge if digest.ranking == "judge" else None,
+                dedup_judge=judge if digest.deduplication == "judge" else None,
             ),
         )
 

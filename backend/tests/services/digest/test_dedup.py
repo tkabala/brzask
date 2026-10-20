@@ -1,10 +1,13 @@
 import math
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
+from brzask.clients.judge import JudgeError, Judgement, Noul, NoulAnswer, Question, Text
+from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import EMBEDDING_DIMENSIONS
 from brzask.services.digest.dedup import (
     DEFAULT_MODEL,
@@ -15,6 +18,8 @@ from brzask.services.digest.dedup import (
     cosine,
     deduplicate,
     deduplicate_candidates,
+    grey_pairs,
+    judge_same_event,
     thresholds_for,
 )
 from brzask.services.digest.pool import Candidate
@@ -212,12 +217,14 @@ def test_the_stage_compares_with_recent_articles_of_the_same_model(
     assert ranks(survivors) == list(range(2, 13))
     stats = run.stats["deduplication"]
     assert {key: value for key, value in stats.items() if key != "drops"} == {
+        "same_day_method": "threshold",
         "candidates": 12,
         "survivors": 11,
         "shown_compared": 1,
         "cross_day_dropped": 1,
         "same_day_dropped": 0,
         "same_day_threshold": 0.80,
+        "judged_pairs": 0,
         "thresholds_measured": False,
     }
     assert stats["drops"] == [
@@ -226,6 +233,151 @@ def test_the_stage_compares_with_recent_articles_of_the_same_model(
             "reason": "cross_day",
             "similarity": 1.0,
             "duplicate_of": None,
+            "same_event": None,
         }
     ]
     assert "deduplication" in run.timings
+
+
+# --- Same-day, judged ------------------------------------------------------------------
+
+
+def judged(probabilities: dict[tuple[int, int], float]) -> Any:
+    """A same-event answer by rank pair; pairs not listed are 0 (different events)."""
+    asked: list[list[tuple[int | None, int | None]]] = []
+
+    def same_event(pairs: Any) -> dict[tuple[str, str], float]:
+        asked.append([(a.rank, b.rank) for a, b in pairs])
+        return {
+            (a.link, b.link): probabilities.get((a.rank or 0, b.rank or 0), 0.0) for a, b in pairs
+        }
+
+    same_event.asked = asked  # type: ignore[attr-defined]
+    return same_event
+
+
+def test_grey_pairs_are_those_between_the_lowest_same_day_and_the_cross_day_threshold() -> None:
+    candidates = [
+        candidate(1, axis(0)),
+        candidate(2, near(0.85, 0, 2)),  # grey with 1
+        candidate(3, near(0.97, 0, 3)),  # above the zone with 1
+        candidate(4, near(0.79, 0, 4)),  # below it
+        candidate(5, None),
+    ]
+
+    pairs = grey_pairs(list(reversed(candidates)), 0.80, 0.96)
+
+    assert [(a.rank, b.rank) for a, b in pairs] == [(1, 2), (2, 3)]  # 2-3: 0.85 * 0.97
+
+
+def test_the_judge_decides_grey_pairs_and_above_the_zone_needs_no_judge() -> None:
+    candidates = [
+        candidate(1, axis(0)),
+        candidate(2, near(0.85, 0, 2)),  # same event as 1, judged
+        candidate(3, near(0.82, 0, 3)),  # same topic as 1, judged different
+        candidate(4, near(0.97, 0, 4)),  # above the zone
+        *distinct(5, 9),
+    ]
+    same_event = judged({(1, 2): 0.9, (1, 3): 0.2})
+
+    result = deduplicate(candidates, [], GEMINI, same_event)
+
+    assert ranks(result.survivors) == [1, 3, *range(5, 14)]
+    assert result.drops == [
+        Drop("https://news.example/2", "same_day", 0.85, "https://news.example/1", 0.9),
+        Drop("https://news.example/4", "same_day", 0.97, "https://news.example/1", None),
+    ]
+    assert result.same_day_threshold is None
+    assert result.judged_pairs == len(same_event.asked[0])
+
+
+def test_an_undecided_judge_keeps_both() -> None:
+    candidates = [candidate(1, axis(0)), candidate(2, near(0.85, 0, 2)), *distinct(3, 9)]
+
+    result = deduplicate(candidates, [], GEMINI, judged({(1, 2): 0.49}))
+
+    assert result.drops == []
+
+
+def test_the_judged_pass_keeps_the_survivor_floor() -> None:
+    # Every pair at 0.99 * 0.99 = 0.98, above the zone.
+    candidates = [candidate(rank, near(0.99, 0, rank)) for rank in range(1, 12)]
+
+    result = deduplicate(candidates, [], GEMINI, judged({}))
+
+    assert len(result.survivors) == MIN_SURVIVORS
+    assert ranks(result.survivors) == [1, *range(4, 12)]  # the first two duplicates go
+
+
+def test_without_grey_pairs_the_judge_is_not_asked() -> None:
+    same_event = judged({})
+
+    deduplicate(distinct(1, 10), [], GEMINI, same_event)
+
+    assert same_event.asked == []
+
+
+class PairJudge:
+    """Says every pair is one event with probability 0.8; keeps the request."""
+
+    model = "test/judge"
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.requests: list[tuple[Any, dict[str, Question]]] = []
+
+    def ask(
+        self,
+        state: Text,
+        questions: Any,
+        *,
+        purpose: str,
+        meter: UsageMeter | None = None,
+    ) -> Judgement:
+        self.requests.append((state, dict(questions)))
+        if self.fail:
+            raise JudgeError("unavailable")
+        usage = CallUsage(self.model, purpose, 300, 0, 0.00001, 1)
+        if meter is not None:
+            meter.add(usage)
+        return Judgement({name: NoulAnswer(0.8) for name in questions}, usage)
+
+    def close(self) -> None:
+        pass
+
+
+def test_pairs_are_asked_in_one_call_with_each_article_once() -> None:
+    judge = PairJudge()
+    first = candidate(1, axis(0), text="A long text " * 200)
+    second = replace(candidate(2, near(0.85, 0, 2)), snippet="Only a snippet")
+    third = candidate(3, near(0.85, 0, 3))
+
+    answers = judge_same_event(judge)([(first, second), (first, third)])
+
+    assert answers == {(first.link, second.link): 0.8, (first.link, third.link): 0.8}
+    ((state, questions),) = judge.requests
+    assert list(state["articles"]) == ["a1", "a2", "a3"]
+    assert len(state["articles"]["a1"]["text"]) == 1000
+    assert state["articles"]["a2"]["text"] == "Only a snippet"
+    question = questions["pair1"]
+    assert isinstance(question, Noul)
+    assert question.instructions == "Do `articles.a1` and `articles.a3` report the same event?"
+
+
+def test_the_stage_uses_the_judge_and_falls_back_when_it_fails(
+    sessions: sessionmaker[Session],
+) -> None:
+    candidates = [candidate(1, axis(0)), candidate(2, near(0.85, 0, 2)), *distinct(3, 9)]
+
+    run = context(sessions)
+    survivors = deduplicate_candidates(run, candidates, TEST_MODEL, judge=PairJudge())
+    assert len(survivors) == 10
+    assert run.stats["deduplication"]["same_day_method"] == "judge"
+    assert run.stats["deduplication"]["judged_pairs"] == 1
+    assert run.stats["deduplication"]["drops"][0]["same_event"] == 0.8
+    assert run.usage.summary()["by_purpose"]["deduplication"]["calls"] == 1
+
+    run = context(sessions)
+    survivors = deduplicate_candidates(run, candidates, TEST_MODEL, judge=PairJudge(fail=True))
+    assert len(survivors) == 10  # the 0.80 threshold drops the pair too
+    assert run.stats["deduplication"]["same_day_method"] == "threshold (judge failed)"

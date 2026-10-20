@@ -31,7 +31,15 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.judge import Judge
@@ -90,8 +98,17 @@ class RankingConfig(_Section):
 
 
 class DeduplicationConfig(_Section):
-    cross_day: float = Field(gt=0, le=1)
-    same_day: tuple[float, ...] = Field(min_length=1)
+    # "judge": grey-zone pairs are asked about (needs a judge, see judge_model).
+    method: Literal["threshold", "judge"] = "threshold"
+    # Both or neither; neither keeps the embedding model's own thresholds.
+    cross_day: float | None = Field(None, gt=0, le=1)
+    same_day: tuple[float, ...] | None = Field(None, min_length=1)
+
+    @model_validator(mode="after")
+    def _both_thresholds(self) -> Self:
+        if (self.cross_day is None) != (self.same_day is None):
+            raise ValueError("set both cross_day and same_day, or neither")
+        return self
 
 
 class SelectionConfig(_Section):
@@ -105,14 +122,13 @@ class ReplayConfig(_Section):
     """
 
     llm_model: str | None = None  # None: LLM_MODEL
-    judge_model: str | None = None  # None: JUDGE_MODEL; used when ranking.method = "judge"
+    judge_model: str | None = None  # None: JUDGE_MODEL; for the methods set to "judge"
     # None: the active model. Another one compares its stored vectors, e.g. after
     # `brzask reembed --no-switch`, to check its thresholds before switching.
     embedding_model: str | None = None
     pool: PoolConfig = PoolConfig()
     ranking: RankingConfig = RankingConfig()
-    # None: the embedding model's own thresholds.
-    deduplication: DeduplicationConfig | None = None
+    deduplication: DeduplicationConfig = DeduplicationConfig()
     selection: SelectionConfig = SelectionConfig()
 
     @classmethod
@@ -132,9 +148,13 @@ class ReplayConfig(_Section):
 
     def thresholds(self) -> Thresholds | None:
         """The thresholds to try; None keeps the model's own, with a warning if unmeasured."""
-        if self.deduplication is None:
+        dedup = self.deduplication
+        if dedup.cross_day is None or dedup.same_day is None:
             return None
-        return Thresholds(self.deduplication.cross_day, self.deduplication.same_day)
+        return Thresholds(dedup.cross_day, dedup.same_day)
+
+    def uses_judge(self) -> bool:
+        return "judge" in (self.ranking.method, self.deduplication.method)
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +163,7 @@ class ReplayClients:
     llm_model: str  # reported with the results
     embedding_model: str  # stored vectors of other models are not used
     language: Language
-    judge: Judge | None = None  # required when the config ranks with a judge
+    judge: Judge | None = None  # required when the config uses a judge
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,15 +295,19 @@ def replay_day(
         dry_run=True,
     )
     try:
-        judge = clients.judge if config.ranking.method == "judge" else None
-        if config.ranking.method == "judge" and judge is None:
-            raise ValueError("ranking.method = judge needs a judge client")
+        if config.uses_judge() and clients.judge is None:
+            raise ValueError("a method set to judge needs a judge client")
+        ranking_judge = clients.judge if config.ranking.method == "judge" else None
         top = rank_candidates(
-            context, candidates, clients.llm, config.limits(), judge, config.weights()
+            context, candidates, clients.llm, config.limits(), ranking_judge, config.weights()
         )
         top = with_stored_text(top, by_id, vectors)
         survivors = deduplicate_candidates(
-            context, top, clients.embedding_model, config.thresholds()
+            context,
+            top,
+            clients.embedding_model,
+            config.thresholds(),
+            clients.judge if config.deduplication.method == "judge" else None,
         )
         picks = select_digest(
             context, survivors, clients.llm, clients.language, config.selection.digest_size

@@ -34,7 +34,8 @@ def replay_command(
         typer.Option(
             "--config",
             help="TOML file with the values to try: llm_model, judge_model, [pool], "
-            "[ranking] (method = judge, [ranking.weights]), [deduplication], [selection].",
+            "[ranking] (method = judge, [ranking.weights]), [deduplication] "
+            "(method = judge), [selection].",
         ),
     ] = None,
     prompt_dir: Annotated[
@@ -77,7 +78,7 @@ def replay_command(
                 session, settings.embedding.model
             )
         judge = None
-        if config.ranking.method == "judge":
+        if config.uses_judge():
             judge = build_judge(settings, config.judge_model)
             stack.callback(judge.close)
         clients = ReplayClients(

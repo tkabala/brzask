@@ -280,6 +280,18 @@ def test_a_judge_config_ranks_with_the_judge_and_its_weights(
     assert config.weights() == {**WEIGHTS, "depth": 2.0}
 
 
+def test_a_judge_config_can_decide_grey_zone_duplicates(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    config = ReplayConfig.model_validate({"deduplication": {"method": "judge"}})
+
+    days = replay(sessions, clients(FakeModel(), FakeJudge()), since=TODAY, config=config)
+
+    assert days[0].stats["ranking"]["method"] == "llm"
+    assert days[0].stats["deduplication"]["same_day_method"] == "judge"
+    assert config.thresholds() is None
+
+
 def test_a_judge_config_without_a_judge_is_refused(
     sessions: sessionmaker[Session], history: dict[str, Article]
 ) -> None:
@@ -295,6 +307,7 @@ def test_a_judge_config_without_a_judge_is_refused(
         ("[ranking]\ntop_m = 20\n", "top_m"),  # misspelt: never ignored
         ("[ranking.weights]\nfit = 1.0\n", "unknown dimensions fit"),
         ('[ranking]\nmethod = "votes"\n', "'llm' or 'judge'"),
+        ('[deduplication]\nmethod = "votes"\n', "'threshold' or 'judge'"),
         ("[ranking]\ntop_n = 0\n", "greater than 0"),
         ("[deduplication]\ncross_day = 0.95\n", "same_day"),
         ("[ranking\n", "Expected"),
