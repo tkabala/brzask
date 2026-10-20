@@ -9,6 +9,7 @@ Significant decisions are recorded as Architecture Decision Records (ADRs) in th
 | [0002](0002-trafilatura-as-the-default-page-extractor.md) | Trafilatura as the default page extractor | Accepted |
 | [0003](0003-paid-web-search-for-discovery-is-optional.md) | Paid web search for discovery is optional | Accepted |
 | [0004](0004-no-vector-index-until-history-needs-one.md) | No vector index until the history needs one | Accepted |
+| [0005](0005-system-one-judgements-over-one-http-client.md) | System One judgements over one HTTP client for every model | Accepted |
 
 To add a decision, copy the [template](0000-template.md) to the next free number,
 fill it in and add it to this table and to the `nav` in `mkdocs.yml`.
