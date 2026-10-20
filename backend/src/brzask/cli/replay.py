@@ -80,7 +80,8 @@ def replay_command(
             embedding_model=embedding_model,
             language=prompts.language(settings.digest.language),
         )
-        results = replay(sessions, clients, since, config, workers)
+        with common.errors_as_messages():
+            results = replay(sessions, clients, since, config, workers)
 
     _print(results, summarize(results))
     if json_file is not None:

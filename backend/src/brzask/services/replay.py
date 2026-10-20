@@ -40,8 +40,9 @@ from brzask.db.models import Article, RunKind
 from brzask.log import get_logger
 from brzask.prompts import Language
 from brzask.repositories import ArticleRepository, EmbeddingRepository
+from brzask.repositories.articles import DigestRun
 from brzask.services.digest import pool, ranking, selection
-from brzask.services.digest.dedup import Thresholds, deduplicate_candidates, thresholds_for
+from brzask.services.digest.dedup import Thresholds, deduplicate_candidates
 from brzask.services.digest.pool import (
     Candidate,
     FeedSource,
@@ -51,6 +52,7 @@ from brzask.services.digest.pool import (
 )
 from brzask.services.digest.ranking import ChatModel, RankingLimits, rank_candidates
 from brzask.services.digest.selection import SelectionError, select_digest
+from brzask.services.errors import ServiceError
 from brzask.services.runs import RunContext
 
 log = get_logger(__name__)
@@ -110,9 +112,10 @@ class ReplayConfig(_Section):
     def limits(self) -> RankingLimits:
         return RankingLimits(**self.ranking.model_dump())
 
-    def thresholds(self, embedding_model: str) -> Thresholds:
+    def thresholds(self) -> Thresholds | None:
+        """The thresholds to try; None keeps the model's own, with a warning if unmeasured."""
         if self.deduplication is None:
-            return thresholds_for(embedding_model)[0]
+            return None
         return Thresholds(self.deduplication.cross_day, self.deduplication.same_day)
 
 
@@ -136,7 +139,7 @@ class ReplayPick:
 @dataclass(frozen=True, slots=True)
 class DayReplay:
     day: date
-    run_at: datetime  # end of the real run: the pool is what was stored by then
+    run_at: datetime  # start of the real run; the pool is what was stored by its end
     pool: int
     opened_in_pool: int  # the most opens any selection of this pool could score
     shown: int  # the real digest
@@ -171,10 +174,11 @@ class ReplaySummary:
 
 
 def replay_pool(articles: Iterable[Article], at: datetime, config: PoolConfig) -> list[Candidate]:
-    """The pool a run at `at` would have built from these stored articles.
+    """The pool a run started at `at` would have built from these stored articles.
 
-    `articles` are those first seen in the carry-over window and not shown
-    before `at`; stale ones are dropped and the cap applied as in a real run.
+    `articles` are those first seen in the carry-over window up to the run's
+    end and not shown before `at`; stale ones are dropped and the cap applied
+    as in a real run.
     """
     stored = list(articles)
     sources = {a.source.id: FeedSource.of(a.source) for a in stored if a.source is not None}
@@ -212,17 +216,19 @@ def with_stored_text(
 
 def replay_day(
     sessions: sessionmaker[Session],
-    day: date,
-    run_at: datetime,
+    run: DigestRun,
     clients: ReplayClients,
     config: ReplayConfig,
 ) -> DayReplay:
     """One day chosen again; a failed model call is reported on the day, not raised."""
+    day, run_at = run.day, run.started_at
     since = run_at - timedelta(days=config.pool.carry_over_days)
     with sessions.begin() as session:
         articles = ArticleRepository(session)
-        stored = articles.seen_between(since, run_at)
-        shown = articles.digest(day)
+        stored = articles.seen_between(since, run_at, run.finished_at)
+        # Only what this run showed: a forced run later that day appends
+        # articles that were never in this run's pool.
+        shown = [a for a in articles.digest(day) if a.shown_at == run_at]
         vectors = EmbeddingRepository(session).of_articles(
             [article.id for article in stored], clients.embedding_model
         )
@@ -253,7 +259,7 @@ def replay_day(
         top = rank_candidates(context, candidates, clients.llm, config.limits())
         top = with_stored_text(top, by_id, vectors)
         survivors = deduplicate_candidates(
-            context, top, clients.embedding_model, config.thresholds(clients.embedding_model)
+            context, top, clients.embedding_model, config.thresholds()
         )
         picks = select_digest(
             context, survivors, clients.llm, clients.language, config.selection.digest_size
@@ -300,12 +306,19 @@ def replay(
     """
     config = config or ReplayConfig()
     with sessions.begin() as session:
+        stored = EmbeddingRepository(session).counts_by_model()
         runs = ArticleRepository(session).digest_runs(since)
+    if stored and clients.embedding_model not in stored:
+        # Deduplication would compare nothing and the replay would look valid.
+        raise ServiceError(
+            f"no vectors of {clients.embedding_model} are stored "
+            "(brzask reembed --model ... --no-switch computes them)"
+        )
     log.info("replaying digests", days=len(runs), since=since.isoformat())
     with ThreadPoolExecutor(max_workers=workers) as executor:
         return list(
             executor.map(
-                lambda run: replay_day(sessions, run[0], run[1], clients, config),
+                lambda run: replay_day(sessions, run, clients, config),
                 runs,
             )
         )

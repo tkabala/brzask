@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.util import identity_key
 
-from brzask.db.models import Article, ArticleEmbedding, ArticleState, Source
+from brzask.db.models import Article, ArticleEmbedding, ArticleState, Run, RunKind, Source
 from brzask.repositories.embeddings import EmbeddingRepository
 
 # Rows per INSERT in `add_new`: six bind parameters each (five fields and the state
@@ -34,6 +34,15 @@ class Extraction:
     extracted_by: str | None
     embedding: Sequence[float] | None
     embedding_model: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DigestRun:
+    """The run that built a day's digest."""
+
+    day: date
+    started_at: datetime  # its articles' `shown_at`
+    finished_at: datetime  # its fresh entries were stored by then
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,21 +184,24 @@ class ArticleRepository:
         )
         return self.session.scalars(query).all()
 
-    def seen_between(self, since: datetime, until: datetime) -> Sequence[Article]:
-        """Articles first seen in [`since`, `until`] and not shown before `until`, with sources.
+    def seen_between(
+        self, since: datetime, started: datetime, finished: datetime
+    ) -> Sequence[Article]:
+        """Articles a digest run from `started` to `finished` could choose from, with sources.
 
-        What a digest run at `until` could choose from, as far as it was stored:
-        the pool of a past day, for `brzask replay`. Articles without a source
-        are left out.
+        First seen from `since` until the run finished (a run stores its fresh
+        entries after it starts) and not shown before it started: the pool of a
+        past day as far as it was stored, for `brzask replay`. Articles without
+        a source are left out.
         """
         query = (
             select(Article)
             .options(joinedload(Article.source))
             .where(
                 Article.first_seen_at >= since,
-                Article.first_seen_at <= until,
+                Article.first_seen_at <= finished,
                 Article.source_id.is_not(None),
-                Article.shown_at.is_(None) | (Article.shown_at >= until),
+                Article.shown_at.is_(None) | (Article.shown_at >= started),
             )
             .order_by(Article.first_seen_at, Article.id)
         )
@@ -277,22 +289,39 @@ class ArticleRepository:
         )
         return self.session.scalars(query).all()
 
-    def digest_runs(self, since: date) -> list[tuple[date, datetime]]:
-        """Days with a digest from `since` on, oldest first, each with its first `shown_at`.
+    def digest_runs(self, since: date) -> list[DigestRun]:
+        """Days with a digest from `since` on, oldest first, each with its first run.
 
-        A digest's articles are marked shown when its run ends, so that moment
-        bounds what the run could have seen.
+        A digest's articles are marked shown with the run's start, so the first
+        `shown_at` of a day is its run's start; the run row gives its end. Without
+        that row, the latest first sighting among the day's articles stands in.
         """
-        query = (
-            select(Article.digest_date, func.min(Article.shown_at))
+        shown = (
+            select(
+                Article.digest_date.label("day"),
+                func.min(Article.shown_at).label("started_at"),
+                func.max(Article.first_seen_at).label("last_seen"),
+            )
             .where(Article.digest_date >= since, Article.shown_at.is_not(None))
             .group_by(Article.digest_date)
-            .order_by(Article.digest_date)
+            .subquery()
+        )
+        finished_at = func.coalesce(
+            Run.finished_at, func.greatest(shown.c.started_at, shown.c.last_seen)
+        )
+        query = (
+            select(shown.c.day, shown.c.started_at, finished_at)
+            .outerjoin(
+                Run,
+                (Run.kind == RunKind.DIGEST)
+                & Run.dry_run.is_(False)
+                & (Run.started_at == shown.c.started_at),
+            )
+            .order_by(shown.c.day)
         )
         return [
-            (day, shown_at)
-            for day, shown_at in self.session.execute(query)
-            if day is not None and shown_at is not None
+            DigestRun(day, started_at, finished)
+            for day, started_at, finished in self.session.execute(query)
         ]
 
     def latest_digest_date(self) -> date | None:

@@ -1,11 +1,12 @@
+import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session
 
-from brzask.db.models import ArticleState
+from brzask.db.models import ArticleState, Run, RunKind
 from brzask.repositories import ArticleRepository, EmbeddingRepository
-from brzask.repositories.articles import DigestEntry, Extraction, NewArticle
+from brzask.repositories.articles import DigestEntry, DigestRun, Extraction, NewArticle
 from tests.factories import TEST_MODEL, Factories, unit_vector
 
 NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
@@ -140,9 +141,17 @@ def test_seen_between_is_what_a_past_run_could_choose_from(
     session: Session, make: Factories
 ) -> None:
     source = make.source("Lobsters")
-    run_at = NOW
+    run_at, run_end = NOW, NOW + timedelta(minutes=5)
     since = NOW - timedelta(days=7)
     fresh = make.article(source, title="Fresh", first_seen_at=NOW - timedelta(hours=1))
+    # Stored by the run itself, after it started, and picked by it.
+    stored_by_run = make.article(
+        source,
+        title="Stored by the run",
+        first_seen_at=NOW + timedelta(minutes=1),
+        shown_at=run_at,
+        digest_date=TODAY,
+    )
     picked = make.article(  # shown by this very run
         source,
         title="Picked",
@@ -164,28 +173,45 @@ def test_seen_between_is_what_a_past_run_could_choose_from(
         digest_date=TODAY - timedelta(days=1),
     )
     make.article(source, first_seen_at=NOW - timedelta(days=8))  # before the window
-    make.article(source, first_seen_at=NOW + timedelta(minutes=1))  # after the run
+    make.article(source, first_seen_at=NOW + timedelta(minutes=10))  # after the run
     make.article(None, first_seen_at=NOW - timedelta(hours=2))  # no source
 
-    stored = ArticleRepository(session).seen_between(since, run_at)
+    stored = ArticleRepository(session).seen_between(since, run_at, run_end)
 
-    assert stored == [later, picked, fresh]
+    assert stored == [later, picked, fresh, stored_by_run]
     assert stored[0].source is not None and stored[0].source.name == "Lobsters"
 
 
-def test_digest_runs_by_day_with_the_first_shown_at(session: Session, make: Factories) -> None:
+def test_digest_runs_by_day_with_the_first_run(session: Session, make: Factories) -> None:
+    yesterday = NOW - timedelta(days=1)
     make.article(digest_date=TODAY - timedelta(days=3), shown_at=NOW - timedelta(days=3))
-    make.article(digest_date=TODAY - timedelta(days=1), shown_at=NOW - timedelta(days=1))
-    make.article(  # appended by a forced run later that day
-        digest_date=TODAY - timedelta(days=1), shown_at=NOW - timedelta(hours=20)
+    make.article(
+        digest_date=TODAY - timedelta(days=1),
+        shown_at=yesterday,
+        first_seen_at=yesterday + timedelta(minutes=1),
     )
-    make.article(digest_date=TODAY, shown_at=NOW)
+    make.article(  # appended by a forced run later that day
+        digest_date=TODAY - timedelta(days=1),
+        shown_at=NOW - timedelta(hours=20),
+        first_seen_at=yesterday - timedelta(hours=1),
+    )
+    make.article(digest_date=TODAY, shown_at=NOW, first_seen_at=NOW - timedelta(days=1))
+    session.add(
+        Run(
+            id=uuid.uuid4(),
+            kind=RunKind.DIGEST,
+            started_at=NOW,
+            finished_at=NOW + timedelta(minutes=5),
+        )
+    )
+    session.flush()
 
     runs = ArticleRepository(session).digest_runs(since=TODAY - timedelta(days=1))
 
     assert runs == [
-        (TODAY - timedelta(days=1), NOW - timedelta(days=1)),
-        (TODAY, NOW),
+        # No run row: the day's latest first sighting bounds the run.
+        DigestRun(TODAY - timedelta(days=1), yesterday, yesterday + timedelta(minutes=1)),
+        DigestRun(TODAY, NOW, NOW + timedelta(minutes=5)),
     ]
 
 

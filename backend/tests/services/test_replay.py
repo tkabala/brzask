@@ -1,6 +1,7 @@
 """Replaying past digests, on Postgres, with a fake model."""
 
 import re
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -14,8 +15,8 @@ from brzask.clients.llm import Completion, LLMError
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, Run
 from brzask.repositories import EmbeddingRepository
-from brzask.services.digest.dedup import THRESHOLDS
 from brzask.services.digest.pool import POOL_CAP
+from brzask.services.errors import ServiceError
 from brzask.services.replay import (
     PoolConfig,
     ReplayClients,
@@ -89,10 +90,10 @@ def history(make: Factories) -> dict[str, Article]:
         "unshown": make.article(
             blog, title="Unshown", first_seen_at=yesterday_run - timedelta(hours=1)
         ),
-        "fresh": make.article(
+        "fresh": make.article(  # stored by today's run, after it started
             lobsters,
             title="Fresh",
-            first_seen_at=today_run - timedelta(hours=1),
+            first_seen_at=today_run + timedelta(minutes=1),
             digest_date=TODAY,
             shown_at=today_run,
             opened_at=today_run + timedelta(hours=1),
@@ -155,6 +156,34 @@ def test_a_failed_day_is_reported_and_left_out_of_the_totals(
     summary = summarize(days)
     assert (summary.days, summary.failed, summary.shown) == (0, 1, 0)
     assert summary.usage["calls"] == 2  # the failed call is still paid for
+
+
+def test_a_forced_run_later_that_day_is_left_out_of_the_comparison(
+    sessions: sessionmaker[Session], make: Factories, history: dict[str, Article]
+) -> None:
+    make.article(  # appended by a forced run after the day's run
+        title="Forced",
+        first_seen_at=NOW + timedelta(hours=2),
+        digest_date=TODAY,
+        shown_at=NOW + timedelta(hours=3),
+        opened_at=NOW + timedelta(hours=4),
+    )
+
+    (day,) = replay(sessions, clients(FakeModel()), since=TODAY)
+
+    assert (day.shown, day.shown_opened) == (1, 1)  # only `fresh`, from the first run
+
+
+def test_a_model_without_stored_vectors_is_refused(
+    sessions: sessionmaker[Session], make: Factories, history: dict[str, Article]
+) -> None:
+    make.article(extracted_text="Text", embedding=unit_vector(0, 1))
+    model = FakeModel()
+    other = replace(clients(model), embedding_model="typo/model")
+
+    with pytest.raises(ServiceError, match="no vectors of typo/model"):
+        replay(sessions, other, since=TODAY)
+    assert model.prompts["ranking"] == []
 
 
 def test_the_report_has_every_day_and_pick(
@@ -223,11 +252,9 @@ def test_config_from_toml(tmp_path: Path) -> None:
     assert config.llm_model == "x/y"
     assert config.limits().top_n == 20
     assert config.limits().max_per_source == 2  # left out: the digest's own value
-    assert config.thresholds(TEST_MODEL).same_day == (0.85, 0.9)
-    assert (
-        ReplayConfig().thresholds("google/gemini-embedding-001")
-        == (THRESHOLDS["gemini-embedding-001"])
-    )
+    thresholds = config.thresholds()
+    assert thresholds is not None and thresholds.same_day == (0.85, 0.9)
+    assert ReplayConfig().thresholds() is None  # left out: the embedding model's own
 
 
 @pytest.mark.parametrize(
