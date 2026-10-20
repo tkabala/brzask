@@ -221,13 +221,17 @@ def _same_day_judged(
 ) -> list[Drop]:
     """Greedy, in ranking order: a candidate goes when a kept one is above the
     zone, or in it and judged the same event; never below MIN_SURVIVORS.
+
+    When the floor binds, the closest duplicates go first and, among equally
+    close ones, the worst ranked, so a near-identical pair is not kept while a
+    looser judged one used up the room.
     """
     kept: list[Candidate] = []
-    drops: list[Drop] = []
+    drops: list[tuple[Drop, float]] = []
     room = max(len(candidates) - MIN_SURVIVORS, 0)
     for candidate in sorted(candidates, key=_rank):
         duplicates: list[tuple[float, Candidate, float | None]] = []
-        comparable = candidate.embedding is not None and len(drops) < room
+        comparable = candidate.embedding is not None
         for other in kept if comparable else []:
             if other.embedding is None:
                 continue
@@ -243,18 +247,15 @@ def _same_day_judged(
                 duplicates.append((similarity, other, probability))
         if duplicates:
             similarity, original, probability = max(duplicates, key=lambda match: match[0])
-            drops.append(
-                Drop(
-                    candidate.link,
-                    "same_day",
-                    round(similarity, 4),
-                    original.link,
-                    probability,
-                )
-            )
+            similarity = round(similarity, 4)
+            drop = Drop(candidate.link, "same_day", similarity, original.link, probability)
+            drops.append((drop, _rank(candidate)))
             continue
         kept.append(candidate)
-    return drops
+    if len(drops) > room:
+        chosen = sorted(drops, key=lambda item: (-item[0].similarity, -item[1]))[:room]
+        drops = [item for item in drops if item in chosen]
+    return [drop for drop, _ in drops]
 
 
 def judge_same_event(judge: Judge, meter: UsageMeter | None = None) -> SameEvent:

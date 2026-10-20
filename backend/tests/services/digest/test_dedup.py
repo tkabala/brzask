@@ -306,7 +306,21 @@ def test_the_judged_pass_keeps_the_survivor_floor() -> None:
     result = deduplicate(candidates, [], GEMINI, judged({}))
 
     assert len(result.survivors) == MIN_SURVIVORS
-    assert ranks(result.survivors) == [1, *range(4, 12)]  # the first two duplicates go
+    assert ranks(result.survivors) == list(range(1, 10))  # equally close: the worst ranked go
+
+
+def test_when_the_floor_binds_the_closest_duplicates_go_first() -> None:
+    candidates = [
+        candidate(1, axis(0)),
+        candidate(2, near(0.85, 0, 2)),  # grey, judged the same event as 1
+        *distinct(3, 7),
+        candidate(10, near(0.99, 0, 10)),  # near-identical to 1, ranked last
+    ]
+
+    result = deduplicate(candidates, [], GEMINI, judged({(1, 2): 0.6}))
+
+    assert len(result.survivors) == MIN_SURVIVORS
+    assert [drop.link for drop in result.drops] == ["https://news.example/10"]
 
 
 def test_without_grey_pairs_the_judge_is_not_asked() -> None:
