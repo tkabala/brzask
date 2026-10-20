@@ -32,8 +32,10 @@ log = get_logger(__name__)
 
 # The order of pipelines that share a schedule.
 ORDER = (RunKind.DIGEST, RunKind.REVIEW, RunKind.VISITED, RunKind.DISCOVERY)
-# A run that could not start on time (the machine slept, the worker restarted)
-# still runs if it is at most this late; later ones wait for the next time.
+# A run that could not start on time while the worker was up (the machine
+# slept, an earlier job ran long) still runs if it is at most this late; later
+# ones wait for the next time. Jobs are kept in memory, so a worker started
+# after a scheduled time does not catch up on it: run it with `brzask run`.
 MISFIRE_GRACE_SECONDS = 3 * 3600
 _WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
