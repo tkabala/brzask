@@ -153,3 +153,18 @@ def test_weights_change_the_order_without_asking_differently(
     )
 
     assert titles(top) == ["Article 3", "Article 1", "Article 2"]
+
+
+def test_when_the_judge_fails_on_every_candidate_the_llm_ranks(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    pool = stored_pool(make, 3)
+    judge = FakeJudge(fail={"Article 1", "Article 2", "Article 3"})
+    model = FakeModel({"ranking": [3]})
+    run = context(sessions, dry_run=True)
+
+    top = rank_candidates(run, pool, model, judge=judge)
+
+    assert titles(top) == ["Article 3", "Article 1", "Article 2"]
+    assert len(model.prompts) == 1
+    assert run.stats["ranking"]["method"] == "llm (judge failed)"

@@ -16,7 +16,7 @@ from typing import Any, Protocol
 from sqlalchemy.orm import Session
 
 from brzask import prompts
-from brzask.clients.judge import Judge
+from brzask.clients.judge import Judge, JudgeError
 from brzask.clients.llm import Completion, InvalidJSONError
 from brzask.clients.usage import UsageMeter
 from brzask.log import get_logger
@@ -163,10 +163,11 @@ def rank_candidates(
     """The top of the pool's ranking; stores the ranks outside a dry run.
 
     The LLM ranks the pool, or, given a `judge`, each candidate is scored and
-    the `weights` order them. An answer that is not a usable ranking is logged
-    and the pool order is used instead: a bad answer must not cost the day's
-    digest. Only opens before the run's start count, so a replayed day sees
-    what that day's run saw.
+    the `weights` order them; when the judge answers for no candidate, the LLM
+    ranks instead. An answer that is not a usable ranking is logged and the
+    pool order is used instead: a bad answer must not cost the day's digest.
+    Only opens before the run's start count, so a replayed day sees what that
+    day's run saw.
     """
     if not candidates:
         return []
@@ -177,25 +178,32 @@ def rank_candidates(
             since, OPENS_LIMIT, before=context.started_at
         )
 
-    stats: dict[str, Any]
-    if judge is None:
-        prompt = ranking_prompt(candidates, interests, opens, limits.rank_limit)
-        with context.stage("ranking"):
+    stats: dict[str, Any] = {}
+    ranking: list[int] | None = None
+    method = "llm"
+    with context.stage("ranking"):
+        if judge is not None:
+            opened_titles = [opened.title for opened in opens[:OPENED_TITLES]]
+            try:
+                scored = scoring.score_candidates(
+                    candidates, judge, interests, opened_titles, meter=context.usage
+                )
+            except JudgeError as error:
+                # The judge is unusable; the LLM still is, so it ranks instead.
+                log.warning("ranking judge failed; the LLM ranks", error=str(error))
+                method = "llm (judge failed)"
+            else:
+                ranking = scoring.composite_ranking(scored, weights)
+                stats = {"method": "judge", "judge_model": judge.model, "judged": len(scored)}
+        if ranking is None:
+            prompt = ranking_prompt(candidates, interests, opens, limits.rank_limit)
             try:
                 answer, _ = llm.complete_json(prompt, purpose="ranking", meter=context.usage)
             except InvalidJSONError as error:
                 log.warning("ranking answer is not JSON", answer=error.content[:500])
                 answer = None
-        ranking = parse_ranking(answer, len(candidates))
-        stats = {"method": "llm", "prompt_chars": len(prompt)}
-    else:
-        opened_titles = [opened.title for opened in opens[:OPENED_TITLES]]
-        with context.stage("ranking"):
-            scored = scoring.score_candidates(
-                candidates, judge, interests, opened_titles, meter=context.usage
-            )
-        ranking = scoring.composite_ranking(scored, weights)
-        stats = {"method": "judge", "judge_model": judge.model, "judged": len(scored)}
+            ranking = parse_ranking(answer, len(candidates))
+            stats = {"method": method, "prompt_chars": len(prompt)}
     if not ranking:
         log.warning("no usable ranking; taking candidates in pool order")
     top = select_top(candidates, ranking, limits)
