@@ -448,6 +448,10 @@ def test_reembed_moves_vectors_and_switches(
     ]
     assert "1 embedded, 0 to go" in computed.stderr
     assert switched.stdout.splitlines()[0] == "0 articles embedded with new/embedding."
-    assert switched.stdout.splitlines()[-1] == "Active model is now new/embedding."
+    assert switched.stdout.splitlines()[-2:] == [
+        "Active model is now new/embedding.",
+        "Set EMBEDDING_MODEL=new/embedding so the configuration matches; "
+        "until then every digest logs a warning.",
+    ]
     assert "Embedding model: new/embedding" in status.stdout
     assert models == ["new/embedding", "new/embedding"]

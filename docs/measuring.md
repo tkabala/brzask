@@ -93,7 +93,7 @@ $ brzask replay --days 30 --config new-model.toml          # embedding_model = "
 $ brzask reembed --model provider/new-model               # embed what came in since, then switch
 ```
 
-`reembed` embeds every article that has a vector of another model again, from its stored text, in batches; it can be stopped and run again. Digests keep using the active model until the switch, which waits for no digest to be running. `brzask status` shows the active model and the stored vectors per model. Add the measured thresholds for the new model to `THRESHOLDS` before or right after switching; until then the digest uses the default ones and logs a warning.
+`reembed` embeds every article that has a vector of another model again, from its stored text, in batches; it can be stopped and run again. Digests keep using the active model until the switch, which waits for no digest to be running. `brzask status` shows the active model and the stored vectors per model. Add the measured thresholds for the new model to `THRESHOLDS` before or right after switching; until then the digest uses the default ones and logs a warning. After the switch, set `EMBEDDING_MODEL` to the new model too: the active model wins, but every digest logs a warning while the two differ. A replay naming a model with no stored vectors stops with an error instead of deduplicating nothing.
 
 ## Extractors: extract-bench
 

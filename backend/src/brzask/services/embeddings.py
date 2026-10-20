@@ -120,6 +120,12 @@ def _embed_missing(
     """Vectors for every article that has one of another model and stored text."""
     model = embedder.model
     done = 0
+    # Counted once: a count per batch scans every article again. Articles a
+    # running digest adds meanwhile are embedded too, so this only guides progress.
+    remaining = 0
+    if progress is not None:
+        with sessions.begin() as session:
+            remaining = EmbeddingRepository(session).count_missing(model)[0]
     while True:
         with sessions.begin() as session:
             batch = EmbeddingRepository(session).missing(model, BATCH)
@@ -129,11 +135,10 @@ def _embed_missing(
         vectors = embedder.embed(
             [text[:TEXT_CHARS] for _, text in batch], "document", purpose="reembed", meter=meter
         )
+        ids = [article_id for article_id, _ in batch]
         with sessions.begin() as session:
-            embeddings = EmbeddingRepository(session)
-            ids = [article_id for article_id, _ in batch]
-            embeddings.add(model, dict(zip(ids, vectors, strict=True)))
-            remaining = embeddings.count_missing(model)[0]
+            EmbeddingRepository(session).add(model, dict(zip(ids, vectors, strict=True)))
         done += len(batch)
+        remaining = max(0, remaining - len(batch))
         if progress is not None:
             progress(done, remaining)

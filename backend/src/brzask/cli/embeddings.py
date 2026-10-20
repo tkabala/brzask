@@ -53,6 +53,11 @@ def reembed_command(
         typer.echo(f"{result.without_text} embedded articles have no stored text and were skipped.")
     if result.switched:
         typer.echo(f"Active model is now {result.model}.")
+        if result.model != settings.embedding.model:
+            typer.echo(
+                f"Set EMBEDDING_MODEL={result.model} so the configuration matches; "
+                "until then every digest logs a warning."
+            )
     elif result.active == result.model:
         typer.echo(f"{result.model} was already the active model.")
     else:

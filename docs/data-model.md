@@ -55,6 +55,9 @@ The digest embeds with one model, the active one: `EMBEDDING_MODEL` until
 embedded) with the new model and switches only once all of them have a vector,
 so the switch never leaves deduplication with a partial history. Vectors of
 earlier models stay, so switching back costs nothing.
+`extracted_text` holds the first 4000 characters, the text that was embedded;
+rows holding only 2000 characters are embedded again from those, so their new
+vectors come from a shorter input than the rest of the history.
 
 ## Sources
 
