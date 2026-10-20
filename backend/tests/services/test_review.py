@@ -17,6 +17,9 @@ DAY = timedelta(days=1)
 
 
 def source(age_days: int = 60, **health: Any) -> Source:
+    """A source; one that is failing failed last today unless `failed_at` says otherwise."""
+    if health.get("failing_since") is not None:
+        health.setdefault("failed_at", NOW)
     return Source(
         name="Feed",
         url="https://feed.example/rss",
@@ -68,6 +71,26 @@ def stats(articles: int, ranked: int = 0, opened: int = 0) -> SourceStats:
         (
             "any error for a month",
             source(failing_since=NOW - 30 * DAY, fetch_error="ReadTimeout: slow"),
+            stats(0),
+            Decision.DEAD,
+        ),
+        (
+            "one failure a month ago, not fetched since",
+            source(
+                failing_since=NOW - 30 * DAY,
+                permanent_failing_since=NOW - 30 * DAY,
+                failed_at=NOW - 30 * DAY,
+            ),
+            stats(0),
+            Decision.QUIET,
+        ),
+        (
+            "permanent errors for two weeks, last one a week ago",
+            source(
+                failing_since=NOW - 21 * DAY,
+                permanent_failing_since=NOW - 21 * DAY,
+                failed_at=NOW - 7 * DAY,
+            ),
             stats(0),
             Decision.DEAD,
         ),
@@ -130,6 +153,7 @@ def test_review_mutes_and_marks_dead_with_a_change_log_entry(
         name="Gone",
         failing_since=NOW - 20 * DAY,
         permanent_failing_since=NOW - 20 * DAY,
+        failed_at=NOW - DAY,
         fetch_error="HTTPStatusError: 404",
     )
     good = old_source(make, name="Good")
@@ -166,7 +190,7 @@ def test_a_dry_run_changes_nothing(
     sessions: sessionmaker[Session], session: Session, make: Factories
 ) -> None:
     quiet = old_source(make)
-    gone = old_source(make, failing_since=NOW - 40 * DAY)
+    gone = old_source(make, failing_since=NOW - 40 * DAY, failed_at=NOW)
     run = context(sessions, dry_run=True)
 
     review_sources(run)
@@ -184,6 +208,7 @@ def test_enabling_a_dead_source_gives_it_a_fresh_start(
         make,
         failing_since=NOW - 40 * DAY,
         permanent_failing_since=NOW - 40 * DAY,
+        failed_at=NOW,
         fetch_failures=40,
         fetch_error="HTTPStatusError: 410",
     )
@@ -196,5 +221,6 @@ def test_enabling_a_dead_source_gives_it_a_fresh_start(
     revived = session.get_one(Source, gone.id)
     assert revived.status is SourceStatus.ACTIVE
     assert (revived.failing_since, revived.permanent_failing_since) == (None, None)
+    assert revived.failed_at is None
     assert (revived.fetch_failures, revived.fetch_error) == (0, None)
     assert evaluate(revived, None, NOW).decision is Decision.QUIET

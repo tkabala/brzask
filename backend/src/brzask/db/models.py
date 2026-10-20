@@ -87,6 +87,9 @@ class Source(TimestampMixin, Base):
         comment="First fetch of the current run of permanent errors (404, 410, 403, not a feed);"
         " null when the last error was temporary."
     )
+    failed_at: Mapped[datetime | None] = mapped_column(
+        comment="Last failed fetch; null while fetches succeed."
+    )
     fetch_failures: Mapped[int] = mapped_column(
         default=0, server_default=text("0"), comment="Failed fetches in a row."
     )

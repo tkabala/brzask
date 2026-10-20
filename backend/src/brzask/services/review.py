@@ -52,13 +52,18 @@ class Verdict:
 
 
 def evaluate(source: Source, stats: SourceStats | None, now: datetime) -> Verdict:
-    """The decision for one active source, from its fetch health and its stats."""
-    if source.permanent_failing_since is not None and (
-        now - source.permanent_failing_since >= DEAD_AFTER_PERMANENT
-    ):
-        return Verdict(Decision.DEAD, _dead_note(source, source.permanent_failing_since))
-    if source.failing_since is not None and now - source.failing_since >= DEAD_AFTER_ANY:
-        return Verdict(Decision.DEAD, _dead_note(source, source.failing_since))
+    """The decision for one active source, from its fetch health and its stats.
+
+    A feed counts as failing for as long as its failed fetches span, from the
+    first one to the last: a single failure before the digest was paused is
+    not a month of failures.
+    """
+    permanent = source.permanent_failing_since
+    if permanent is not None and _failed_for(source, permanent) >= DEAD_AFTER_PERMANENT:
+        return Verdict(Decision.DEAD, _dead_note(source, permanent))
+    since = source.failing_since
+    if since is not None and _failed_for(source, since) >= DEAD_AFTER_ANY:
+        return Verdict(Decision.DEAD, _dead_note(source, since))
     if now - source.created_at < PROBATION:
         return Verdict(Decision.PROBATION)
     articles = stats.articles if stats else 0
@@ -115,6 +120,10 @@ def review_sources(context: RunContext) -> None:
             }
         )
     log.info("sources reviewed", **context.stats["decisions"])
+
+
+def _failed_for(source: Source, since: datetime) -> timedelta:
+    return (source.failed_at or since) - since
 
 
 def _dead_note(source: Source, since: datetime) -> str:

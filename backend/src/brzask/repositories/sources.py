@@ -106,6 +106,7 @@ class SourceRepository:
         """Forget past fetch failures; the next fetch starts a new record."""
         source.failing_since = None
         source.permanent_failing_since = None
+        source.failed_at = None
         source.fetch_failures = 0
         source.fetch_error = None
         self.session.flush()
@@ -120,6 +121,7 @@ class SourceRepository:
             return
         source.failing_since = source.failing_since or at
         source.permanent_failing_since = None if temporary else source.permanent_failing_since or at
+        source.failed_at = at
         source.fetch_failures += 1
         source.fetch_error = error
         self.session.flush()

@@ -76,6 +76,7 @@ Every digest run records how each active source's fetch went:
 | `fetched_at` | Last successful fetch, including "not modified" (HTTP 304) |
 | `failing_since` | First failure of the current run of failures; empty while fetches succeed |
 | `permanent_failing_since` | First failure of the current run of permanent errors (404, 410, 403, not a feed); empty when the last error was temporary (429, 5xx, timeout, network error) |
+| `failed_at` | Last failed fetch; empty while fetches succeed |
 | `fetch_failures` | Failed fetches in a row |
 | `fetch_error` | Error of the last failed fetch |
 

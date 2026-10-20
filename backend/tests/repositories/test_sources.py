@@ -134,6 +134,7 @@ def test_record_fetch_tracks_a_run_of_failures(session: Session, make: Factories
     assert source.fetched_at == NOW
     assert source.failing_since == NOW + day
     assert source.permanent_failing_since == NOW + day
+    assert source.failed_at == NOW + 2 * day
     assert source.fetch_failures == 2
     assert source.fetch_error == "HTTPStatusError: 410"
 
@@ -167,6 +168,7 @@ def test_a_successful_fetch_clears_the_failures(session: Session, make: Factorie
     assert source.fetched_at == NOW + timedelta(days=1)
     assert source.failing_since is None
     assert source.permanent_failing_since is None
+    assert source.failed_at is None
     assert (source.fetch_failures, source.fetch_error) == (0, None)
 
 
