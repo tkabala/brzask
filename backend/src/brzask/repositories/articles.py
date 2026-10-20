@@ -330,7 +330,10 @@ class ArticleRepository:
     def search_similar(
         self, vector: Sequence[float], model: str, limit: int
     ) -> list[SimilarArticle]:
-        """Nearest articles by cosine similarity, among vectors of the same model."""
+        """Nearest articles by cosine similarity, among vectors of the same model.
+
+        An exact scan of the model's vectors, without a vector index (ADR 0004).
+        """
         distance = ArticleEmbedding.embedding.cosine_distance(list(vector))
         query = (
             select(Article, distance)

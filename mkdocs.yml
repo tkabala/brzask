@@ -41,6 +41,7 @@ nav:
       - decisions/0001-record-architecture-decisions.md
       - decisions/0002-trafilatura-as-the-default-page-extractor.md
       - decisions/0003-paid-web-search-for-discovery-is-optional.md
+      - decisions/0004-no-vector-index-until-history-needs-one.md
       - Template: decisions/0000-template.md
 
 validation:
