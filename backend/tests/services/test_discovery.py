@@ -12,6 +12,7 @@ from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.clients.web_search import SearchResult, WebSearchError
 from brzask.db.models import Source, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository
+from brzask.services import discovery
 from brzask.services.discovery import (
     ACTOR,
     RECENT_WINDOW,
@@ -21,6 +22,7 @@ from brzask.services.discovery import (
     judge_prompt,
     name_mismatch,
     parse_verdicts,
+    run_discovery,
     search_query,
     status_for,
     to_candidate,
@@ -201,6 +203,10 @@ class FakeSearch:
     def __init__(self, results: dict[str, list[SearchResult] | Exception]) -> None:
         self.results = results  # by a word of the query
         self.queries: list[str] = []
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
 
     def search(
         self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
@@ -385,3 +391,20 @@ def test_changes_are_recorded_as_the_discovery_pipeline(
         (c.actor, c.action) for c in ChangeRepository(session).find(limit=20) if c.actor == ACTOR
     }
     assert actions == {(ACTOR, "source.add"), (ACTOR, "source.propose"), (ACTOR, "source.reject")}
+
+
+def test_run_discovery_closes_the_web_search_when_the_run_fails(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    search = FakeSearch({})
+    monkeypatch.setattr(discovery, "build_web_search", lambda settings: search)
+
+    def fail(*args: Any) -> None:
+        raise RuntimeError("judge down")
+
+    monkeypatch.setattr(discovery, "discover_sources", fail)
+
+    with pytest.raises(RuntimeError, match="judge down"):
+        run_discovery(context(sessions))
+
+    assert search.closed

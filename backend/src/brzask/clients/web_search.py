@@ -58,6 +58,9 @@ class WebSearch(Protocol):
         self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
     ) -> list[SearchResult]: ...
 
+    def close(self) -> None:
+        """Close the search's client."""
+
 
 class SearxngSearch:
     """A SearXNG instance's JSON API (`search.formats` must include `json`)."""
@@ -67,6 +70,9 @@ class SearxngSearch:
     def __init__(self, client: httpx2.Client, base_url: str) -> None:
         self.client = client
         self.url = base_url.rstrip("/") + "/search"
+
+    def close(self) -> None:
+        self.client.close()
 
     def search(
         self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
@@ -86,6 +92,9 @@ class BraveSearch:
     def __init__(self, client: httpx2.Client, api_key: str) -> None:
         self.client = client
         self.api_key = api_key
+
+    def close(self) -> None:
+        self.client.close()
 
     def search(
         self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
@@ -126,6 +135,9 @@ class LLMOnlineSearch:
         self.model = model
         self.report_cost = report_cost
         self._sleep = sleep
+
+    def close(self) -> None:
+        self.client.close()
 
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:

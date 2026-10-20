@@ -34,7 +34,7 @@ from brzask.repositories import SourceRepository
 from brzask.services.digest.ranking import ChatModel, interest_context
 from brzask.services.runs import RunContext, SkipRunError
 from brzask.services.sources import propose_source
-from brzask.services.visited import FindsFeeds
+from brzask.services.visited import FindsFeeds, known_hosts
 from brzask.urls import host_matches, host_of
 
 log = get_logger(__name__)
@@ -215,7 +215,7 @@ def discover_sources(
         interests = interest_context(session)
         sources = SourceRepository(session).find()
         known_urls = {source.url for source in sources}
-        known_sites = {host_of(url) for s in sources for url in (s.url, s.site_url) if url}
+        known_sites = known_hosts([s.url for s in sources] + [s.site_url for s in sources])
     if not interests:
         raise SkipRunError("no active interests")
 
@@ -294,11 +294,14 @@ def run_discovery(context: RunContext) -> None:
     settings = get_settings()
     finder = FeedFinder(FeedFetcher())
     llm = LLMClient.from_settings(settings.llm)
+    search = build_web_search(settings)
     try:
-        discover_sources(context, build_web_search(settings), finder, llm)
+        discover_sources(context, search, finder, llm)
     finally:
         finder.close()
         llm.client.close()
+        if search is not None:
+            search.close()
 
 
 def _store(session: Session, verdict: Verdict, adapter: str) -> None:
