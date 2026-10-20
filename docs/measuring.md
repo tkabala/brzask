@@ -9,14 +9,14 @@ Thresholds, limits, prompts and extractors are not tuned by feel. Two commands m
 ```console
 $ brzask replay --days 30
 DATE        POOL  OPENED IN POOL  SHOWN: OPENED  REPLAY: OPENED  SAME  ERROR
-2026-09-27  200   2               2/7            2/7             4
-2026-09-28  200   2               2/7            2/7             3
-2026-09-29  200   1               1/7            1/7             3
-2026-09-30  200   0               1/7            0/7             3
+2026-09-27  200   2               2/7            2/7             3
+2026-09-28  200   2               2/7            2/7             2
+2026-09-29  200   1               1/7            0/7             2
+2026-09-30  200   0               1/7            0/7             0
 ...
 
-Replay: opened 10 of 194 picks (5%); shown: opened 19 of 202 (9%); 67 picks also shown; over 28 days.
-56 model calls, $0.2754.
+Replay: opened 10 of 193 picks (5%); shown: opened 19 of 195 (10%); 55 picks also shown; over 28 days.
+56 model calls, $0.1057.
 ```
 
 For each day with a digest, replay rebuilds the candidate pool from the articles stored by the end of that day's run, ranks it, deduplicates the top and selects the digest again, exactly as the daily run does. It writes nothing: its database transactions are read-only.
@@ -77,7 +77,7 @@ $ brzask replay --days 30 --prompt-dir my-prompts/   # e.g. my-prompts/ranking.m
 
 ### Baseline
 
-Over 28 days of daily use (2026-09-21 to 2026-10-20, `deepseek/deepseek-v4-flash`), the digests actually shown were opened 19 times out of 202 articles (9%). Replaying the same days with the current setup picked 194 articles, 67 of them the same as shown, and 10 of them had been opened (5%). The pools held 28 opened articles in total. A change is worth keeping when it moves the replay's number up beyond the spread of repeated replays, not when it beats the shown digests, which the replay can hardly do.
+Over 28 days of daily use (2026-09-21 to 2026-10-20, `deepseek/deepseek-v4-flash`), the digests actually shown (by each day's first run) were opened 19 times out of 195 articles (10%). Replaying the same days with the current setup picked 193 articles, 55 of them the same as shown, and 10 of them had been opened (5%). The pools held 27 opened articles in total. A change is worth keeping when it moves the replay's number up beyond the spread of repeated replays, not when it beats the shown digests, which the replay can hardly do.
 
 One opened article (2026-09-30) is in no rebuilt pool: it was published two months before it was shown, and the 10-day age limit drops it.
 
