@@ -46,6 +46,13 @@ def item(n: int, topic: str = "Rust", **fields: Any) -> dict[str, Any]:
 CANDIDATES = [candidate(n) for n in range(1, 11)]
 
 
+def test_another_digest_size_can_be_tried() -> None:
+    answer = {"articles": [item(n) for n in range(1, 10)]}
+
+    assert len(parse_selection(answer, CANDIDATES, ENGLISH, size=3)) == 3
+    assert "select exactly 3 articles" in selection_prompt(CANDIDATES, [], ENGLISH, size=3)
+
+
 def test_picks_are_grouped_by_topic_in_order_of_appearance() -> None:
     answer = {"articles": [item(3, "Rust"), item(1, "Postgres"), item(5, "Rust")]}
 

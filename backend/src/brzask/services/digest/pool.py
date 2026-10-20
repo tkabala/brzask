@@ -145,6 +145,7 @@ def filter_candidates(
     carried: Iterable[Candidate],
     shown_links: set[str],
     now: datetime,
+    max_age: timedelta = MAX_AGE,
 ) -> tuple[list[Candidate], PoolCounts]:
     """Drop stale entries and links already shown; one candidate per link.
 
@@ -152,7 +153,7 @@ def filter_candidates(
     the fresh one has the feed's full content. An entry without a date is
     kept: a missing date must not remove a candidate.
     """
-    cutoff = now - MAX_AGE
+    cutoff = now - max_age
     by_link: dict[str, Candidate] = {}
     fresh_count = carried_count = stale = already_shown = 0
     for is_fresh, group in ((True, fresh), (False, carried)):

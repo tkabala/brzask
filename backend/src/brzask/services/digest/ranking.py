@@ -7,7 +7,7 @@ the pool, since fresh entries have no article ID in a dry run.
 
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any, Protocol
 
@@ -40,6 +40,19 @@ OPENED_TITLES = 15
 OPENED_TALLY = 8
 
 
+@dataclass(frozen=True, slots=True)
+class RankingLimits:
+    """The limits above; `brzask replay` tries others."""
+
+    rank_limit: int = RANK_LIMIT
+    top_n: int = TOP_N
+    max_per_source: int = MAX_PER_SOURCE
+    min_candidates: int = MIN_CANDIDATES
+
+
+DEFAULT_LIMITS = RankingLimits()
+
+
 class ChatModel(Protocol):
     """Answers a prompt with JSON (`LLMClient`)."""
 
@@ -52,6 +65,7 @@ def ranking_prompt(
     candidates: Sequence[Candidate],
     interests: Sequence[dict[str, Any]],
     opens: Sequence[OpenedArticle],
+    rank_limit: int = RANK_LIMIT,
 ) -> str:
     """The ranking prompt; candidate `i` in the pool is listed with ID `i + 1`."""
     return prompts.render(
@@ -70,7 +84,7 @@ def ranking_prompt(
             }
             for number, candidate in enumerate(candidates, start=1)
         ],
-        rank_limit=min(RANK_LIMIT, len(candidates)),
+        rank_limit=min(rank_limit, len(candidates)),
     )
 
 
@@ -91,7 +105,11 @@ def parse_ranking(answer: Any, count: int) -> list[int]:
     return list(positions)
 
 
-def select_top(candidates: Sequence[Candidate], ranking: Sequence[int]) -> list[Candidate]:
+def select_top(
+    candidates: Sequence[Candidate],
+    ranking: Sequence[int],
+    limits: RankingLimits = DEFAULT_LIMITS,
+) -> list[Candidate]:
     """Up to TOP_N candidates in ranking order, each with its rank, at most MAX_PER_SOURCE each.
 
     One pass in ranking order: a source's third article is skipped and the
@@ -118,34 +136,40 @@ def select_top(candidates: Sequence[Candidate], ranking: Sequence[int]) -> list[
                 return
             if candidate.link in picked_links:
                 continue
-            if capped and per_source[candidate.source_id] >= MAX_PER_SOURCE:
+            if capped and per_source[candidate.source_id] >= limits.max_per_source:
                 continue
             per_source[candidate.source_id] += 1
             picked_links.add(candidate.link)
             picked.append(candidate)
 
-    fill(ranked, TOP_N, capped=True)
-    fill(unranked, MIN_CANDIDATES, capped=True)
-    fill([*ranked, *unranked], MIN_CANDIDATES, capped=False)
+    fill(ranked, limits.top_n, capped=True)
+    fill(unranked, limits.min_candidates, capped=True)
+    fill([*ranked, *unranked], limits.min_candidates, capped=False)
     return sorted(picked, key=lambda candidate: candidate.rank or 0)
 
 
 def rank_candidates(
-    context: RunContext, candidates: Sequence[Candidate], llm: ChatModel
+    context: RunContext,
+    candidates: Sequence[Candidate],
+    llm: ChatModel,
+    limits: RankingLimits = DEFAULT_LIMITS,
 ) -> list[Candidate]:
     """The top of the LLM's ranking of the pool; stores the ranks outside a dry run.
 
     An answer that is not a usable ranking is logged and the pool order is used
-    instead: a bad answer must not cost the day's digest.
+    instead: a bad answer must not cost the day's digest. Only opens before
+    the run's start count, so a replayed day sees what that day's run saw.
     """
     if not candidates:
         return []
     since = context.started_at - OPENS_WINDOW
     with context.sessions.begin() as session:
         interests = interest_context(session)
-        opens = ArticleRepository(session).recent_opens(since, OPENS_LIMIT)
+        opens = ArticleRepository(session).recent_opens(
+            since, OPENS_LIMIT, before=context.started_at
+        )
 
-    prompt = ranking_prompt(candidates, interests, opens)
+    prompt = ranking_prompt(candidates, interests, opens, limits.rank_limit)
     with context.stage("ranking"):
         try:
             answer, _ = llm.complete_json(prompt, purpose="ranking", meter=context.usage)
@@ -155,7 +179,7 @@ def rank_candidates(
     ranking = parse_ranking(answer, len(candidates))
     if not ranking:
         log.warning("no usable ranking; taking candidates in pool order")
-    top = select_top(candidates, ranking)
+    top = select_top(candidates, ranking, limits)
 
     if not context.dry_run:
         ranks = {

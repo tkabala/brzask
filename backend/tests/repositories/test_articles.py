@@ -122,6 +122,73 @@ def test_recent_opens_newest_first_with_source_names(session: Session, make: Fac
     assert everything[-1].topic == "Rust"
 
 
+def test_history_reads_can_stop_at_a_moment(session: Session, make: Factories) -> None:
+    make.article(title="Before", opened_at=NOW - timedelta(hours=1))
+    make.article(title="After", opened_at=NOW + timedelta(hours=1))
+    make.article(digest_date=TODAY, shown_at=NOW - timedelta(days=1), embedding=unit_vector(0, 1))
+    make.article(digest_date=TODAY, shown_at=NOW, embedding=unit_vector(1, 1))
+    articles = ArticleRepository(session)
+
+    opens = articles.recent_opens(NOW - timedelta(days=90), 10, before=NOW)
+    vectors = articles.shown_embeddings(NOW - timedelta(days=7), TEST_MODEL, before=NOW)
+
+    assert [o.title for o in opens] == ["Before"]
+    assert vectors == [pytest.approx(unit_vector(0, 1))]
+
+
+def test_seen_between_is_what_a_past_run_could_choose_from(
+    session: Session, make: Factories
+) -> None:
+    source = make.source("Lobsters")
+    run_at = NOW
+    since = NOW - timedelta(days=7)
+    fresh = make.article(source, title="Fresh", first_seen_at=NOW - timedelta(hours=1))
+    picked = make.article(  # shown by this very run
+        source,
+        title="Picked",
+        first_seen_at=NOW - timedelta(days=1),
+        shown_at=run_at,
+        digest_date=TODAY,
+    )
+    later = make.article(  # shown by a later run: still a candidate then
+        source,
+        title="Later",
+        first_seen_at=NOW - timedelta(days=2),
+        shown_at=NOW + timedelta(days=1),
+        digest_date=TODAY + timedelta(days=1),
+    )
+    make.article(  # shown before the run
+        source,
+        first_seen_at=NOW - timedelta(days=3),
+        shown_at=NOW - timedelta(days=1),
+        digest_date=TODAY - timedelta(days=1),
+    )
+    make.article(source, first_seen_at=NOW - timedelta(days=8))  # before the window
+    make.article(source, first_seen_at=NOW + timedelta(minutes=1))  # after the run
+    make.article(None, first_seen_at=NOW - timedelta(hours=2))  # no source
+
+    stored = ArticleRepository(session).seen_between(since, run_at)
+
+    assert stored == [later, picked, fresh]
+    assert stored[0].source is not None and stored[0].source.name == "Lobsters"
+
+
+def test_digest_runs_by_day_with_the_first_shown_at(session: Session, make: Factories) -> None:
+    make.article(digest_date=TODAY - timedelta(days=3), shown_at=NOW - timedelta(days=3))
+    make.article(digest_date=TODAY - timedelta(days=1), shown_at=NOW - timedelta(days=1))
+    make.article(  # appended by a forced run later that day
+        digest_date=TODAY - timedelta(days=1), shown_at=NOW - timedelta(hours=20)
+    )
+    make.article(digest_date=TODAY, shown_at=NOW)
+
+    runs = ArticleRepository(session).digest_runs(since=TODAY - timedelta(days=1))
+
+    assert runs == [
+        (TODAY - timedelta(days=1), NOW - timedelta(days=1)),
+        (TODAY, NOW),
+    ]
+
+
 def test_opened_since(session: Session, make: Factories) -> None:
     opened = make.article(opened_at=NOW - timedelta(days=3))
     make.article(opened_at=NOW - timedelta(days=31))

@@ -1,5 +1,8 @@
-from collections.abc import Callable
-from datetime import UTC, datetime
+import json
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
@@ -8,12 +11,14 @@ from typer.testing import CliRunner, Result
 from brzask import __version__
 from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
+from brzask.config.settings import LLMSettings
 from brzask.db.models import RunKind, RunStatus, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services import pipelines
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
 from tests.factories import Factories
+from tests.services.test_replay import FakeModel
 
 runner = CliRunner()
 
@@ -83,7 +88,8 @@ def test_an_invalid_setting_is_reported_by_its_variable(
 def test_help_lists_the_commands() -> None:
     result = runner.invoke(app, ["--help"])
 
-    for command in ("migrate", "run", "status", "sources", "interests", "pause", "resume"):
+    top_level = ("migrate", "run", "status", "sources", "interests", "pause", "resume", "replay")
+    for command in top_level:
         assert command in result.stdout
     for group, commands in {
         "sources": ("list", "add", "mute", "enable"),
@@ -288,3 +294,77 @@ def test_run_of_a_pipeline_that_is_not_available(
 
 def test_run_rejects_unknown_pipelines(cli: Invoke) -> None:
     assert cli("run", "everything").exit_code == 2
+
+
+# --- replay --------------------------------------------------------------------
+
+
+@pytest.fixture
+def models(
+    cli: Invoke, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> list[str]:
+    """Replays read the test database and ask a fake model; collects the models asked for."""
+    asked: list[str] = []
+
+    @contextmanager
+    def llm_client(settings: LLMSettings) -> Iterator[FakeModel]:
+        asked.append(settings.model)
+        yield FakeModel()
+
+    monkeypatch.setattr(common, "get_read_only_sessions", lambda: sessions)
+    monkeypatch.setattr(common, "llm_client", llm_client)
+    return asked
+
+
+def test_replay_prints_days_and_totals(
+    cli: Invoke, models: list[str], make: Factories, tmp_path: Path
+) -> None:
+    source = make.source()
+    run_at = datetime.now(UTC) - timedelta(days=1)
+    make.article(
+        source,
+        first_seen_at=run_at - timedelta(hours=1),
+        digest_date=run_at.date(),
+        shown_at=run_at,
+        opened_at=run_at + timedelta(hours=1),
+    )
+    make.article(source, first_seen_at=run_at - timedelta(hours=1))
+    config = tmp_path / "candidate.toml"
+    config.write_text('llm_model = "other/model"\n')
+    output = tmp_path / "replay.json"
+
+    result = cli("replay", "--days", "3", "--config", str(config), "--json", str(output))
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0].split() == [
+        "DATE", "POOL", "OPENED", "IN", "POOL", "SHOWN:", "OPENED", "REPLAY:", "OPENED", "SAME",
+        "ERROR",
+    ]  # fmt: skip
+    assert lines[1].split() == [run_at.date().isoformat(), "2", "1", "1/1", "1/2", "1"]
+    assert "Replay: opened 1 of 2 picks (50%); shown: opened 1 of 1 (100%)" in result.stdout
+    assert models == ["other/model"]
+    assert json.loads(output.read_text())["summary"]["picked"] == 2
+
+
+def test_replay_without_digests(cli: Invoke, models: list[str]) -> None:
+    result = cli("replay", "--days", "1")
+
+    assert result.exit_code == 0
+    assert "No digests in that period." in result.stdout
+
+
+def test_replay_rejects_a_bad_config_or_prompt_dir(
+    cli: Invoke, models: list[str], tmp_path: Path
+) -> None:
+    config = tmp_path / "candidate.toml"
+    config.write_text("[ranking]\ntop_m = 3\n")
+    (tmp_path / "rankng.md").write_text("typo")
+
+    bad_config = cli("replay", "--config", str(config))
+    bad_prompts = cli("replay", "--prompt-dir", str(tmp_path))
+
+    assert bad_config.exit_code == 2
+    assert "top_m" in bad_config.stderr
+    assert bad_prompts.exit_code == 2
+    assert "rankng.md" in bad_prompts.stderr

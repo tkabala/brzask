@@ -166,10 +166,20 @@ def _rank(candidate: Candidate) -> float:
 
 
 def deduplicate_candidates(
-    context: RunContext, candidates: Sequence[Candidate], model: str
+    context: RunContext,
+    candidates: Sequence[Candidate],
+    model: str,
+    thresholds: Thresholds | None = None,
 ) -> list[Candidate]:
-    """Survivors of both passes, compared with articles shown by vectors of `model`."""
-    thresholds, measured = thresholds_for(model)
+    """Survivors of both passes, compared with articles shown by vectors of `model`.
+
+    Articles shown in the window before the run's start count, so a replayed
+    day compares with what had been shown by then. `thresholds` replaces the
+    model's own (to try others with `brzask replay`).
+    """
+    measured = True
+    if thresholds is None:
+        thresholds, measured = thresholds_for(model)
     if not measured:
         log.warning(
             "no deduplication thresholds measured for this embedding model; using defaults",
@@ -178,7 +188,7 @@ def deduplicate_candidates(
         )
     with context.sessions.begin() as session:
         shown = ArticleRepository(session).shown_embeddings(
-            context.started_at - CROSS_DAY_WINDOW, model
+            context.started_at - CROSS_DAY_WINDOW, model, before=context.started_at
         )
     with context.stage("deduplication"):
         result = deduplicate(candidates, shown, thresholds)

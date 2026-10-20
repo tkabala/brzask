@@ -183,9 +183,16 @@ def test_the_stage_compares_with_recent_articles_of_the_same_model(
     sessions: sessionmaker[Session], make: Factories
 ) -> None:
     today = NOW.date()
-    make.article(embedding=axis(0), digest_date=today - timedelta(days=2))
+    make.article(
+        embedding=axis(0),
+        first_seen_at=NOW - timedelta(days=2),
+        digest_date=today - timedelta(days=2),
+    )
     make.article(  # other model: never compared
-        embedding=axis(1), embedding_model="other/model", digest_date=today - timedelta(days=1)
+        embedding=axis(1),
+        embedding_model="other/model",
+        first_seen_at=NOW - timedelta(days=1),
+        digest_date=today - timedelta(days=1),
     )
     make.article(  # too old to compare
         embedding=axis(2),

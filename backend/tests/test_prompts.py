@@ -1,5 +1,6 @@
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 import jinja2
@@ -227,3 +228,26 @@ def test_discovery_search_in_plain_language_or_keywords() -> None:
     assert "staying up to date on Postgres (pgvector, replication), plus" in request
     assert keywords == "Postgres pgvector replication blog\n"
     assert bare == "Postgres blog\n"
+
+
+def test_a_directory_overrides_the_templates_it_holds(tmp_path: Path) -> None:
+    (tmp_path / "web_search.md").write_text("Look up {{ query }} somewhere else.")
+    sample = SAMPLES["web_search"]
+    packaged = prompts.render("web_search", **sample)
+
+    with prompts.overridden(tmp_path):
+        changed = prompts.render("web_search", **sample)
+        ranking = prompts.render("ranking", **SAMPLES["ranking"])
+
+    assert changed == f"Look up {sample['query']} somewhere else.\n"
+    assert ranking == prompts.render("ranking", **SAMPLES["ranking"])  # not in the directory
+    assert prompts.render("web_search", **sample) == packaged  # restored afterwards
+
+
+def test_an_override_named_like_no_template_is_an_error(tmp_path: Path) -> None:
+    (tmp_path / "rankng.md").write_text("typo")
+
+    with pytest.raises(ValueError, match=r"no prompt is named like rankng\.md"):
+        prompts.overridden(tmp_path).__enter__()
+    with pytest.raises(ValueError, match="is not a directory"):
+        prompts.overridden(tmp_path / "missing").__enter__()

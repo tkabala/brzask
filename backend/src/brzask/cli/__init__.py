@@ -17,6 +17,7 @@ from brzask.cli.common import (
     table,
     unit_of_work,
 )
+from brzask.cli.replay import replay_command
 from brzask.config import get_settings
 from brzask.db import migrations
 from brzask.db.models import RunKind, RunStatus
@@ -30,6 +31,7 @@ from brzask.worker import run_worker
 app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
 app.add_typer(sources.app, name="sources")
 app.add_typer(interests.app, name="interests")
+app.command(name="replay")(replay_command)
 
 
 def run_cli() -> None:

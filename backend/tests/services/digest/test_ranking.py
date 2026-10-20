@@ -15,6 +15,7 @@ from brzask.services.digest.ranking import (
     OPENED_TITLES,
     RANK_LIMIT,
     TOP_N,
+    RankingLimits,
     parse_ranking,
     rank_candidates,
     ranking_prompt,
@@ -70,6 +71,16 @@ def test_parse_ranking_skips_what_it_cannot_use(answer: Any, expected: list[int]
 
 
 # --- Picking the top -------------------------------------------------------------------
+
+
+def test_other_limits_can_be_tried() -> None:
+    pool = [candidate(n, source_id=n % 3) for n in range(1, 31)]
+    limits = RankingLimits(rank_limit=20, top_n=6, max_per_source=1, min_candidates=4)
+
+    top = select_top(pool, list(range(30)), limits)
+
+    assert titles(top) == ["Article 1", "Article 2", "Article 3", "Article 4"]
+    assert "best 20 candidates" in ranking_prompt(pool, [], [], limits.rank_limit)
 
 
 def test_top_follows_the_ranking_and_numbers_the_ranks() -> None:

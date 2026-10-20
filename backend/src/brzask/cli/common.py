@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FeedFinder
 from brzask.clients.feeds import FeedFetcher
+from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
-from brzask.config.settings import GROUPS, env_name
+from brzask.config.settings import GROUPS, LLMSettings, env_name
 from brzask.db.session import create_db_engine, session_factory
+from brzask.services.digest.ranking import ChatModel
 from brzask.services.errors import ServiceError
 
 # Recorded as the actor in the change log for changes made from the command line.
@@ -23,6 +25,21 @@ ACTOR = "user"
 @lru_cache(maxsize=1)
 def get_sessions() -> sessionmaker[Session]:
     return session_factory(create_db_engine())
+
+
+@lru_cache(maxsize=1)
+def get_read_only_sessions() -> sessionmaker[Session]:
+    """Sessions whose transactions the database keeps read-only (`brzask replay`)."""
+    return session_factory(create_db_engine().execution_options(postgresql_readonly=True))
+
+
+@contextmanager
+def llm_client(settings: LLMSettings) -> Iterator[ChatModel]:
+    client = LLMClient.from_settings(settings)
+    try:
+        yield client
+    finally:
+        client.client.close()
 
 
 def get_feed_finder() -> FeedFinder:

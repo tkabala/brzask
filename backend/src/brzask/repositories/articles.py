@@ -124,17 +124,23 @@ class ArticleRepository:
         )
         return self.session.scalars(query).all()
 
-    def shown_embeddings(self, since: datetime, model: str) -> list[list[float]]:
-        """Vectors of articles shown at or after `since`, from `model` only."""
+    def shown_embeddings(
+        self, since: datetime, model: str, before: datetime | None = None
+    ) -> list[list[float]]:
+        """Vectors of articles shown from `since` (until `before`), from `model` only."""
         query = select(Article.embedding).where(
             Article.state == ArticleState.SHOWN,
             Article.shown_at >= since,
             Article.embedding_model == model,
         )
+        if before is not None:
+            query = query.where(Article.shown_at < before)
         return [list(vector) for vector in self.session.scalars(query) if vector is not None]
 
-    def recent_opens(self, since: datetime, limit: int) -> list[OpenedArticle]:
-        """Most recently opened articles first."""
+    def recent_opens(
+        self, since: datetime, limit: int, before: datetime | None = None
+    ) -> list[OpenedArticle]:
+        """Articles opened at or after `since` (and before `before`), most recent first."""
         query = (
             select(Article.title, Article.topic, Source.name, Article.opened_at)
             .outerjoin(Source, Article.source_id == Source.id)
@@ -142,6 +148,8 @@ class ArticleRepository:
             .order_by(Article.opened_at.desc())
             .limit(limit)
         )
+        if before is not None:
+            query = query.where(Article.opened_at < before)
         return [
             OpenedArticle(title, topic, source_name, opened_at)
             for title, topic, source_name, opened_at in self.session.execute(query)
@@ -150,6 +158,26 @@ class ArticleRepository:
 
     def opened_since(self, since: datetime) -> Sequence[Article]:
         query = select(Article).where(Article.opened_at >= since).order_by(Article.opened_at.desc())
+        return self.session.scalars(query).all()
+
+    def seen_between(self, since: datetime, until: datetime) -> Sequence[Article]:
+        """Articles first seen in [`since`, `until`] and not shown before `until`, with sources.
+
+        What a digest run at `until` could choose from, as far as it was stored:
+        the pool of a past day, for `brzask replay`. Articles without a source
+        are left out.
+        """
+        query = (
+            select(Article)
+            .options(joinedload(Article.source))
+            .where(
+                Article.first_seen_at >= since,
+                Article.first_seen_at <= until,
+                Article.source_id.is_not(None),
+                Article.shown_at.is_(None) | (Article.shown_at >= until),
+            )
+            .order_by(Article.first_seen_at, Article.id)
+        )
         return self.session.scalars(query).all()
 
     # --- Pipeline results --------------------------------------------------------
@@ -226,6 +254,24 @@ class ArticleRepository:
             .order_by(Article.digest_position)
         )
         return self.session.scalars(query).all()
+
+    def digest_runs(self, since: date) -> list[tuple[date, datetime]]:
+        """Days with a digest from `since` on, oldest first, each with its first `shown_at`.
+
+        A digest's articles are marked shown when its run ends, so that moment
+        bounds what the run could have seen.
+        """
+        query = (
+            select(Article.digest_date, func.min(Article.shown_at))
+            .where(Article.digest_date >= since, Article.shown_at.is_not(None))
+            .group_by(Article.digest_date)
+            .order_by(Article.digest_date)
+        )
+        return [
+            (day, shown_at)
+            for day, shown_at in self.session.execute(query)
+            if day is not None and shown_at is not None
+        ]
 
     def latest_digest_date(self) -> date | None:
         return self.session.scalar(select(func.max(Article.digest_date)))

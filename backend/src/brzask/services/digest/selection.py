@@ -39,7 +39,10 @@ class Pick:
 
 
 def selection_prompt(
-    candidates: Sequence[Candidate], interests: Sequence[dict[str, Any]], language: Language
+    candidates: Sequence[Candidate],
+    interests: Sequence[dict[str, Any]],
+    language: Language,
+    size: int = DIGEST_SIZE,
 ) -> str:
     return prompts.render(
         "selection",
@@ -58,17 +61,19 @@ def selection_prompt(
             }
             for candidate in candidates
         ],
-        digest_size=DIGEST_SIZE,
+        digest_size=size,
         language=language,
     )
 
 
-def parse_selection(answer: Any, candidates: Sequence[Candidate], language: Language) -> list[Pick]:
+def parse_selection(
+    answer: Any, candidates: Sequence[Candidate], language: Language, size: int = DIGEST_SIZE
+) -> list[Pick]:
     """Picks from `{"articles": [...]}`, grouped by topic and numbered from 1.
 
     Topics keep the order in which they first appear; links are matched to the
     candidates (ignoring a trailing slash), unknown and repeated ones skipped,
-    and at most DIGEST_SIZE kept. A missing title falls back to the original one.
+    and at most `size` kept. A missing title falls back to the original one.
     """
     items = answer.get("articles") if isinstance(answer, dict) else None
     if not isinstance(items, list):
@@ -77,7 +82,7 @@ def parse_selection(answer: Any, candidates: Sequence[Candidate], language: Lang
     chosen: list[tuple[Candidate, dict[str, Any]]] = []
     used: set[str] = set()
     for item in items:
-        if not isinstance(item, dict) or len(chosen) == DIGEST_SIZE:
+        if not isinstance(item, dict) or len(chosen) == size:
             continue
         candidate = by_link.get(_link_key(_text(item.get("link"))))
         if candidate is None or candidate.link in used:
@@ -105,15 +110,19 @@ def parse_selection(answer: Any, candidates: Sequence[Candidate], language: Lang
 
 
 def select_digest(
-    context: RunContext, candidates: Sequence[Candidate], llm: ChatModel, language: Language
+    context: RunContext,
+    candidates: Sequence[Candidate],
+    llm: ChatModel,
+    language: Language,
+    size: int = DIGEST_SIZE,
 ) -> list[Pick]:
     """The day's picks; raises `SelectionError` when the answer names no candidate."""
     with context.sessions.begin() as session:
         interests = interest_context(session)
-    prompt = selection_prompt(candidates, interests, language)
+    prompt = selection_prompt(candidates, interests, language, size)
     with context.stage("selection"):
         answer, _ = llm.complete_json(prompt, purpose="selection", meter=context.usage)
-    picks = parse_selection(answer, candidates, language)
+    picks = parse_selection(answer, candidates, language, size)
     if not picks:
         raise SelectionError("the selection answer named none of the candidates")
     context.stats["selection"] = {
