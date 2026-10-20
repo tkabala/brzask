@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.clients.embeddings import EmbeddingError
 from brzask.clients.extractors import SNIPPET, ExtractionInput, ExtractionResult
 from brzask.db.models import Article
+from brzask.repositories import EmbeddingRepository
 from brzask.services.digest.extraction import STORED_CHARS, TEXT_CHARS, extract_and_embed
 from brzask.services.digest.pool import Candidate
 from tests.factories import TEST_MODEL, Factories
@@ -59,12 +60,14 @@ def test_texts_are_cut_embedded_as_documents_and_stored(
 
     session.expire_all()
     stored = session.get_one(Article, full.id)
-    assert stored.extracted_text == (first.text or "")[:STORED_CHARS]
-    assert len(stored.extracted_text or "") == STORED_CHARS
-    assert (stored.extracted_by, stored.embedding_model) == ("trafilatura", TEST_MODEL)
-    assert list(stored.embedding or []) == pytest.approx(first.embedding)
+    assert stored.extracted_text == first.text  # what was embedded, for a later reembed
+    assert STORED_CHARS == TEXT_CHARS
+    assert stored.extracted_by == "trafilatura"
+    vectors = EmbeddingRepository(session).of_articles([full.id, nothing.id], TEST_MODEL)
+    assert vectors.keys() == {full.id}
+    assert vectors[full.id] == pytest.approx(first.embedding)
     empty = session.get_one(Article, nothing.id)
-    assert (empty.extracted_text, empty.embedding, empty.embedding_model) == (None, None, None)
+    assert empty.extracted_text is None
 
     assert run.stats["extraction"] == {
         "candidates": 3,

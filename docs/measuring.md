@@ -39,6 +39,7 @@ A configuration file overrides any of the digest's limits; everything left out k
 
 ```toml
 llm_model = "provider/another-model"  # left out: LLM_MODEL
+embedding_model = "provider/new-model"  # left out: the active model; its stored vectors are used
 
 [pool]
 max_age_days = 10
@@ -81,6 +82,18 @@ Over 28 days of daily use (2026-09-21 to 2026-10-20, `deepseek/deepseek-v4-flash
 One opened article (2026-09-30) is in no rebuilt pool: it was published two months before it was shown, and the 10-day age limit drops it.
 
 Each day costs two model calls (ranking and selection). `--workers` (default 4) replays several days at once.
+
+## Embedding models: reembed and replay
+
+Deduplication thresholds are cosine values measured on one embedding model and mean nothing for another (see `THRESHOLDS` in the deduplication stage). Moving to another model is therefore three steps:
+
+```console
+$ brzask reembed --model provider/new-model --no-switch   # compute vectors, keep using the current model
+$ brzask replay --days 30 --config new-model.toml          # embedding_model = "provider/new-model", [deduplication] ...
+$ brzask reembed --model provider/new-model               # embed what came in since, then switch
+```
+
+`reembed` embeds every article that has a vector of another model again, from its stored text, in batches; it can be stopped and run again. Digests keep using the active model until the switch, which waits for no digest to be running. `brzask status` shows the active model and the stored vectors per model. Add the measured thresholds for the new model to `THRESHOLDS` before or right after switching; until then the digest uses the default ones and logs a warning.
 
 ## Extractors: extract-bench
 

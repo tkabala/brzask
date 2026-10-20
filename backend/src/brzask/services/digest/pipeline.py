@@ -12,6 +12,7 @@ from brzask.clients.feeds import FeedFetcher
 from brzask.clients.http import new_client
 from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
+from brzask.log import get_logger
 from brzask.prompts import Language
 from brzask.repositories import ArticleRepository
 from brzask.repositories.articles import DigestEntry
@@ -20,8 +21,11 @@ from brzask.services.digest.extraction import DocumentEmbedder, TextExtractor, e
 from brzask.services.digest.pool import FeedReader, gather_candidates
 from brzask.services.digest.ranking import ChatModel, rank_candidates
 from brzask.services.digest.selection import Pick, select_digest
+from brzask.services.embeddings import active_model
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
+
+log = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,8 +72,17 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
 
 
 def run_digest(context: RunContext) -> None:
-    """The digest with clients built from the settings."""
+    """The digest with clients built from the settings, embedding with the active model."""
     settings = get_settings()
+    with context.sessions.begin() as session:
+        model = active_model(session, settings.embedding.model)
+    if model != settings.embedding.model:
+        log.warning(
+            "EMBEDDING_MODEL differs from the active model; using the active one "
+            "(brzask reembed switches models)",
+            configured=settings.embedding.model,
+            active=model,
+        )
     with ExitStack() as stack:
         feeds = FeedFetcher()
         stack.callback(feeds.close)
@@ -77,7 +90,7 @@ def run_digest(context: RunContext) -> None:
         stack.callback(pages.close)
         llm = LLMClient.from_settings(settings.llm)
         stack.callback(llm.client.close)
-        embedder = Embedder.from_settings(settings)
+        embedder = Embedder.from_settings(settings, model)
         stack.callback(embedder.client.close)
         build_digest(
             context,

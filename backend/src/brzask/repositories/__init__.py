@@ -8,6 +8,7 @@ the same queries work when re-running past days.
 
 from brzask.repositories.articles import ArticleRepository
 from brzask.repositories.changes import ChangeRepository
+from brzask.repositories.embeddings import EmbeddingRepository
 from brzask.repositories.interests import InterestRepository
 from brzask.repositories.runs import RunRepository
 from brzask.repositories.settings import SettingRepository
@@ -18,6 +19,7 @@ __all__ = [
     "ApiTokenRepository",
     "ArticleRepository",
     "ChangeRepository",
+    "EmbeddingRepository",
     "InterestRepository",
     "RunRepository",
     "SettingRepository",

@@ -157,12 +157,10 @@ class Article(Base):
     shown_at: Mapped[datetime | None]
     opened_at: Mapped[datetime | None] = mapped_column(comment="First open; the preference signal.")
 
-    extracted_text: Mapped[str | None]
-    extracted_by: Mapped[str | None] = mapped_column(comment="Extractor that produced the text.")
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
-    embedding_model: Mapped[str | None] = mapped_column(
-        comment="Only vectors of the same model are compared."
+    extracted_text: Mapped[str | None] = mapped_column(
+        comment="The text that was embedded, so another model can embed it again."
     )
+    extracted_by: Mapped[str | None] = mapped_column(comment="Extractor that produced the text.")
 
     # Set when the article is picked for a digest.
     digest_date: Mapped[date | None]
@@ -176,9 +174,6 @@ class Article(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "(embedding IS NULL) = (embedding_model IS NULL)", name="embedding_has_model"
-        ),
-        CheckConstraint(
             "(digest_date IS NULL) = (digest_position IS NULL)", name="digest_date_and_position"
         ),
         CheckConstraint(
@@ -188,6 +183,23 @@ class Article(Base):
         Index(None, "opened_at", postgresql_where=text("opened_at IS NOT NULL")),
         Index(None, "shown_at", postgresql_where=text("shown_at IS NOT NULL")),
     )
+
+
+class ArticleEmbedding(Base):
+    """An article's vector from one model; an article has one per model that embedded it."""
+
+    __tablename__ = "article_embeddings"
+
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(
+        primary_key=True, comment="Only vectors of the same model are compared."
+    )
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (Index(None, "model", "article_id"),)
 
 
 # --- Runs ------------------------------------------------------------------------

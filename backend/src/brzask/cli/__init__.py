@@ -17,6 +17,7 @@ from brzask.cli.common import (
     table,
     unit_of_work,
 )
+from brzask.cli.embeddings import reembed_command
 from brzask.cli.extract_bench import extract_bench_command
 from brzask.cli.replay import replay_command
 from brzask.config import get_settings
@@ -34,6 +35,7 @@ app.add_typer(sources.app, name="sources")
 app.add_typer(interests.app, name="interests")
 app.command(name="replay")(replay_command)
 app.command(name="extract-bench")(extract_bench_command)
+app.command(name="reembed")(reembed_command)
 
 
 def run_cli() -> None:
@@ -107,7 +109,7 @@ def run(
 def status() -> None:
     """Show article and source counts, the pause and the last run of each pipeline."""
     with unit_of_work() as session:
-        current = get_status(session, datetime.now(UTC))
+        current = get_status(session, datetime.now(UTC), get_settings().embedding.model)
     articles = current.articles
     typer.echo(
         f"Articles: {articles.total} stored, {articles.shown} shown, {articles.opened} opened"
@@ -116,6 +118,13 @@ def status() -> None:
         "Sources: "
         + ", ".join(f"{count} {state.value}" for state, count in current.sources.items())
     )
+    vectors = ", ".join(
+        f"{count} {model}" + (" (active)" if model == current.embedding_model else "")
+        for model, count in sorted(current.embeddings.items())
+    )
+    typer.echo(f"Embedding model: {current.embedding_model}")
+    if vectors:
+        typer.echo(f"Vectors: {vectors}")
     typer.echo(f"Last digest: {current.last_digest or '-'}")
     if current.paused_until:
         typer.echo(f"Paused until {local(current.paused_until)}")

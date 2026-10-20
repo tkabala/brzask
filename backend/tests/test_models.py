@@ -18,6 +18,7 @@ def test_all_tables_are_registered() -> None:
         "sources",
         "interests",
         "articles",
+        "article_embeddings",
         "runs",
         "settings",
         "change_log",
@@ -38,7 +39,7 @@ def test_articles_join_sources_by_id() -> None:
 
 
 def test_embedding_column_has_fixed_width() -> None:
-    assert f"embedding VECTOR({EMBEDDING_DIMENSIONS})" in ddl("articles")
+    assert f"embedding VECTOR({EMBEDDING_DIMENSIONS}) NOT NULL" in ddl("article_embeddings")
 
 
 def test_statuses_are_text_with_check_constraints() -> None:
@@ -56,8 +57,10 @@ def test_constraint_names_follow_the_convention() -> None:
     assert "CONSTRAINT pk_articles PRIMARY KEY" in sql
     assert "CONSTRAINT uq_articles_link UNIQUE" in sql
     assert "CONSTRAINT uq_articles_digest_date_digest_position UNIQUE" in sql
-    assert "CONSTRAINT ck_articles_embedding_has_model CHECK" in sql
     assert "CONSTRAINT fk_articles_source_id_sources FOREIGN KEY" in sql
+    embeddings = ddl("article_embeddings")
+    assert "CONSTRAINT pk_article_embeddings PRIMARY KEY (article_id, model)" in embeddings
+    assert "CONSTRAINT fk_article_embeddings_article_id_articles FOREIGN KEY" in embeddings
 
 
 def test_enum_values_are_stored_not_member_names() -> None:

@@ -14,13 +14,15 @@ from brzask.clients.feeds import FeedEntry, FeedResult, FetchStatus
 from brzask.clients.llm import Completion
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, ArticleState, RunKind, RunStatus, Source
-from brzask.repositories import ArticleRepository
-from brzask.services.digest.pipeline import DigestClients, build_digest
+from brzask.repositories import ArticleRepository, EmbeddingRepository
+from brzask.services.digest import pipeline
+from brzask.services.digest.pipeline import DigestClients, build_digest, run_digest
 from brzask.services.digest.selection import DIGEST_SIZE
+from brzask.services.embeddings import switch_model
 from brzask.services.pause import pause
 from brzask.services.runs import RunContext, run_pipeline
-from tests.factories import Factories
-from tests.services.digest.fakes import NOW, FakeEmbedder, FakeExtractor, FakeFeeds
+from tests.factories import TEST_MODEL, Factories
+from tests.services.digest.fakes import NOW, FakeEmbedder, FakeExtractor, FakeFeeds, context
 
 WARSAW = ZoneInfo("Europe/Warsaw")
 # 07:00 UTC on 18 October is 09:00 in Warsaw: the digest date is the 18th.
@@ -121,7 +123,9 @@ def test_a_run_builds_and_stores_todays_digest(
     assert all(a.state is ArticleState.SHOWN and a.shown_at == NOW for a in digest)
     assert digest[0].digest_title == f"T {digest[0].link}"
     assert (digest[0].summary, digest[0].why_it_matters, digest[0].topic) == ("S", "W", "X")
-    assert all(a.rank is not None and a.embedding is not None for a in digest)
+    assert all(a.rank is not None for a in digest)
+    vectors = EmbeddingRepository(session).of_articles([a.id for a in digest], TEST_MODEL)
+    assert vectors.keys() == {a.id for a in digest}
     assert model.purposes == ["ranking", "selection"]
     stats = finished.stats
     assert stats["date"] == TODAY.isoformat()
@@ -197,3 +201,19 @@ def test_a_failed_selection_shows_nothing_and_keeps_the_pool(
     stored = session.scalars(select(Article)).all()
     assert len(stored) == 12
     assert all(article.state is ArticleState.SEEN for article in stored)
+
+
+def test_the_digest_embeds_with_the_active_model(
+    sessions: sessionmaker[Session], session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    switch_model(session, "new/embedding", TEST_MODEL, actor="user")
+    monkeypatch.setenv("EMBEDDING_MODEL", TEST_MODEL)
+    built: list[str] = []
+
+    def build(context: RunContext, clients: DigestClients) -> None:
+        built.append(clients.embedder.model)
+
+    monkeypatch.setattr(pipeline, "build_digest", build)
+    run_digest(context(sessions))
+
+    assert built == ["new/embedding"]

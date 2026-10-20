@@ -44,11 +44,17 @@ digest language when the article is picked.
 
 ### Embeddings
 
-`embedding` always has 768 dimensions: every embedding model is asked for
-vectors of that size, so the column type never changes when the model does.
-`embedding_model` records which model produced each vector, and similarity
-queries compare only vectors of the same model. A constraint keeps the two
-columns set together.
+Vectors live in `article_embeddings`, one row per article and embedding model.
+Every vector has 768 dimensions: every model is asked for vectors of that
+size, so the column type never changes when the model does. Similarity queries
+always name a model, so vectors of different models are never compared.
+
+The digest embeds with one model, the active one: `EMBEDDING_MODEL` until
+`brzask reembed` moves to another model, then the one recorded in `settings`.
+`reembed` embeds every embedded article's `extracted_text` (the text that was
+embedded) with the new model and switches only once all of them have a vector,
+so the switch never leaves deduplication with a partial history. Vectors of
+earlier models stay, so switching back costs nothing.
 
 ## Sources
 

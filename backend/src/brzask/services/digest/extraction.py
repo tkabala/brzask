@@ -24,9 +24,9 @@ log = get_logger(__name__)
 # Characters of article text embedded and shown to the selection prompt; the
 # start of an article says what it is about.
 TEXT_CHARS = 4000
-# Characters stored, to keep the table small. Stored vectors are computed from
-# the longer TEXT_CHARS text.
-STORED_CHARS = 2000
+# Characters stored: the text that was embedded, so `brzask reembed` gives
+# another model the same input.
+STORED_CHARS = TEXT_CHARS
 # Pages extracted at once for the top 15.
 WORKERS = 5
 

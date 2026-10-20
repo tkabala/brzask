@@ -54,7 +54,6 @@ def test_constraints_from_the_models_exist(empty_database_url: str, engine: Engi
     checks = {check["name"] for check in inspect(engine).get_check_constraints("articles")}
     assert {
         "ck_articles_article_state",
-        "ck_articles_embedding_has_model",
         "ck_articles_digest_date_and_position",
         "ck_articles_only_shown_articles_in_digest",
     } <= checks
@@ -62,7 +61,7 @@ def test_constraints_from_the_models_exist(empty_database_url: str, engine: Engi
         column_type = connection.execute(
             text(
                 "SELECT format_type(atttypid, atttypmod) FROM pg_attribute "
-                "WHERE attrelid = 'articles'::regclass AND attname = 'embedding'"
+                "WHERE attrelid = 'article_embeddings'::regclass AND attname = 'embedding'"
             )
         ).scalar_one()
     assert column_type == "vector(768)"
@@ -77,6 +76,41 @@ def test_downgrade_and_upgrade_again(empty_database_url: str, engine: Engine) ->
 
     command.upgrade(config, "head")
     assert current_revision(empty_database_url) == head()
+
+
+def test_vectors_move_to_their_own_table_and_back(empty_database_url: str, engine: Engine) -> None:
+    config = alembic_config(empty_database_url)
+    command.upgrade(config, "87fe06d6643f")  # vectors on articles
+    vector = "[" + ",".join(["0.5"] * 4 + ["0"] * 764) + "]"
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO articles (link, title, embedding, embedding_model) VALUES "
+                "('https://a.example/1', 'With', :vector, 'google/gemini-embedding-001'), "
+                "('https://a.example/2', 'Without', NULL, NULL)"
+            ),
+            {"vector": vector},
+        )
+
+    command.upgrade(config, "9fb9574849ff")
+    with engine.connect() as connection:
+        moved = connection.execute(
+            text(
+                "SELECT a.title, e.model FROM article_embeddings e "
+                "JOIN articles a ON a.id = e.article_id"
+            )
+        ).all()
+    assert [tuple(row) for row in moved] == [("With", "google/gemini-embedding-001")]
+
+    command.downgrade(config, "87fe06d6643f")
+    with engine.connect() as connection:
+        back = connection.execute(
+            text("SELECT title, embedding_model, embedding IS NOT NULL FROM articles ORDER BY id")
+        ).all()
+    assert [tuple(row) for row in back] == [
+        ("With", "google/gemini-embedding-001", True),
+        ("Without", None, False),
+    ]
 
 
 def test_cli_migrate_uses_the_database_settings(

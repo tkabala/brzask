@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from brzask.db.models import (
     EMBEDDING_DIMENSIONS,
     Article,
+    ArticleEmbedding,
     ArticleState,
     Interest,
     Source,
@@ -86,6 +87,8 @@ class Factories:
     ) -> Article:
         """An article; giving `digest_date` makes it shown in that day's digest.
 
+        `embedding` stores a vector of `embedding_model` (default TEST_MODEL).
+
         The position defaults to the next free one for that day, `shown_at`
         to `first_seen_at`.
         """
@@ -93,9 +96,6 @@ class Factories:
         fields.setdefault("link", f"https://news.example/articles/{n}")
         fields.setdefault("title", f"Article {n}")
         seen = first_seen_at or datetime.now(UTC)
-        if embedding is not None:
-            fields["embedding"] = list(embedding)
-            fields["embedding_model"] = embedding_model or TEST_MODEL
         if digest_date is not None:
             fields.setdefault("state", ArticleState.SHOWN)
             fields.setdefault("shown_at", seen)
@@ -105,6 +105,16 @@ class Factories:
                 if digest_position is not None
                 else (ArticleRepository(self.session).last_digest_position(digest_date) or 0) + 1
             )
-        return self._add(
+        article = self._add(
             Article(source_id=source.id if source else None, first_seen_at=seen, **fields)
+        )
+        if embedding is not None:
+            self.embedding(article, embedding, embedding_model or TEST_MODEL)
+        return article
+
+    def embedding(
+        self, article: Article, vector: Sequence[float], model: str = TEST_MODEL
+    ) -> ArticleEmbedding:
+        return self._add(
+            ArticleEmbedding(article_id=article.id, model=model, embedding=list(vector))
         )

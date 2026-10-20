@@ -39,7 +39,7 @@ from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, RunKind
 from brzask.log import get_logger
 from brzask.prompts import Language
-from brzask.repositories import ArticleRepository
+from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.services.digest import pool, ranking, selection
 from brzask.services.digest.dedup import Thresholds, deduplicate_candidates, thresholds_for
 from brzask.services.digest.pool import (
@@ -89,6 +89,9 @@ class ReplayConfig(_Section):
     """
 
     llm_model: str | None = None  # None: LLM_MODEL
+    # None: the active model. Another one compares its stored vectors, e.g. after
+    # `brzask reembed --no-switch`, to check its thresholds before switching.
+    embedding_model: str | None = None
     pool: PoolConfig = PoolConfig()
     ranking: RankingConfig = RankingConfig()
     # None: the embedding model's own thresholds.
@@ -181,29 +184,27 @@ def replay_pool(articles: Iterable[Article], at: datetime, config: PoolConfig) -
 
 
 def with_stored_text(
-    candidates: Sequence[Candidate], articles: Mapping[int, Article], embedding_model: str
+    candidates: Sequence[Candidate],
+    articles: Mapping[int, Article],
+    vectors: Mapping[int, Sequence[float]],
 ) -> list[Candidate]:
-    """Candidates with the text and vector stored when a real run extracted them.
+    """Candidates with the text a real run extracted and their stored vectors.
 
-    Vectors of another embedding model are left out: they cannot be compared.
+    `vectors` are of one embedding model, the one deduplication compares with.
     """
     result = []
     for candidate in candidates:
         article = articles.get(candidate.article_id) if candidate.article_id else None
-        if article is None:
+        if article is None or candidate.article_id is None:
             result.append(candidate)
             continue
-        same_model = article.embedding_model == embedding_model
+        vector = vectors.get(candidate.article_id)
         result.append(
             replace(
                 candidate,
                 text=article.extracted_text,
                 extracted_by=article.extracted_by,
-                embedding=(
-                    list(article.embedding)
-                    if same_model and article.embedding is not None
-                    else None
-                ),
+                embedding=list(vector) if vector is not None else None,
             )
         )
     return result
@@ -222,6 +223,9 @@ def replay_day(
         articles = ArticleRepository(session)
         stored = articles.seen_between(since, run_at)
         shown = articles.digest(day)
+        vectors = EmbeddingRepository(session).of_articles(
+            [article.id for article in stored], clients.embedding_model
+        )
     by_id = {article.id: article for article in stored}
     candidates = replay_pool(stored, run_at, config.pool)
     result = DayReplay(
@@ -247,7 +251,7 @@ def replay_day(
     )
     try:
         top = rank_candidates(context, candidates, clients.llm, config.limits())
-        top = with_stored_text(top, by_id, clients.embedding_model)
+        top = with_stored_text(top, by_id, vectors)
         survivors = deduplicate_candidates(
             context, top, clients.embedding_model, config.thresholds(clients.embedding_model)
         )

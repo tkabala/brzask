@@ -13,6 +13,7 @@ from brzask import prompts
 from brzask.clients.llm import Completion, LLMError
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, Run
+from brzask.repositories import EmbeddingRepository
 from brzask.services.digest.dedup import THRESHOLDS
 from brzask.services.digest.pool import POOL_CAP
 from brzask.services.replay import (
@@ -199,7 +200,8 @@ def test_stored_text_and_vectors_of_the_same_model_are_used(
     )
     candidates = replay_pool([same, other], NOW, PoolConfig())
 
-    stored = with_stored_text(candidates, {same.id: same, other.id: other}, TEST_MODEL)
+    vectors = EmbeddingRepository(session).of_articles([same.id, other.id], TEST_MODEL)
+    stored = with_stored_text(candidates, {same.id: same, other.id: other}, vectors)
     by_link = {c.link: c for c in stored}
 
     assert by_link[same.link].text == "Text"

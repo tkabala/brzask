@@ -135,7 +135,8 @@ def run_pipeline(
         raise ServiceError(f"the {kind.value} pipeline is not available")
 
     run_id = uuid.uuid4()
-    with logged_run(kind.value, str(run_id)), pipeline_lock(_bind(sessions), kind) as acquired:
+    lock = pipeline_lock(session_bind(sessions), kind)
+    with logged_run(kind.value, str(run_id)), lock as acquired:
         context = RunContext(
             run_id=run_id,
             kind=kind,
@@ -164,7 +165,8 @@ def run_pipeline(
         return _finish(context, RunStatus.OK)
 
 
-def _bind(sessions: sessionmaker[Session]) -> Engine | Connection:
+def session_bind(sessions: sessionmaker[Session]) -> Engine | Connection:
+    """What `sessions` connect through, for a pipeline lock outside `run_pipeline`."""
     bind = sessions.kw.get("bind")
     if not isinstance(bind, Engine | Connection):
         raise RuntimeError("the session factory is not bound to a database")

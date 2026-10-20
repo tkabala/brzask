@@ -9,12 +9,14 @@ import typer
 from pydantic import ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
+from brzask.clients.embeddings import Embedder
 from brzask.clients.feed_finder import FeedFinder
 from brzask.clients.feeds import FeedFetcher
 from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
-from brzask.config.settings import GROUPS, LLMSettings, env_name
+from brzask.config.settings import GROUPS, LLMSettings, Settings, env_name
 from brzask.db.session import create_db_engine, session_factory
+from brzask.services.digest.extraction import DocumentEmbedder
 from brzask.services.digest.ranking import ChatModel
 from brzask.services.errors import ServiceError
 
@@ -31,6 +33,15 @@ def get_sessions() -> sessionmaker[Session]:
 def get_read_only_sessions() -> sessionmaker[Session]:
     """Sessions whose transactions the database keeps read-only (`brzask replay`)."""
     return session_factory(create_db_engine().execution_options(postgresql_readonly=True))
+
+
+@contextmanager
+def embedder(settings: Settings, model: str) -> Iterator[DocumentEmbedder]:
+    client = Embedder.from_settings(settings, model)
+    try:
+        yield client
+    finally:
+        client.client.close()
 
 
 @contextmanager

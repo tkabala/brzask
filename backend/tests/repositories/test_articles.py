@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from brzask.db.models import ArticleState
-from brzask.repositories import ArticleRepository
+from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.repositories.articles import DigestEntry, Extraction, NewArticle
 from tests.factories import TEST_MODEL, Factories, unit_vector
 
@@ -217,9 +217,8 @@ def test_save_extractions_stores_text_and_vector(session: Session, make: Factori
     )
 
     assert (article.extracted_text, article.extracted_by) == ("Full text", "trafilatura")
-    assert article.embedding is not None
-    assert list(article.embedding) == pytest.approx(vector)
-    assert article.embedding_model == TEST_MODEL
+    stored = EmbeddingRepository(session).of_articles([article.id], TEST_MODEL)
+    assert stored[article.id] == pytest.approx(vector)
 
 
 def test_save_extraction_without_text_or_vector(session: Session, make: Factories) -> None:
@@ -227,7 +226,7 @@ def test_save_extraction_without_text_or_vector(session: Session, make: Factorie
 
     ArticleRepository(session).save_extractions([Extraction(article.id, None, None, None, None)])
 
-    assert article.embedding is None
+    assert EmbeddingRepository(session).counts_by_model() == {}
     assert article.extracted_text is None
 
 

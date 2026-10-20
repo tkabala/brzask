@@ -10,7 +10,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.util import identity_key
 
-from brzask.db.models import Article, ArticleState, Source
+from brzask.db.models import Article, ArticleEmbedding, ArticleState, Source
+from brzask.repositories.embeddings import EmbeddingRepository
 
 # Rows per INSERT in `add_new`: six bind parameters each (five fields and the state
 # default), far below the 65,535 parameters Postgres accepts in one statement.
@@ -128,14 +129,18 @@ class ArticleRepository:
         self, since: datetime, model: str, before: datetime | None = None
     ) -> list[list[float]]:
         """Vectors of articles shown from `since` (until `before`), from `model` only."""
-        query = select(Article.embedding).where(
-            Article.state == ArticleState.SHOWN,
-            Article.shown_at >= since,
-            Article.embedding_model == model,
+        query = (
+            select(ArticleEmbedding.embedding)
+            .join(Article, Article.id == ArticleEmbedding.article_id)
+            .where(
+                ArticleEmbedding.model == model,
+                Article.state == ArticleState.SHOWN,
+                Article.shown_at >= since,
+            )
         )
         if before is not None:
             query = query.where(Article.shown_at < before)
-        return [list(vector) for vector in self.session.scalars(query) if vector is not None]
+        return [list(vector) for vector in self.session.scalars(query)]
 
     def recent_opens(
         self, since: datetime, limit: int, before: datetime | None = None
@@ -202,23 +207,30 @@ class ArticleRepository:
             self._expire_cached(ranks)
 
     def save_extractions(self, extractions: Sequence[Extraction]) -> None:
-        if extractions:
-            self.session.execute(
-                update(Article),
-                [
-                    {
-                        "id": extraction.article_id,
-                        "extracted_text": extraction.text,
-                        "extracted_by": extraction.extracted_by,
-                        "embedding": (
-                            list(extraction.embedding) if extraction.embedding is not None else None
-                        ),
-                        "embedding_model": extraction.embedding_model,
-                    }
-                    for extraction in extractions
-                ],
-            )
-            self._expire_cached(extraction.article_id for extraction in extractions)
+        """Store each article's text and, when it has one, its vector under its model."""
+        if not extractions:
+            return
+        self.session.execute(
+            update(Article),
+            [
+                {
+                    "id": extraction.article_id,
+                    "extracted_text": extraction.text,
+                    "extracted_by": extraction.extracted_by,
+                }
+                for extraction in extractions
+            ],
+        )
+        self._expire_cached(extraction.article_id for extraction in extractions)
+        by_model: dict[str, dict[int, Sequence[float]]] = {}
+        for extraction in extractions:
+            if extraction.embedding is not None and extraction.embedding_model is not None:
+                by_model.setdefault(extraction.embedding_model, {})[extraction.article_id] = (
+                    extraction.embedding
+                )
+        embeddings = EmbeddingRepository(self.session)
+        for model, vectors in by_model.items():
+            embeddings.add(model, vectors)
 
     def last_digest_position(self, day: date) -> int | None:
         """Highest position in the digest for `day`; None when there is no digest yet."""
@@ -319,10 +331,11 @@ class ArticleRepository:
         self, vector: Sequence[float], model: str, limit: int
     ) -> list[SimilarArticle]:
         """Nearest articles by cosine similarity, among vectors of the same model."""
-        distance = Article.embedding.cosine_distance(list(vector))
+        distance = ArticleEmbedding.embedding.cosine_distance(list(vector))
         query = (
             select(Article, distance)
-            .where(Article.embedding_model == model)
+            .join(ArticleEmbedding, ArticleEmbedding.article_id == Article.id)
+            .where(ArticleEmbedding.model == model)
             .order_by(distance)
             .limit(limit)
         )

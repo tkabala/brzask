@@ -96,8 +96,11 @@ class Embedder:
         self._sleep = sleep
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> Self:
-        """Embedding settings, falling back to the LLM's base URL and key."""
+    def from_settings(cls, settings: Settings, model: str | None = None) -> Self:
+        """Embedding settings, falling back to the LLM's base URL and key.
+
+        `model` replaces EMBEDDING_MODEL (the active model, or one to switch to).
+        """
         embedding, llm = settings.embedding, settings.llm
         base_url = str(embedding.base_url or llm.base_url)
         secret = embedding.api_key or llm.api_key
@@ -109,7 +112,9 @@ class Embedder:
             max_retries=0,  # retried here, with a log line per retry
         )
         return cls(
-            client, embedding.model, openrouter=urlsplit(base_url).hostname == "openrouter.ai"
+            client,
+            model or embedding.model,
+            openrouter=urlsplit(base_url).hostname == "openrouter.ai",
         )
 
     def embed(

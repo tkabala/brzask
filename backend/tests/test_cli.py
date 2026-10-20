@@ -11,13 +11,14 @@ from typer.testing import CliRunner, Result
 from brzask import __version__
 from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
-from brzask.config.settings import LLMSettings
+from brzask.config.settings import LLMSettings, Settings
 from brzask.db.models import RunKind, RunStatus, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services import pipelines
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
 from tests.factories import Factories
+from tests.services.digest.fakes import FakeEmbedder
 from tests.services.test_replay import FakeModel
 
 runner = CliRunner()
@@ -90,7 +91,7 @@ def test_help_lists_the_commands() -> None:
 
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
-        "extract-bench",
+        "extract-bench", "reembed",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
@@ -248,7 +249,7 @@ def test_pause_rejects_bad_or_past_dates(cli: Invoke, value: str, code: int) -> 
 def test_status_shows_counts_and_runs(cli: Invoke, make: Factories) -> None:
     source = make.source()
     make.source(status=SourceStatus.PENDING)
-    make.article(source, opened_at=datetime.now(UTC))
+    make.article(source, opened_at=datetime.now(UTC), embedding=[1.0] + [0.0] * 767)
 
     result = cli("status")
 
@@ -256,7 +257,9 @@ def test_status_shows_counts_and_runs(cli: Invoke, make: Factories) -> None:
     lines = result.stdout.splitlines()
     assert lines[0] == "Articles: 1 stored, 0 shown, 1 opened"
     assert lines[1].startswith("Sources: 1 active, 1 pending, 0 rejected")
-    assert lines[2] == "Last digest: -"
+    assert lines[2] == "Embedding model: google/gemini-embedding-001"
+    assert lines[3] == "Vectors: 1 test/embedding"
+    assert lines[4] == "Last digest: -"
     assert any(line.split() == ["digest", "never"] for line in lines)
 
 
@@ -395,3 +398,39 @@ def test_extract_bench_without_stored_links(
 
     assert result.exit_code == 0
     assert "No stored links in that period." in result.stdout
+
+
+# --- reembed -----------------------------------------------------------------------
+
+
+def test_reembed_moves_vectors_and_switches(
+    cli: Invoke, make: Factories, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    make.article(extracted_text="Text", embedding=[1.0] + [0.0] * 767)
+    make.article(extracted_text=None, embedding=[1.0] + [0.0] * 767)
+    models: list[str] = []
+
+    @contextmanager
+    def embedder(settings: Settings, model: str) -> Iterator[FakeEmbedder]:
+        models.append(model)
+        fake = FakeEmbedder()
+        fake.model = model
+        yield fake
+
+    monkeypatch.setattr(common, "embedder", embedder)
+
+    computed = cli("reembed", "--model", "new/embedding", "--no-switch")
+    switched = cli("reembed", "--model", "new/embedding")
+    status = cli("status")
+
+    assert computed.exit_code == 0, computed.output
+    assert computed.stdout.splitlines() == [
+        "1 articles embedded with new/embedding.",
+        "1 embedded articles have no stored text and were skipped.",
+        "Active model is still google/gemini-embedding-001.",
+    ]
+    assert "1 embedded, 0 to go" in computed.stderr
+    assert switched.stdout.splitlines()[0] == "0 articles embedded with new/embedding."
+    assert switched.stdout.splitlines()[-1] == "Active model is now new/embedding."
+    assert "Embedding model: new/embedding" in status.stdout
+    assert models == ["new/embedding", "new/embedding"]

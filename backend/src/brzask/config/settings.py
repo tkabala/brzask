@@ -227,7 +227,10 @@ class EmbeddingSettings(SettingsGroup):
     base_url: Annotated[HttpUrl | None, BeforeValidator(_empty_to_none)] = Field(
         None, description="Base URL of the embeddings API; defaults to LLM_BASE_URL."
     )
-    model: str = Field("google/gemini-embedding-001", description="Embedding model.")
+    model: str = Field(
+        "google/gemini-embedding-001",
+        description="Embedding model; `brzask reembed` moves stored vectors to another one.",
+    )
     api_key: OptionalSecret = Field(None, description="API key; defaults to LLM_API_KEY.")
 
 

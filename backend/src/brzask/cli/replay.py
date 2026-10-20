@@ -12,6 +12,7 @@ from brzask import prompts
 from brzask.cli import common
 from brzask.cli.common import table
 from brzask.config import get_settings
+from brzask.services.embeddings import active_model
 from brzask.services.replay import (
     DayReplay,
     ReplayClients,
@@ -68,13 +69,18 @@ def replay_command(
                 stack.enter_context(prompts.overridden(prompt_dir))
             except ValueError as error:
                 raise typer.BadParameter(str(error), param_hint="--prompt-dir") from error
+        sessions = common.get_read_only_sessions()
+        with sessions.begin() as session:
+            embedding_model = config.embedding_model or active_model(
+                session, settings.embedding.model
+            )
         clients = ReplayClients(
             llm=stack.enter_context(common.llm_client(llm_settings)),
             llm_model=llm_settings.model,
-            embedding_model=settings.embedding.model,
+            embedding_model=embedding_model,
             language=prompts.language(settings.digest.language),
         )
-        results = replay(common.get_read_only_sessions(), clients, since, config, workers)
+        results = replay(sessions, clients, since, config, workers)
 
     _print(results, summarize(results))
     if json_file is not None:
