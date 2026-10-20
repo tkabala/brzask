@@ -40,7 +40,7 @@ A configuration file overrides any of the digest's limits; everything left out k
 ```toml
 llm_model = "provider/another-model"  # left out: LLM_MODEL
 embedding_model = "provider/new-model"  # left out: the active model; its stored vectors are used
-judge_model = "liquid/d1"  # left out: JUDGE_MODEL; used when [ranking] method = "judge"
+judge_model = "liquid/d1"  # left out: JUDGE_MODEL; used by every method set to "judge"
 
 [pool]
 max_age_days = 10
