@@ -19,6 +19,7 @@ from brzask.cli.common import (
 )
 from brzask.cli.embeddings import reembed_command
 from brzask.cli.extract_bench import extract_bench_command
+from brzask.cli.fit_weights import fit_weights_command
 from brzask.cli.judge_bench import judge_bench_command
 from brzask.cli.replay import replay_command
 from brzask.config import get_settings
@@ -37,6 +38,7 @@ app.add_typer(interests.app, name="interests")
 app.command(name="replay")(replay_command)
 app.command(name="extract-bench")(extract_bench_command)
 app.command(name="judge-bench")(judge_bench_command)
+app.command(name="fit-weights")(fit_weights_command)
 app.command(name="reembed")(reembed_command)
 
 

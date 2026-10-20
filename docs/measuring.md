@@ -125,6 +125,10 @@ deepseek/deepseek-v4-flash  19/195  0       0.47           0.54              0.4
 
 An AUC below 0.5 means the reverse relation. For promotion it is the expected direction: opened articles were less promotional.
 
+### Fitting weights: fit-weights
+
+`brzask fit-weights bench.json [--model M] [--until DATE] [--l2 0.01]` fits the composite weights to the opens in a judge-bench report (logistic regression, the dimension scores as features). It compares them with the hand-set weights, each day scored by weights fitted on the other days, and prints a `[ranking.weights]` block for `brzask replay --config`. `--until` fits only on earlier days, so the later ones can be replayed out of sample. So far learned weights lose to the hand-set ones; [ADR 0009](decisions/0009-hand-set-composite-weights-until-opens-can-train-them.md) explains why.
+
 ### Judge models compared
 
 Measured on 2026-10-20, on daily use. Each row comes from its own measurement:

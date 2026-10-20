@@ -46,6 +46,7 @@ nav:
       - decisions/0006-llm-ranking-stays-the-default-over-composite-scores.md
       - decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md
       - decisions/0008-jev-stays-the-default-judge.md
+      - decisions/0009-hand-set-composite-weights-until-opens-can-train-them.md
       - Template: decisions/0000-template.md
 
 validation:

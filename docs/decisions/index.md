@@ -13,6 +13,7 @@ Significant decisions are recorded as Architecture Decision Records (ADRs) in th
 | [0006](0006-llm-ranking-stays-the-default-over-composite-scores.md) | LLM ranking stays the default; composite scores are opt-in | Accepted |
 | [0007](0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md) | A judge decides same-day duplicates in the grey zone | Accepted |
 | [0008](0008-jev-stays-the-default-judge.md) | Jev stays the default judge | Accepted |
+| [0009](0009-hand-set-composite-weights-until-opens-can-train-them.md) | Hand-set composite weights until opens can train them | Accepted |
 
 To add a decision, copy the [template](0000-template.md) to the next free number,
 fill it in and add it to this table and to the `nav` in `mkdocs.yml`.
