@@ -41,6 +41,32 @@ SAMPLES: dict[str, dict[str, Any]] = {
         ],
         "rank_limit": 40,
     },
+    "judge": {
+        "state": '{"article": {"title": "Postgres 18 released"}}',
+        "questions": [
+            {
+                "name": "is_release",
+                "kind": "noul",
+                "instructions": "Is `article` a release announcement?",
+                "criteria": None,
+                "options": [],
+            },
+            {
+                "name": "kind",
+                "kind": "choice",
+                "instructions": "What kind of article is it?",
+                "criteria": '{"release": "A new version", "news": "Anything else"}',
+                "options": ["release", "news"],
+            },
+            {
+                "name": "fit",
+                "kind": "score",
+                "instructions": "How well does it fit Postgres?",
+                "criteria": '["Unrelated", "Related", "Exactly"]',
+                "options": ["0", "1", "2"],
+            },
+        ],
+    },
     "selection": {
         "interests": INTERESTS,
         "candidates": [

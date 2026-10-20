@@ -24,14 +24,15 @@ one client serve both, and how should brzask talk to them?
 
 ## Considered options
 
-- A small `httpx` client for `POST {base}/v1/systemone`, the request and
-  response shapes typed in brzask.
+- A small client of brzask's own for `POST {base}/v1/systemone`, the request
+  and response shapes typed in brzask, sent through the `openai` SDK's request
+  layer that the LLM and embedding clients already use.
 - The TypeSafe Python SDK (`typesafe_sdk`) pointed at OpenRouter.
 - The OpenRouter Python SDK.
 
 ## Decision outcome
 
-Chosen option: a small `httpx` client, because the API is one endpoint with a
+Chosen option: a client of brzask's own, because the API is one endpoint with a
 stable shape that both models accept, and the SDKs add a dependency for one
 call while each fits only one provider well.
 
@@ -93,17 +94,20 @@ All calls together cost under $0.001.
   provider needs only a base URL and a key.
 - Good, because the typed request and response live in brzask and are checked
   by `mypy --strict`.
-- Bad, because brzask owns retries for 429 and 529, which the TypeSafe SDK
-  would do.
+- Good, because retries (429, 529 and other server errors, with
+  `Retry-After`), timeouts and tracing are the ones every other API call
+  already has.
 - Bad, because `score` questions need at least two levels to work on every
   model; the client enforces that rather than relying on one provider's
   leniency.
 
 ## Pros and cons of the options
 
-### Own `httpx` client
+### Own client over the `openai` SDK's request layer
 
-- Good, because no new dependency; `httpx` is already used for every other API.
+- Good, because no new dependency; the SDK's generic `post` sends any JSON
+  body to the configured base URL and maps error statuses to the same
+  exceptions as chat calls.
 - Good, because errors from either provider map to brzask's own exceptions.
 - Bad, because the shapes have to be kept up to date by hand.
 
@@ -126,3 +130,10 @@ ranking and the deduplication thresholds, is decided by measuring with
 `brzask replay`, not by this record. The confidence gap on the promotion
 score (Jev 1.00, d1 0.51 on the same webinar invitation) is one example, not
 a measurement; compare the models on stored history before choosing.
+
+Until then the default is `typesafe/jev-1.13` (`JUDGE_MODEL`). Where no System
+One model is reachable, `JUDGE_BACKEND=llm` asks the chat model the same
+questions for probabilities in JSON and builds the same answers in code,
+confidence included; a chat model's probabilities are not trained to be
+calibrated, so thresholds measured with one backend do not carry over to the
+other.

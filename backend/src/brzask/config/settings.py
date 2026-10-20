@@ -234,6 +234,27 @@ class EmbeddingSettings(SettingsGroup):
     api_key: OptionalSecret = Field(None, description="API key; defaults to LLM_API_KEY.")
 
 
+class JudgeSettings(SettingsGroup):
+    """Judgements: short typed questions (yes/no, one of a set, a level) about articles."""
+
+    model_config = SettingsConfigDict(env_prefix="JUDGE_")
+
+    backend: Literal["system-one", "llm"] = Field(
+        "system-one",
+        description="system-one (a System One model such as Jev or d1) or llm "
+        "(the chat model answers in JSON; works with local servers).",
+    )
+    model: Annotated[str | None, BeforeValidator(_empty_to_none)] = Field(
+        None,
+        description="Model with its author prefix; defaults to typesafe/jev-1.13 "
+        "for system-one and to LLM_MODEL for llm.",
+    )
+    base_url: Annotated[HttpUrl | None, BeforeValidator(_empty_to_none)] = Field(
+        None, description="Base URL of the API; defaults to LLM_BASE_URL."
+    )
+    api_key: OptionalSecret = Field(None, description="API key; defaults to LLM_API_KEY.")
+
+
 Extractor = Literal["feed", "trafilatura", "jina", "firecrawl", "crawl4ai"]
 
 FIRECRAWL_CLOUD_URL = HttpUrl("https://api.firecrawl.dev")
@@ -445,6 +466,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     DatabaseSettings,
     LLMSettings,
     EmbeddingSettings,
+    JudgeSettings,
     ExtractorSettings,
     WebSearchSettings,
     AuthSettings,
@@ -473,6 +495,10 @@ class Settings:
     @cached_property
     def embedding(self) -> EmbeddingSettings:
         return EmbeddingSettings()
+
+    @cached_property
+    def judge(self) -> JudgeSettings:
+        return JudgeSettings()
 
     @cached_property
     def extractors(self) -> ExtractorSettings:
