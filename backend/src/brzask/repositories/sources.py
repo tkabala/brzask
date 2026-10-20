@@ -22,6 +22,20 @@ class SourceStats:
     opened: int
 
 
+@dataclass(frozen=True, slots=True)
+class SourceRecord:
+    """A source's whole history in counts, for survival statistics."""
+
+    source_id: int
+    origin: SourceOrigin
+    origin_detail: str | None
+    status: SourceStatus
+    created_at: datetime
+    articles: int
+    shown: int
+    opened: int
+
+
 class SourceRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -125,6 +139,34 @@ class SourceRepository:
         source.fetch_failures += 1
         source.fetch_error = error
         self.session.flush()
+
+    def records(self) -> list[SourceRecord]:
+        """Every source with its article, shown and opened counts over all time."""
+        counts = (
+            select(
+                Article.source_id,
+                func.count().label("articles"),
+                func.count().filter(Article.state == ArticleState.SHOWN).label("shown"),
+                func.count(Article.opened_at).label("opened"),
+            )
+            .group_by(Article.source_id)
+            .subquery()
+        )
+        query = (
+            select(
+                Source.id,
+                Source.origin,
+                Source.origin_detail,
+                Source.status,
+                Source.created_at,
+                func.coalesce(counts.c.articles, 0),
+                func.coalesce(counts.c.shown, 0),
+                func.coalesce(counts.c.opened, 0),
+            )
+            .outerjoin(counts, counts.c.source_id == Source.id)
+            .order_by(Source.id)
+        )
+        return [SourceRecord(*row) for row in self.session.execute(query)]
 
     def stats(self, since: datetime) -> dict[int, SourceStats]:
         """Counts per source for articles first seen at or after `since`.

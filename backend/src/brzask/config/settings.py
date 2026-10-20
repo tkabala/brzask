@@ -283,7 +283,8 @@ class WebSearchSettings(SettingsGroup):
     ] = Field(
         None,
         validation_alias="WEB_SEARCH",
-        description="searxng, llm-online or brave; empty runs discovery without web search.",
+        description="searxng, llm-online (recommended with OpenRouter) or brave; "
+        "empty turns source discovery off.",
     )
     searxng_url: Annotated[HttpUrl | None, BeforeValidator(_empty_to_none)] = Field(
         None, description="SearXNG instance URL (JSON format must be enabled)."

@@ -12,7 +12,7 @@ from brzask import __version__
 from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
 from brzask.config.settings import LLMSettings, Settings
-from brzask.db.models import RunKind, RunStatus, SourceStatus
+from brzask.db.models import RunKind, RunStatus, SourceOrigin, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services import pipelines
 from brzask.services.pause import paused_until
@@ -96,7 +96,7 @@ def test_help_lists_the_commands() -> None:
     for command in top_level:
         assert command in result.stdout
     for group, commands in {
-        "sources": ("list", "add", "mute", "enable"),
+        "sources": ("list", "add", "mute", "enable", "stats"),
         "interests": ("list", "add", "edit"),
     }.items():
         output = runner.invoke(app, [group, "--help"]).stdout
@@ -185,6 +185,23 @@ def test_a_failed_command_writes_nothing(cli: Invoke, session: Session) -> None:
 
     assert result.exit_code == 1
     assert cli("sources", "list").stdout == "No sources.\n"
+
+
+def test_sources_stats_by_origin(cli: Invoke, make: Factories) -> None:
+    old = datetime.now(UTC) - timedelta(days=40)
+    source = make.source(
+        origin=SourceOrigin.DISCOVERY, origin_detail="llm-online: Rust", created_at=old
+    )
+    make.article(source, opened_at=datetime.now(UTC))
+
+    result = cli("sources", "stats")
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0].split()[:4] == ["ORIGIN", "ADAPTER", "ADDED", "ENABLED"]
+    assert lines[1].split() == [
+        "discovery", "llm-online", "1", "1", "1", "1", "(100%)", "0", "(0%)", "1", "(100%)", "1",
+    ]  # fmt: skip
 
 
 def test_sources_list_rejects_unknown_statuses(cli: Invoke) -> None:
