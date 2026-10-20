@@ -319,3 +319,12 @@ def test_config_errors_name_the_problem(tmp_path: Path, text: str, message: str)
 
     with pytest.raises(ValueError, match=message):
         ReplayConfig.load(path)
+
+
+def test_methods_left_out_follow_the_daily_settings() -> None:
+    config = ReplayConfig.model_validate({"ranking": {"method": "judge"}})
+
+    resolved = config.with_methods("llm", "judge")
+
+    assert (resolved.ranking.method, resolved.deduplication.method) == ("judge", "judge")
+    assert ReplayConfig().with_methods("llm", "threshold").uses_judge() is False

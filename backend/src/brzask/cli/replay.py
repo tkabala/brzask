@@ -60,6 +60,7 @@ def replay_command(
         raise typer.BadParameter(str(error), param_hint="--config") from error
 
     settings = get_settings()
+    config = config.with_methods(settings.digest.ranking, settings.digest.deduplication)
     llm_settings = settings.llm
     if config.llm_model:
         llm_settings = llm_settings.model_copy(update={"model": config.llm_model})

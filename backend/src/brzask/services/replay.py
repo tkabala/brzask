@@ -78,7 +78,7 @@ class PoolConfig(_Section):
 
 
 class RankingConfig(_Section):
-    method: Literal["llm", "judge"] = "llm"
+    method: Literal["llm", "judge"] | None = None  # None: DIGEST_RANKING (the CLI fills it)
     rank_limit: PositiveInt = ranking.RANK_LIMIT
     top_n: PositiveInt = ranking.TOP_N
     max_per_source: PositiveInt = ranking.MAX_PER_SOURCE
@@ -99,7 +99,7 @@ class RankingConfig(_Section):
 
 class DeduplicationConfig(_Section):
     # "judge": grey-zone pairs are asked about (needs a judge, see judge_model).
-    method: Literal["threshold", "judge"] = "threshold"
+    method: Literal["threshold", "judge"] | None = None  # None: DIGEST_DEDUPLICATION
     # Both or neither; neither keeps the embedding model's own thresholds.
     cross_day: float | None = Field(None, gt=0, le=1)
     same_day: tuple[float, ...] | None = Field(None, min_length=1)
@@ -152,6 +152,19 @@ class ReplayConfig(_Section):
         if dedup.cross_day is None or dedup.same_day is None:
             return None
         return Thresholds(dedup.cross_day, dedup.same_day)
+
+    def with_methods(self, ranking: str, deduplication: str) -> Self:
+        """The methods left out set to these (the daily run's settings)."""
+        return self.model_copy(
+            update={
+                "ranking": self.ranking.model_copy(
+                    update={"method": self.ranking.method or ranking}
+                ),
+                "deduplication": self.deduplication.model_copy(
+                    update={"method": self.deduplication.method or deduplication}
+                ),
+            }
+        )
 
     def uses_judge(self) -> bool:
         return "judge" in (self.ranking.method, self.deduplication.method)

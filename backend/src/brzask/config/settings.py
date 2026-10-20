@@ -413,10 +413,10 @@ class DigestSettings(SettingsGroup):
         description="llm (the LLM orders the pool) or judge (each article scored "
         "on several dimensions by JUDGE_BACKEND, weighted in code).",
     )
-    deduplication: Literal["threshold", "judge"] = Field(
-        "threshold",
-        description="threshold (same-day duplicates by an adaptive similarity threshold) "
-        "or judge (JUDGE_BACKEND decides pairs in the grey zone).",
+    deduplication: Literal["judge", "threshold"] = Field(
+        "judge",
+        description="judge (JUDGE_BACKEND decides same-day pairs in the grey zone; "
+        "the threshold if it fails) or threshold (an adaptive similarity threshold).",
     )
 
 
