@@ -366,6 +366,7 @@ class ArticleRepository:
         distance = ArticleEmbedding.embedding.cosine_distance(list(vector))
         query = (
             select(Article, distance)
+            .options(joinedload(Article.source))
             .join(ArticleEmbedding, ArticleEmbedding.article_id == Article.id)
             .where(ArticleEmbedding.model == model)
             .order_by(distance)

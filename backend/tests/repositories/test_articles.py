@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from brzask.db.models import ArticleState, Run, RunKind
@@ -350,6 +351,16 @@ def test_search_similar_orders_by_cosine_similarity(session: Session, make: Fact
     assert [r.article for r in results] == [exact, close]
     assert results[0].similarity == pytest.approx(1.0)
     assert results[1].similarity == pytest.approx(0.7071, abs=1e-4)
+
+
+def test_search_similar_loads_the_sources(session: Session, make: Factories) -> None:
+    make.article(make.source("Wanted"), embedding=unit_vector(1, 0))
+    session.flush()
+    session.expunge_all()
+
+    [result] = ArticleRepository(session).search_similar(unit_vector(1, 0), TEST_MODEL, limit=1)
+
+    assert "source" not in inspect(result.article).unloaded
 
 
 def test_search_text_matches_titles_and_summaries(session: Session, make: Factories) -> None:
