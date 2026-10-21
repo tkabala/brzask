@@ -81,3 +81,7 @@ down:
 # Regenerate the demo instance the web app's stories and tests use
 demo-json:
     cd backend && uv run python -m brzask.services.demo > ../frontend/src/demo/instance.gen.json.tmp && mv ../frontend/src/demo/instance.gen.json.tmp ../frontend/src/demo/instance.gen.json
+
+# Retake the README's screenshot and demo GIF on the demo instance (needs ffmpeg)
+media:
+    cd frontend && node scripts/media.ts
