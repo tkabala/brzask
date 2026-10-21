@@ -1,3 +1,5 @@
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -12,6 +14,7 @@ from brzask.api.app import create_app
 from brzask.api.metrics import prometheus_reader
 from brzask.config.settings import AuthSettings
 from brzask.db.models import LoginSession
+from brzask.services import auth
 from brzask.services.auth import FAILURES_PER_CLIENT, link_signature
 from tests.api.conftest import PASSWORD, SECRET
 from tests.factories import Factories
@@ -90,6 +93,25 @@ def test_lockout_after_repeated_failures(client: TestClient) -> None:
     assert response.status_code == 429
     assert 1 <= int(response.headers["retry-after"]) <= 15 * 60
     assert "set-cookie" not in response.headers
+
+
+def test_parallel_wrong_passwords_are_counted_one_by_one(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def slow_wrong(password_hash: str, password: str) -> bool:
+        time.sleep(0.05)  # long enough for every request to reach the check at once
+        return False
+
+    monkeypatch.setattr(auth, "verify_password", slow_wrong)
+
+    def attempt(_: int) -> int:
+        return client.post("/api/v1/auth/login", json={"password": "guess"}).status_code
+
+    with ThreadPoolExecutor(max_workers=FAILURES_PER_CLIENT * 2) as pool:
+        statuses = list(pool.map(attempt, range(FAILURES_PER_CLIENT * 2)))
+
+    assert statuses.count(401) == FAILURES_PER_CLIENT
+    assert statuses.count(429) == FAILURES_PER_CLIENT
 
 
 def test_changes_need_the_csrf_token(client: TestClient, make: Factories) -> None:

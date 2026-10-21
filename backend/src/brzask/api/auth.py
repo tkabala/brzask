@@ -12,6 +12,7 @@ API token instead (`Authorization: Bearer brz_...`), which no browser sends on
 its own, so it needs no CSRF token; a `read` token may only read.
 """
 
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -51,6 +52,9 @@ class Auth:
 
     settings: AuthSettings
     throttle: auth.LoginThrottle = field(default_factory=auth.LoginThrottle)
+    # One password check at a time: checking the throttle and counting a failure
+    # are then one step, so parallel tries cannot all slip under the limit.
+    login_lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property
     def mode(self) -> Literal["password", "header", "none"]:
@@ -260,17 +264,18 @@ def login(
     if config.mode != "password":
         raise ProblemError(HTTPStatus.BAD_REQUEST, f"AUTH_MODE is {config.mode}: no password.")
     client = _client(request, config)
-    wait = config.throttle.retry_after(client)
-    if wait is not None:
-        raise ProblemError(
-            HTTPStatus.TOO_MANY_REQUESTS,
-            "Too many wrong passwords; try again later.",
-            headers={"Retry-After": str(wait)},
-        )
-    if not auth.verify_password(config.password_hash(), credentials.password):
-        config.throttle.failed(client)
-        raise ProblemError(HTTPStatus.UNAUTHORIZED, "Wrong password.")
-    config.throttle.succeeded(client)
+    with config.login_lock:
+        wait = config.throttle.retry_after(client)
+        if wait is not None:
+            raise ProblemError(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                "Too many wrong passwords; try again later.",
+                headers={"Retry-After": str(wait)},
+            )
+        if not auth.verify_password(config.password_hash(), credentials.password):
+            config.throttle.failed(client)
+            raise ProblemError(HTTPStatus.UNAUTHORIZED, "Wrong password.")
+        config.throttle.succeeded(client)
     new = auth.log_in(session, datetime.now(UTC))
     csrf = auth.csrf_token(config.signing_secret(), new.token)
     _set_cookies(request, response, config, new.token, csrf)
