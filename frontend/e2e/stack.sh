@@ -34,7 +34,7 @@ case "${1:-}" in
     secret crawl4ai_api_token "$(openssl rand -hex 24)"
     secret searxng_secret "$(openssl rand -hex 24)"
     compose up --detach --wait
-    compose exec -T api brzask demo-data
+    compose exec -T api brzask seed-demo
     ;;
   down)
     compose down --volumes --remove-orphans

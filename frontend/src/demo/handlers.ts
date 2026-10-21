@@ -45,6 +45,7 @@ export const loggedOutSession: SessionOut = {
 function fresh() {
   return structuredClone({
     session: loggedInSession,
+    articles: demo.allArticles,
     digest: demo.digest,
     days: demo.days,
     sources: [...demo.pendingSources, ...demo.sources],
@@ -86,7 +87,7 @@ function page(items: readonly unknown[], url: URL) {
 }
 
 function allArticles(): ArticleOut[] {
-  return db.digest.articles
+  return db.articles
 }
 
 const authenticated = () => db.session.authenticated
@@ -117,20 +118,13 @@ export const handlers = [
   http.get(`${API}/digests`, ({ request }) => page(db.days, new URL(request.url))),
   http.get(`${API}/digests/:day`, ({ params }) =>
     HttpResponse.json(
-      params.day === db.digest.date ? db.digest : { date: params.day, articles: [] },
+      params.day === db.digest.date ? db.digest : demo.digestOf(String(params.day)),
     ),
   ),
   http.get(`${API}/articles/:id/ranking`, ({ params }) => {
     const article = allArticles().find((a) => String(a.id) === params.id)
     if (!article) return problem(404, 'Not Found', `no article ${String(params.id)}`)
-    return HttpResponse.json({
-      ...demo.ranking,
-      article_id: article.id,
-      position: article.position,
-      topic: article.topic,
-      why_it_matters: article.why_it_matters,
-      rank: (article.position ?? 1) * 2,
-    })
+    return HttpResponse.json(demo.rankingOf(article))
   }),
   http.get(`${API}/articles/:id`, ({ params }) => {
     const article = allArticles().find((a) => String(a.id) === params.id)
@@ -172,12 +166,12 @@ export const handlers = [
       return problem(409, 'Conflict', `${url} is already a source`)
     }
     const added: SourceOut = {
-      ...structuredClone(demo.phoronix),
+      ...structuredClone(demo.healthySource),
       id: Math.max(...db.sources.map((s) => s.id)) + 1,
       name: body.name ?? new URL(url).hostname,
       url,
       site_url: url,
-      health: { ...demo.phoronix.health, fetched_at: null },
+      health: { ...demo.healthySource.health, fetched_at: null },
       activity: { articles: 0, ranked: 0, shown: 0, opened: 0 },
     }
     db.sources.push(added)

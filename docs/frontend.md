@@ -44,6 +44,13 @@ hand with [MSW](https://mswjs.io/): the same paths, cursor pages and problem
 details as the server, a session (the password is `demo`), and changes that
 last until the next story or test. Storybook and the tests share it.
 
+The demo data is the instance `brzask seed-demo` writes to a database, as of
+2026-10-21: a month of invented digests, sources in every state, interests and
+runs. The backend works it out (`brzask.services.demo`) and `just demo-json`
+exports it to `src/demo/instance.gen.json`, which `data.ts` shapes like the
+API; a backend test fails while the export is stale. Stories, unit tests, the
+end-to-end tests and screenshots therefore all show the same articles.
+
 - **Storybook** (`pnpm storybook`; CI runs `pnpm build-storybook`): each view
   has stories with props, and *Pages* renders the whole app at every route
   against the demo API in the browser. A story replaces single endpoints with
@@ -95,14 +102,14 @@ enforces.
 
 ## End-to-end tests
 
-`just e2e` (`pnpm e2e` in `frontend/`) runs Playwright against the real stack:
-`e2e/start-api.sh` recreates a `brzask_e2e` database on the compose Postgres
-(next to the development one, which it never touches), migrates it, fills it
-with `brzask demo-data` and starts the API with a test password; the built app
-runs under `vite preview`, which passes API requests on. The tests log in,
-use every screen and check each with [axe](https://github.com/dequelabs/axe-core)
-for WCAG 2.1 A and AA violations. They share one database and run one after
-another. CI runs them in the `e2e` job and keeps the report when they fail.
+`just e2e` (`pnpm e2e` in `frontend/`) runs Playwright against the app as
+people run it: `e2e/stack.sh` builds the image from the checkout and starts
+`deploy/compose.yaml` as its own compose project (`brzask-e2e`, so a running
+instance is never touched) with a test password, then fills it with
+`brzask seed-demo`. The tests log in, use every screen and check each with
+[axe](https://github.com/dequelabs/axe-core) for WCAG 2.1 A and AA violations.
+They share one database and run one after another; the stack is removed
+afterwards. CI runs them in the `e2e` job and keeps the report when they fail.
 
-`brzask demo-data` also works on its own, to try brzask without feeds: it
-fills an empty database with made-up sources, digests and runs.
+`brzask seed-demo` also works on its own, to try brzask without feeds: it
+fills an empty database with the demo instance, dated to today.

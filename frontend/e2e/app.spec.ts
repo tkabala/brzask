@@ -41,8 +41,9 @@ test('an archived day, with why an article is there', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Why here?' }).first().click()
   const breakdown = page.getByRole('region', { name: 'How it got here' })
-  await expect(breakdown).toContainText('The day started with 200 articles')
-  await expect(breakdown).toContainText('Ranked 2 of 40 candidates')
+  // Yesterday in the demo instance: its run started with 187 candidates.
+  await expect(breakdown).toContainText('The day started with 187 articles')
+  await expect(breakdown).toContainText('Ranked 1 of 40 candidates')
   await expectAccessible(page)
 })
 
@@ -57,7 +58,7 @@ test('opening an article goes through /open and is remembered', async ({ page })
     card.getByRole('link').first().click(),
   ])
   expect(redirect.status()).toBe(302)
-  expect(await redirect.headerValue('location')).toMatch(/^https:\/\/postgres-weekly\.example\//)
+  expect(await redirect.headerValue('location')).toMatch(/^https:\/\/[a-z-]+\.example\//)
   await expect(card.getByText('Opened')).toBeVisible()
 
   await page.reload()
@@ -68,11 +69,11 @@ test('a pending source is approved', async ({ page }) => {
   await logIn(page)
   await page.goto('/sources')
   const pending = page.getByRole('region', { name: 'Waiting for a decision' })
-  await pending.getByRole('button', { name: 'Read it: Query Planner Blog' }).click()
+  await pending.getByRole('button', { name: 'Read it: Planner Notes' }).click()
 
-  await expect(pending.getByText('Query Planner Blog')).toHaveCount(0)
+  await expect(pending.getByText('Planner Notes')).toHaveCount(0)
   await expect(
-    page.getByRole('region', { name: 'All sources' }).getByText('Query Planner Blog'),
+    page.getByRole('region', { name: 'All sources' }).getByText('Planner Notes'),
   ).toBeVisible()
 })
 

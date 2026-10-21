@@ -1,11 +1,22 @@
 import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { digest, ranking } from '@/demo/data'
+import type { ArticleOut } from '@/client/types.gen'
+import { articles, digest, ranking } from '@/demo/data'
 import { json } from '@/test/fake-api'
 import { nth } from '@/test/nth'
 import { renderApp } from '@/test/render'
 import { loggedInApi } from '@/test/setup-screens'
+
+const [first, second, third, fourth] = [0, 1, 2, 3].map((i) => nth(articles, i)) as [
+  ArticleOut,
+  ArticleOut,
+  ArticleOut,
+  ArticleOut,
+]
+
+/** Matches an accessible name that contains `title`. */
+const titled = (title: string) => (name: string) => name.includes(title)
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -17,14 +28,14 @@ describe('today', () => {
     renderApp('/')
 
     const items = await screen.findAllByRole('listitem')
-    expect(items).toHaveLength(3)
-    const first = within(nth(items, 0))
-    expect(first.getByRole('link', { name: /PostgreSQL 19 beta/ })).toHaveAttribute(
+    expect(items).toHaveLength(digest.articles.length)
+    expect(within(nth(items, 0)).getByRole('link', { name: titled(first.title) })).toHaveAttribute(
       'href',
-      '/open?id=1&sig=demo',
+      `/open?id=${String(first.id)}&sig=demo`,
     )
-    expect(first.getByText('Opened')).toBeInTheDocument()
-    expect(within(nth(items, 1)).queryByText('Opened')).not.toBeInTheDocument()
+    expect(third.opened_at).not.toBeNull()
+    expect(within(nth(items, 2)).getByText('Opened')).toBeInTheDocument()
+    expect(within(nth(items, 0)).queryByText('Opened')).not.toBeInTheDocument()
   })
 
   it('marks an article opened as soon as it is followed', async () => {
@@ -32,7 +43,7 @@ describe('today', () => {
     const user = userEvent.setup()
     renderApp('/')
 
-    const link = await screen.findByRole('link', { name: /Linus Torvalds/ })
+    const link = await screen.findByRole('link', { name: titled(second.title) })
     link.addEventListener('click', (event) => {
       event.preventDefault() // jsdom cannot open tabs
     })
@@ -47,14 +58,14 @@ describe('today', () => {
     loggedInApi({ 'GET /api/v1/digests/today': () => json(digest) })
     renderApp('/')
 
-    const card = async (name: RegExp) => {
-      const link = await screen.findByRole('link', { name })
+    const card = async (title: string) => {
+      const link = await screen.findByRole('link', { name: titled(title) })
       const found = link.closest('[data-slot="card"]')
       if (!(found instanceof HTMLElement)) throw new Error('the link is not in a card')
       return { link, card: within(found) }
     }
-    const menu = await card(/Linus Torvalds/)
-    const tab = await card(/Hermes Agent/)
+    const menu = await card(second.title)
+    const tab = await card(fourth.title)
     expect(tab.card.queryByText('Opened')).not.toBeInTheDocument()
 
     fireEvent(menu.link, new MouseEvent('auxclick', { bubbles: true, button: 2 }))
@@ -76,9 +87,14 @@ describe('today', () => {
     await user.click(nth(buttons, 1))
 
     const breakdown = await screen.findByRole('region', { name: 'How it got here' })
-    expect(within(breakdown).getByText('The day started with 200 articles')).toBeInTheDocument()
-    expect(within(breakdown).getByText('Ranked 4 of 40 candidates')).toBeInTheDocument()
+    expect(ranking.article_id).toBe(second.id)
+    expect(
+      within(breakdown).getByText(`The day started with ${String(ranking.pool)} articles`),
+    ).toBeInTheDocument()
+    expect(within(breakdown).getByText('Ranked 3 of 40 candidates')).toBeInTheDocument()
     expect(within(breakdown).getByText('Ranking: llm; duplicates: judge')).toBeInTheDocument()
-    expect(api.sent('GET /api/v1/articles/:id/ranking')[0]?.url).toContain('/articles/2/')
+    expect(api.sent('GET /api/v1/articles/:id/ranking')[0]?.url).toContain(
+      `/articles/${String(second.id)}/`,
+    )
   })
 })

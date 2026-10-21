@@ -14,18 +14,27 @@ afterEach(() => {
 describe('status', () => {
   it('shows counts, the last run of each pipeline and recent runs', async () => {
     loggedInApi({
-      'GET /api/v1/status': () => json(status),
+      // A pipeline that never ran shows as such.
+      'GET /api/v1/status': () =>
+        json({ ...status, last_runs: { ...status.last_runs, discovery: null } }),
       'GET /api/v1/runs': () => json({ items: runs, next_cursor: null }),
     })
     renderApp('/status')
 
-    expect(await screen.findByText('5345 stored, 802 shown, 36 opened')).toBeInTheDocument()
+    const { total, shown, opened } = status.articles
+    expect(
+      await screen.findByText(
+        `${String(total)} stored, ${String(shown)} shown, ${String(opened)} opened`,
+      ),
+    ).toBeInTheDocument()
     const pipelines = screen.getByRole('region', { name: 'Pipelines' })
     expect(within(pipelines).getByText('never ran')).toBeInTheDocument()
-    expect(within(pipelines).getAllByText('database is locked by another review')).toHaveLength(1)
     const recent = screen.getByRole('region', { name: 'Recent runs' })
-    expect(within(recent).getByText('$0.0812')).toBeInTheDocument()
-    expect(within(recent).getByText('192 s')).toBeInTheDocument()
+    expect(within(recent).getAllByText('$0.0600').length).toBeGreaterThan(0)
+    expect(within(recent).getAllByText('180 s').length).toBeGreaterThan(0)
+    expect(
+      within(recent).getByText('aggregator answered HTTP 429 Too Many Requests'),
+    ).toBeInTheDocument()
   })
 
   it('pauses until the start of a chosen day', async () => {

@@ -1,233 +1,183 @@
-/** Demo data for stories and tests: one plausible day of brzask. */
+/**
+ * Demo data for stories and tests: the same invented instance `brzask
+ * seed-demo` writes to a database, as of DAY. The instance comes from
+ * instance.gen.json (`just demo-json`); this file shapes it like the API.
+ */
 import type {
   ArticleOut,
   DigestDayOut,
   DigestOut,
   InterestOut,
   RankingOut,
+  RunKind,
   RunOut,
   SearchResults,
   SourceOut,
+  SourceStatus,
   StatusOut,
 } from '@/client/types.gen'
 
-export const DAY = '2026-10-21'
+import instance from './instance.gen.json'
 
-function article(id: number, fields: Partial<ArticleOut>): ArticleOut {
+export const DAY = instance.day
+
+function must<T>(item: T | undefined, what: string): T {
+  if (item === undefined) throw new Error(`the demo instance has no ${what}`)
+  return item
+}
+
+const sourceNames = new Map(instance.sources.map((s) => [s.id, s.name]))
+
+/** Every stored article, oldest first. */
+export const allArticles: ArticleOut[] = instance.articles.map((a) => ({
+  id: a.id,
+  link: a.link,
+  open_url: `/open?id=${String(a.id)}&sig=demo`,
+  title: a.title,
+  original_title: a.title,
+  summary: a.summary,
+  why_it_matters: a.why_it_matters,
+  topic: a.topic,
+  source: { id: a.source_id, name: sourceNames.get(a.source_id) ?? '' },
+  state: a.position === null ? 'seen' : 'shown',
+  published_at: a.published_at,
+  first_seen_at: a.first_seen_at,
+  digest_date: a.digest_date,
+  position: a.position,
+  shown_at: a.shown_at,
+  opened_at: a.opened_at,
+}))
+
+/** The digest of `day`, empty when there was none. */
+export function digestOf(day: string): DigestOut {
   return {
-    id,
-    link: `https://news.example/${String(id)}`,
-    open_url: `/open?id=${String(id)}&sig=demo`,
-    title: `Article ${String(id)}`,
-    original_title: `Article ${String(id)}`,
-    summary: null,
-    why_it_matters: null,
-    topic: null,
-    source: { id: 1, name: 'Phoronix' },
-    state: 'shown',
-    published_at: `${DAY}T05:00:00Z`,
-    first_seen_at: `${DAY}T06:00:00Z`,
-    digest_date: DAY,
-    position: id,
-    shown_at: `${DAY}T07:00:00Z`,
-    opened_at: null,
-    ...fields,
+    date: day,
+    articles: allArticles
+      .filter((a) => a.digest_date === day)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
   }
 }
 
-const postgres = article(1, {
-  title: 'PostgreSQL 19 beta brings asynchronous I/O to every read',
-  summary: 'The first beta makes asynchronous reads the default and adds skip scans.',
-  why_it_matters: 'You run Postgres; the beta shows what to test before the upgrade.',
-  topic: 'Postgres',
-  source: { id: 2, name: 'PostgreSQL News' },
-  opened_at: `${DAY}T08:12:00Z`,
-})
-const torvalds = article(2, {
-  title: 'Linus Torvalds merges AI-written page cache work',
-  summary: 'A patch series drafted with an AI agent landed in 7.3 after review.',
-  why_it_matters: 'A real-world case of agent-written kernel code reaching mainline.',
-  topic: 'AI agents',
-})
-const hermes = article(3, {
-  title: 'Hermes Agent 0.4 adds tool sandboxes',
-  summary: 'Each tool call now runs in its own sandbox with a time limit.',
-  why_it_matters: 'Matches the notes: release notes with real changes, not webinars.',
-  topic: 'Hermes Agent',
-  source: { id: 3, name: 'github.com/hermes/agent' },
-})
-
-export const articles: ArticleOut[] = [postgres, torvalds, hermes]
-
-export const digest: DigestOut = { date: DAY, articles }
+export const digest = digestOf(DAY)
+export const articles = digest.articles
 export const emptyDigest: DigestOut = { date: DAY, articles: [] }
 
-export const ranking: RankingOut = {
-  article_id: 2,
-  position: 2,
-  topic: 'AI agents',
-  why_it_matters: 'A real-world case of agent-written kernel code reaching mainline.',
-  rank: 4,
-  pool: 200,
-  ranked: 40,
-  top: 15,
-  ranking_method: 'llm',
-  deduplicated_to: 12,
-  deduplication_method: 'judge',
-  run_id: '0b6f4c1e-2f1a-4c55-9d43-6c9a4a1f2e10',
+export const days: DigestDayOut[] = [
+  ...new Set(allArticles.flatMap((a) => (a.digest_date ? [a.digest_date] : []))),
+]
+  .sort()
+  .reverse()
+  .map((date) => {
+    const shown = digestOf(date).articles
+    return { date, articles: shown.length, opened: shown.filter((a) => a.opened_at).length }
+  })
+
+export const runs: RunOut[] = instance.runs.map((r) => ({
+  id: r.id,
+  kind: r.kind as RunKind,
+  status: r.status as RunOut['status'],
+  dry_run: false,
+  started_at: r.started_at,
+  finished_at: r.finished_at,
+  stats: r.stats,
+  timings: {},
+  error: r.error,
+}))
+
+function latestRun(kind: RunKind): RunOut | null {
+  return runs.find((r) => r.kind === kind) ?? null
 }
 
-export const days: DigestDayOut[] = [
-  { date: '2026-10-21', articles: 7, opened: 2 },
-  { date: '2026-10-20', articles: 7, opened: 0 },
-  { date: '2026-10-17', articles: 7, opened: 3 },
-]
+/** How the article at `position` of today's digest got there. */
+export function rankingOf(article: ArticleOut): RankingOut {
+  const run = runs.find((r) => r.kind === 'digest' && r.started_at === article.shown_at)
+  const stats = (run?.stats ?? {}) as {
+    pool?: { candidates: number }
+    ranking?: { method: string; ranked: number; top: number }
+    deduplication?: { same_day_method: string; survivors: number }
+  }
+  return {
+    article_id: article.id,
+    position: article.position,
+    topic: article.topic,
+    why_it_matters: article.why_it_matters,
+    rank: instance.articles.find((a) => a.id === article.id)?.rank ?? null,
+    pool: stats.pool?.candidates ?? null,
+    ranked: stats.ranking?.ranked ?? null,
+    top: stats.ranking?.top ?? null,
+    ranking_method: stats.ranking?.method ?? null,
+    deduplicated_to: stats.deduplication?.survivors ?? null,
+    deduplication_method: stats.deduplication?.same_day_method ?? null,
+    run_id: run?.id ?? null,
+  }
+}
+
+export const ranking = rankingOf(must(articles[1], 'second article today'))
+
+const EMBEDDING_MODEL = 'google/gemini-embedding-001'
 
 export const searchResults: SearchResults = {
-  model: 'google/gemini-embedding-001',
-  items: [
-    { article: postgres, similarity: 0.82 },
-    { article: torvalds, similarity: 0.61 },
-  ],
+  model: EMBEDDING_MODEL,
+  items: articles.slice(0, 2).map((article, n) => ({ article, similarity: 0.82 - n * 0.2 })),
 }
 
-function source(id: number, fields: Partial<SourceOut>): SourceOut {
+const allSources: SourceOut[] = instance.sources.map((s) => {
+  const published = instance.articles.filter((a) => a.source_id === s.id)
   return {
-    id,
-    name: `Source ${String(id)}`,
-    url: `https://source-${String(id)}.example/feed.xml`,
-    site_url: `https://source-${String(id)}.example/`,
+    id: s.id,
+    name: s.name,
+    url: s.url,
+    site_url: s.site_url,
     kind: 'feed',
-    status: 'active',
-    origin: 'manual',
-    origin_detail: null,
-    note: null,
-    created_at: '2026-09-01T10:00:00Z',
-    health: {
-      fetched_at: `${DAY}T07:00:00Z`,
-      failing_since: null,
-      permanent_failing_since: null,
-      failed_at: null,
-      fetch_failures: 0,
-      fetch_error: null,
+    status: s.status as SourceStatus,
+    origin: s.origin as SourceOut['origin'],
+    origin_detail: s.origin_detail,
+    note: s.note,
+    created_at: s.created_at,
+    health: s.health,
+    activity: {
+      articles: published.length,
+      ranked: published.length, // every stored demo article made the top of a ranking
+      shown: published.filter((a) => a.position !== null).length,
+      opened: published.filter((a) => a.opened_at !== null).length,
     },
-    activity: { articles: 40, ranked: 6, shown: 3, opened: 1 },
-    ...fields,
   }
-}
-
-export const phoronix = source(1, { name: 'Phoronix' })
-
-export const sources: SourceOut[] = [
-  phoronix,
-  source(2, {
-    name: 'VentureBeat AI',
-    health: {
-      fetched_at: '2026-10-18T07:00:00Z',
-      failing_since: '2026-10-19T07:00:00Z',
-      permanent_failing_since: null,
-      failed_at: `${DAY}T07:00:00Z`,
-      fetch_failures: 3,
-      fetch_error: 'HTTP 429 Too Many Requests',
-    },
-    activity: { articles: 12, ranked: 0, shown: 0, opened: 0 },
-  }),
-  source(3, { name: 'Old blog', status: 'muted', note: 'no article opened in 60 days' }),
-]
-
-export const pendingSources: SourceOut[] = [
-  source(4, {
-    name: "Maurice's Blog",
-    status: 'pending',
-    origin: 'visited',
-    note: 'You opened "500B Tokens Later: Letting AI Agents Decompile a Game" through Hacker News.',
-    health: { ...phoronix.health, fetched_at: null },
-    activity: { articles: 0, ranked: 0, shown: 0, opened: 0 },
-  }),
-  source(5, {
-    name: 'Victor Da Luz',
-    status: 'pending',
-    origin: 'discovery',
-    origin_detail: 'llm-online',
-    note: 'discovery judge: interest fit 2.4/3, substance 1.2/2',
-    activity: { articles: 0, ranked: 0, shown: 0, opened: 0 },
-  }),
-]
-
-export const interests: InterestOut[] = [
-  {
-    id: 1,
-    topic: 'Postgres',
-    keywords: ['PostgreSQL', 'pgvector'],
-    notes: 'want: releases, performance work; skip: vendor webinars',
-    active: true,
-    created_at: '2026-09-01T10:00:00Z',
-    updated_at: '2026-10-01T10:00:00Z',
-  },
-  {
-    id: 2,
-    topic: 'AI agents',
-    keywords: ['agent', 'MCP'],
-    notes: '',
-    active: true,
-    created_at: '2026-09-01T10:00:00Z',
-    updated_at: '2026-09-01T10:00:00Z',
-  },
-  {
-    id: 3,
-    topic: 'Video streaming',
-    keywords: [],
-    notes: '',
-    active: false,
-    created_at: '2026-09-01T10:00:00Z',
-    updated_at: '2026-10-10T10:00:00Z',
-  },
-]
-
-function run(id: string, fields: Partial<RunOut>): RunOut {
-  return {
-    id,
-    kind: 'digest',
-    status: 'ok',
-    dry_run: false,
-    started_at: `${DAY}T07:00:00Z`,
-    finished_at: `${DAY}T07:03:12Z`,
-    stats: { usage: { cost_usd: 0.0812 } },
-    timings: {},
-    error: null,
-    ...fields,
-  }
-}
-
-const digestRun = run('9d1c7a52-0000-4000-8000-000000000001', {})
-const discoveryRun = run('9d1c7a52-0000-4000-8000-000000000002', {
-  kind: 'discovery',
-  started_at: '2026-10-20T08:00:00Z',
-  finished_at: '2026-10-20T08:02:05Z',
-  stats: { usage: { cost_usd: 0.0518 } },
-})
-const reviewRun = run('9d1c7a52-0000-4000-8000-000000000003', {
-  kind: 'review',
-  status: 'failed',
-  started_at: '2026-10-20T07:30:00Z',
-  finished_at: '2026-10-20T07:30:02Z',
-  stats: {},
-  error: 'database is locked by another review',
 })
 
-export const runs: RunOut[] = [digestRun, discoveryRun, reviewRun]
+export const sources = allSources.filter((s) => s.status !== 'pending')
+export const pendingSources = allSources.filter((s) => s.status === 'pending')
+
+/** A healthy source to copy, e.g. for one added in a story. */
+export const healthySource: SourceOut = must(sources[0], 'active source')
+
+export const interests: InterestOut[] = instance.interests.map((i) => ({
+  ...i,
+  created_at: '2026-08-20T10:00:00Z',
+  updated_at: '2026-10-01T10:00:00Z',
+}))
+
+const shown = allArticles.filter((a) => a.position !== null)
 
 export const status: StatusOut = {
-  articles: { total: 5345, shown: 802, opened: 36 },
-  sources: { active: 95, pending: 2, rejected: 69, muted: 65, dead: 0 },
+  articles: {
+    total: allArticles.length,
+    shown: shown.length,
+    opened: shown.filter((a) => a.opened_at).length,
+  },
+  sources: Object.fromEntries(
+    (['active', 'pending', 'rejected', 'muted', 'dead'] as const).map((state) => [
+      state,
+      allSources.filter((s) => s.status === state).length,
+    ]),
+  ),
   last_digest: DAY,
   paused_until: null,
   last_runs: {
-    digest: digestRun,
-    review: reviewRun,
-    visited: null,
-    discovery: discoveryRun,
+    digest: latestRun('digest'),
+    review: latestRun('review'),
+    visited: latestRun('visited'),
+    discovery: latestRun('discovery'),
   },
-  embedding_model: 'google/gemini-embedding-001',
-  embeddings: { 'google/gemini-embedding-001': 1072 },
+  embedding_model: EMBEDDING_MODEL,
+  embeddings: { [EMBEDDING_MODEL]: allArticles.length },
 }

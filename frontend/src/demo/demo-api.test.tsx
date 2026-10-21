@@ -2,8 +2,10 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+import { digest } from '@/demo/data'
 import { DEMO_PASSWORD, logOutDemo } from '@/demo/handlers'
 import { initI18n } from '@/i18n'
+import { nth } from '@/test/nth'
 import { renderApp } from '@/test/render'
 
 beforeEach(() => {
@@ -18,7 +20,10 @@ it('logs in with the demo password and shows the digest', async () => {
   await user.type(await screen.findByLabelText('Password'), DEMO_PASSWORD)
   await user.click(screen.getByRole('button', { name: 'Log in' }))
 
-  expect(await screen.findByRole('link', { name: /PostgreSQL 19 beta/ })).toBeInTheDocument()
+  const first = nth(digest.articles, 0)
+  expect(
+    await screen.findByRole('link', { name: (name) => name.includes(first.title) }),
+  ).toBeInTheDocument()
 })
 
 it('moves an approved source out of the pending list', async () => {
@@ -26,13 +31,13 @@ it('moves an approved source out of the pending list', async () => {
   renderApp('/sources')
 
   const pending = await screen.findByRole('region', { name: 'Waiting for a decision' })
-  await user.click(within(pending).getByRole('button', { name: "Read it: Maurice's Blog" }))
+  await user.click(within(pending).getByRole('button', { name: 'Read it: Small Models Weekly' }))
 
   await vi.waitFor(() => {
-    expect(within(pending).queryByText("Maurice's Blog")).not.toBeInTheDocument()
+    expect(within(pending).queryByText('Small Models Weekly')).not.toBeInTheDocument()
   })
   const all = screen.getByRole('region', { name: 'All sources' })
-  expect(within(all).getByText("Maurice's Blog")).toBeInTheDocument()
+  expect(within(all).getByText('Small Models Weekly')).toBeInTheDocument()
 })
 
 it('pauses and resumes', async () => {

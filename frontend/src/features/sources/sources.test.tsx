@@ -8,6 +8,12 @@ import { nth } from '@/test/nth'
 import { renderApp } from '@/test/render'
 import { loggedInApi } from '@/test/setup-screens'
 
+const planner = nth(pendingSources, 0)
+const busiest = nth(
+  sources.filter((source) => source.name === 'Incident Review'),
+  0,
+)
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -26,27 +32,34 @@ describe('sources', () => {
     renderApp('/sources')
 
     const pending = await screen.findByRole('region', { name: 'Waiting for a decision' })
-    expect(within(pending).getByText("Maurice's Blog")).toBeInTheDocument()
+    expect(within(pending).getByText('Small Models Weekly')).toBeInTheDocument()
     const all = screen.getByRole('region', { name: 'All sources' })
-    expect(within(all).getByText(/Failing since .*HTTP 429 Too Many Requests/)).toBeInTheDocument()
-    expect(within(all).getAllByText('30 days: 40 articles, 3 shown, 1 opened')).toHaveLength(2)
+    expect(
+      within(all).getByText(/Failing since .*HTTP 503 Service Unavailable/),
+    ).toBeInTheDocument()
+    const { articles, shown, opened } = busiest.activity
+    expect(
+      within(all).getByText(
+        `30 days: ${String(articles)} articles, ${String(shown)} shown, ${String(opened)} opened`,
+      ),
+    ).toBeInTheDocument()
   })
 
   it('approves a pending source', async () => {
     const api = loggedInApi({
       'GET /api/v1/sources': listSources,
-      'PATCH /api/v1/sources/:id': () => json({ ...pendingSources[0], status: 'active' }),
+      'PATCH /api/v1/sources/:id': () => json({ ...planner, status: 'active' }),
     })
     const user = userEvent.setup()
     renderApp('/sources')
 
-    await user.click(await screen.findByRole('button', { name: "Read it: Maurice's Blog" }))
+    await user.click(await screen.findByRole('button', { name: `Read it: ${planner.name}` }))
 
     await vi.waitFor(() => {
       expect(api.sent('PATCH /api/v1/sources/:id')).toHaveLength(1)
     })
     const request = nth(api.sent('PATCH /api/v1/sources/:id'), 0)
-    expect(request.url).toMatch(/\/sources\/4$/)
+    expect(request.url).toMatch(new RegExp(`/sources/${String(planner.id)}$`))
     expect(await request.json()).toEqual({ status: 'active' })
     expect(request.headers.get('X-CSRF-Token')).toBe('csrf-1')
   })
@@ -59,8 +72,8 @@ describe('sources', () => {
     await user.selectOptions(await screen.findByLabelText('Show'), 'muted')
 
     const all = screen.getByRole('region', { name: 'All sources' })
-    expect(await within(all).findByText('Old blog')).toBeInTheDocument()
-    expect(within(all).queryByText('Phoronix')).not.toBeInTheDocument()
+    expect(await within(all).findByText('Webinar Wire')).toBeInTheDocument()
+    expect(within(all).queryByText('Tidewater Data')).not.toBeInTheDocument()
     const last = api.sent('GET /api/v1/sources').at(-1) ?? new Request('http://localhost/none')
     expect(new URL(last.url).searchParams.getAll('status')).toEqual(['muted'])
   })

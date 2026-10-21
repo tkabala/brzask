@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { searchResults } from '@/demo/data'
+import { nth } from '@/test/nth'
 import { json, problem } from '@/test/fake-api'
 import { renderApp } from '@/test/render'
 import { loggedInApi } from '@/test/setup-screens'
@@ -20,7 +21,10 @@ describe('search', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }))
 
     expect(await screen.findByText('82% similar')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /PostgreSQL 19 beta/ })).toBeInTheDocument()
+    const best = nth(searchResults.items, 0).article
+    expect(
+      screen.getByRole('link', { name: (name) => name.includes(best.title) }),
+    ).toBeInTheDocument()
     const sent = new URL(api.sent('GET /api/v1/search')[0]?.url ?? '')
     expect(sent.searchParams.get('q')).toBe('postgres news')
   })

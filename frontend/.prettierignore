@@ -6,3 +6,4 @@ src/client
 storybook-static
 playwright-report
 test-results
+src/demo/instance.gen.json

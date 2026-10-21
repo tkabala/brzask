@@ -78,5 +78,5 @@ Every `brzask` command runs in the image, for example:
 ```sh
 docker compose exec api brzask status
 docker compose exec api brzask sources add https://example.com/blog
-docker compose run --rm migrate demo-data   # an empty instance to try the app on
+docker compose run --rm migrate seed-demo   # fill an empty instance with demo data
 ```
