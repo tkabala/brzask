@@ -103,6 +103,8 @@ def test_article(client: TestClient, make: Factories) -> None:
 def test_unknown_article(client: TestClient) -> None:
     assert client.get("/api/v1/articles/999999").status_code == 404
     assert client.get("/api/v1/articles/99999999999999999999").status_code == 422
+    # Beyond what JavaScript holds exactly, though still a Postgres bigint.
+    assert client.get(f"/api/v1/articles/{2**53}").status_code == 422
 
 
 def test_ranking_explains_from_the_run(

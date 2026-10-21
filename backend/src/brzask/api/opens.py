@@ -13,15 +13,14 @@ from fastapi.responses import RedirectResponse
 
 from brzask.api import problems
 from brzask.api.auth import AuthConfig, SessionCookie, identify
-from brzask.api.deps import NO_NUL, DbSession
+from brzask.api.deps import MAX_API_ID, NO_NUL, DbSession
 from brzask.api.problems import ProblemError
 from brzask.services import auth
 from brzask.services.opens import article_link, open_article
-from brzask.services.refs import MAX_ID
 
 router = APIRouter(tags=["articles"])
 
-ArticleId = Annotated[int, Query(alias="id", ge=1, le=MAX_ID, description="Article ID.")]
+ArticleId = Annotated[int, Query(alias="id", ge=1, le=MAX_API_ID, description="Article ID.")]
 
 Signature = Annotated[
     str | None,

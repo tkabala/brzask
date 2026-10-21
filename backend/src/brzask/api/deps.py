@@ -35,8 +35,12 @@ DbSession = Annotated[Session, Depends(get_session)]
 Sessions = Annotated[sessionmaker[Session], Depends(get_sessions)]
 Clients = Annotated[ApiClients, Depends(get_clients)]
 
-# IDs are Postgres bigints; a larger number is no ID rather than a database error.
-Id = Annotated[int, Path(ge=1, le=MAX_ID)]
+# The largest ID the API takes: within Postgres bigints, so a larger number is no
+# ID rather than a database error, and exact in JavaScript (2**53 - 1), which
+# reads the document and the IDs as doubles.
+MAX_API_ID = min(MAX_ID, 2**53 - 1)
+
+Id = Annotated[int, Path(ge=1, le=MAX_API_ID)]
 
 # Postgres text cannot hold NUL characters; the schema says so instead of the
 # database failing on them.

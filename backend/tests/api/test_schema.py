@@ -12,7 +12,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 from brzask.api.app import OPENAPI_URL
-from brzask.api.openapi import render
+from brzask.api.openapi import in_javascript_order, render
 from brzask.config.settings import AuthSettings
 from tests.api.conftest import PASSWORD
 
@@ -93,3 +93,12 @@ def test_committed_openapi_is_up_to_date() -> None:
     path = Path(__file__).parents[3] / "openapi.json"
 
     assert path.read_text() == render(), "stale openapi.json: run `just openapi`"
+
+
+def test_document_keys_are_in_javascript_order() -> None:
+    document = {"b": 1, "403": 2, "a": {"default": 3, "401": 4, "200": 5}, "007": 6}
+
+    ordered = in_javascript_order(document)
+
+    assert list(ordered) == ["403", "b", "a", "007"]
+    assert list(ordered["a"]) == ["200", "401", "default"]

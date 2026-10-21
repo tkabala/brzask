@@ -387,7 +387,7 @@ export const zGetDigestPath = z.object({
 export const zGetDigestResponse = zDigestOut;
 
 export const zGetArticlePath = z.object({
-    article_id: z.int().gte(1).lte(9223372036854776000)
+    article_id: z.int().gte(1).lte(9007199254740991)
 });
 
 /**
@@ -396,7 +396,7 @@ export const zGetArticlePath = z.object({
 export const zGetArticleResponse = zArticleOut;
 
 export const zGetArticleRankingPath = z.object({
-    article_id: z.int().gte(1).lte(9223372036854776000)
+    article_id: z.int().gte(1).lte(9007199254740991)
 });
 
 /**
@@ -433,7 +433,7 @@ export const zAddSourceBody = zNewSource;
 export const zAddSourceResponse = zSourceOut;
 
 export const zGetSourcePath = z.object({
-    source_id: z.int().gte(1).lte(9223372036854776000)
+    source_id: z.int().gte(1).lte(9007199254740991)
 });
 
 /**
@@ -444,7 +444,7 @@ export const zGetSourceResponse = zSourceOut;
 export const zChangeSourceBody = zSourceChange;
 
 export const zChangeSourcePath = z.object({
-    source_id: z.int().gte(1).lte(9223372036854776000)
+    source_id: z.int().gte(1).lte(9007199254740991)
 });
 
 /**
@@ -471,7 +471,7 @@ export const zAddInterestBody = zNewInterest;
 export const zAddInterestResponse = zInterestOut;
 
 export const zGetInterestPath = z.object({
-    interest_id: z.int().gte(1).lte(9223372036854776000)
+    interest_id: z.int().gte(1).lte(9007199254740991)
 });
 
 /**
@@ -482,7 +482,7 @@ export const zGetInterestResponse = zInterestOut;
 export const zChangeInterestBody = zInterestChange;
 
 export const zChangeInterestPath = z.object({
-    interest_id: z.int().gte(1).lte(9223372036854776000)
+    interest_id: z.int().gte(1).lte(9007199254740991)
 });
 
 /**
@@ -550,7 +550,7 @@ export const zLogoutResponse = z.void();
 export const zGetSessionStateResponse = zSessionOut;
 
 export const zOpenLinkQuery = z.object({
-    id: z.int().gte(1).lte(9223372036854776000),
+    id: z.int().gte(1).lte(9007199254740991),
     sig: z.string().max(64).regex(/^[^\x00]*$/).nullish()
 });
 
