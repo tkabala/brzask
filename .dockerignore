@@ -10,5 +10,8 @@ frontend/coverage/
 frontend/storybook-static/
 frontend/test-results/
 frontend/playwright-report/
+# Vite would build VITE_* variables from a local .env into the published app.
+frontend/.env*
+frontend/e2e/secrets/
 **/__pycache__/
 **/*.tsbuildinfo
