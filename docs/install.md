@@ -30,8 +30,13 @@ in [`.env.example`](https://github.com/tkabala/brzask/blob/main/.env.example).
 Models and endpoints other than the OpenRouter defaults are covered in
 [Providers](providers.md).
 Set `TZ` (for example `TZ=Europe/Warsaw`) so the daily digest is built in
-your morning. Secrets are read from `./secrets` through `<NAME>_FILE`
-variables; set a secret either as a file there or in `.env`, not both.
+your morning. The secrets `setup` writes (database password, login, session
+secret, LLM API key, Crawl4AI token) are always read from `./secrets`
+through `<NAME>_FILE` variables; compose ignores `DB_PASSWORD`,
+`LLM_API_KEY`, `AUTH_PASSWORD_HASH`, `AUTH_SESSION_SECRET` and
+`CRAWL4AI_API_TOKEN` in `.env`, so a `.env` copied from `.env.example` works
+as it is. To change one of them, edit its file and restart. Other secrets,
+such as `JINA_API_KEY`, go in `.env`.
 
 Compose itself reads a few variables from the same `.env`:
 

@@ -37,6 +37,13 @@ x-brzask: &brzask
     AUTH_SESSION_SECRET_FILE: /run/secrets/auth_session_secret
     LLM_API_KEY_FILE: /run/secrets/llm_api_key
     CRAWL4AI_API_TOKEN_FILE: /run/secrets/crawl4ai_api_token
+    # The files above win over the same variables in .env, such as
+    # DB_PASSWORD=brzask from a copied .env.example: empty counts as not set.
+    DB_PASSWORD: ""
+    AUTH_PASSWORD_HASH: ""
+    AUTH_SESSION_SECRET: ""
+    LLM_API_KEY: ""
+    CRAWL4AI_API_TOKEN: ""
     CRAWL4AI_BASE_URL: ${CRAWL4AI_BASE_URL:-http://crawl4ai:11235}
     SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
   secrets:
