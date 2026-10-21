@@ -23,7 +23,7 @@ from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBea
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
-from brzask.api.deps import ACTOR, NO_NUL, DbSession
+from brzask.api.deps import ACTOR, NO_NUL, DbSession, Sessions
 from brzask.api.problems import ProblemError
 from brzask.config.settings import AuthSettings
 from brzask.db.models import TokenScope
@@ -156,13 +156,17 @@ def _token_identity(session: DbSession, authorization: str) -> Identity | None:
 
 def require_user(
     request: Request,
-    session: DbSession,
+    sessions: Sessions,
     config: AuthConfig,
     token: SessionCookie,
     _bearer: Bearer,  # declares the scheme in the document; read in `identify`
 ) -> None:
     """Let the request through only when it is authenticated (always when AUTH_MODE=none)."""
-    identity = identify(request, session, config, token)
+    # A transaction of its own, committed at once: the route's may last while a
+    # site or the embedding API answers, and must not keep the session row
+    # locked (its last use may have been written) for that long.
+    with sessions.begin() as session:
+        identity = identify(request, session, config, token)
     if identity is None:
         if config.mode == "header":
             raise ProblemError(

@@ -98,6 +98,16 @@ def test_last_use_is_recorded(client: TestClient, session: Session) -> None:
     assert token.last_used_at is not None
 
 
+def test_last_use_is_recorded_when_the_route_fails(client: TestClient, session: Session) -> None:
+    headers = bearer(session, TokenScope.READ, "cron")
+
+    assert client.get("/api/v1/sources/999999", headers=headers).status_code == 404
+
+    session.expire_all()
+    token = session.scalars(select(ApiToken).where(ApiToken.name == "cron")).one()
+    assert token.last_used_at is not None
+
+
 def test_tokens_open_links_and_tell_the_session(
     client: TestClient, session: Session, make: Factories
 ) -> None:
