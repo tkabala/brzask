@@ -14,7 +14,7 @@ ACTOR = "user"
 
 
 def get_session(request: Request) -> Iterator[Session]:
-    """One transaction per request, committed when the route returns without an error."""
+    """One transaction per route, committed when the route returns without an error."""
     sessions: sessionmaker[Session] = request.app.state.sessions
     with sessions.begin() as session:
         yield session
@@ -31,7 +31,11 @@ def get_clients(request: Request) -> ApiClients:
     return clients
 
 
-DbSession = Annotated[Session, Depends(get_session)]
+# Scope "function": the transaction ends (and commits) when the route returns,
+# before the response is sent. With the default ("request") it would commit
+# after, and a client acting on the response at once, such as asking whether
+# the login it just made worked, could read the database before the commit.
+DbSession = Annotated[Session, Depends(get_session, scope="function")]
 Sessions = Annotated[sessionmaker[Session], Depends(get_sessions)]
 Clients = Annotated[ApiClients, Depends(get_clients)]
 

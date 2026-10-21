@@ -91,7 +91,7 @@ def test_help_lists_the_commands() -> None:
 
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
-        "extract-bench", "reembed", "tokens", "hash-password",
+        "extract-bench", "reembed", "tokens", "hash-password", "demo-data",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
@@ -485,3 +485,13 @@ def test_tokens_default_to_read(cli: Invoke) -> None:
 
     assert "read" in cli("tokens", "list").stdout
     assert cli("tokens", "create", "reader").exit_code == 1
+
+
+def test_demo_data(cli: Invoke) -> None:
+    result = cli("demo-data")
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == "Added demo data: 28 articles in 4 digests."
+    again = cli("demo-data")
+    assert again.exit_code == 1
+    assert "empty database" in again.stderr

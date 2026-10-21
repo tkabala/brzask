@@ -31,6 +31,7 @@ from brzask.db.models import RunKind, RunStatus
 from brzask.log import configure_logging
 from brzask.services import auth
 from brzask.services import pause as pausing
+from brzask.services.demo import DIGEST_DAYS, seed_demo
 from brzask.services.runs import run_pipeline
 from brzask.services.status import get_status
 from brzask.telemetry import setup_telemetry
@@ -114,6 +115,15 @@ def hash_password_command() -> None:
     if not password:
         raise typer.BadParameter("the password must not be empty")
     typer.echo(auth.hash_password(password))
+
+
+@app.command(name="demo-data")
+def demo_data() -> None:
+    """Fill an empty database with a made-up instance to try brzask on."""
+    zone = get_settings().scheduler.timezone
+    with errors_as_messages(), unit_of_work() as session:
+        added = seed_demo(session, datetime.now(zone).date(), zone)
+    typer.echo(f"Added demo data: {added} articles in {len(DIGEST_DAYS)} digests.")
 
 
 @app.command()
