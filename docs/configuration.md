@@ -115,15 +115,6 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 | `DIGEST_RANKING` | `llm` | llm (the LLM orders the pool) or judge (each article scored on several dimensions by JUDGE_BACKEND, weighted in code). |
 | `DIGEST_DEDUPLICATION` | `judge` | judge (JUDGE_BACKEND decides same-day pairs in the grey zone; the threshold if it fails) or threshold (an adaptive similarity threshold). |
 
-## LLM spending limits
-
-Above a limit, expensive steps are skipped.
-
-| Variable | Default | Description |
-|---|---|---|
-| `LLM_BUDGET_DAILY_USD` | (none) | Daily limit in USD; empty for none. |
-| `LLM_BUDGET_MONTHLY_USD` | (none) | Monthly limit in USD; empty for none. |
-
 ## Logging
 
 | Variable | Default | Description |

@@ -1,5 +1,4 @@
 from datetime import time
-from decimal import Decimal
 from ipaddress import ip_network
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13,7 +12,6 @@ from brzask.config.env_example import render
 from brzask.config.settings import (
     GROUPS,
     AuthSettings,
-    BudgetSettings,
     DatabaseSettings,
     EmbeddingSettings,
     ExtractorSettings,
@@ -336,23 +334,6 @@ def test_unknown_time_zone_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError, match="unknown time zone"):
         SchedulerSettings()
-
-
-def test_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LLM_BUDGET_DAILY_USD", "0.50")
-    monkeypatch.setenv("LLM_BUDGET_MONTHLY_USD", "")
-
-    budget = BudgetSettings()
-
-    assert budget.daily_usd == Decimal("0.50")
-    assert budget.monthly_usd is None
-
-
-def test_budget_must_be_positive(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LLM_BUDGET_DAILY_USD", "0")
-
-    with pytest.raises(ValidationError):
-        BudgetSettings()
 
 
 # --- .env.example ---------------------------------------------------------------

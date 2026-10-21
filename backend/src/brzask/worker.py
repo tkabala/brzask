@@ -87,7 +87,7 @@ def run_job(kinds: Sequence[RunKind], run: Callable[[RunKind], object]) -> None:
 def build_scheduler(
     settings: SchedulerSettings, run: Callable[[RunKind], object]
 ) -> BackgroundScheduler:
-    # One job at a time: runs are long and share the LLM budget; a second job
+    # One job at a time: runs are long and share the model APIs; a second job
     # due meanwhile starts when the first finishes.
     scheduler = BackgroundScheduler(
         executors={"default": ThreadPoolExecutor(max_workers=1)},

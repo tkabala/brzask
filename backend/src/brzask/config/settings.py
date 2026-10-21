@@ -10,7 +10,6 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import time
-from decimal import Decimal
 from functools import cached_property, lru_cache
 from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
@@ -453,18 +452,6 @@ class DigestSettings(SettingsGroup):
     )
 
 
-PositiveAmount = Annotated[Annotated[Decimal, Field(gt=0)] | None, BeforeValidator(_empty_to_none)]
-
-
-class BudgetSettings(SettingsGroup):
-    """LLM spending limits; above a limit, expensive steps are skipped."""
-
-    model_config = SettingsConfigDict(env_prefix="LLM_BUDGET_")
-
-    daily_usd: PositiveAmount = Field(None, description="Daily limit in USD; empty for none.")
-    monthly_usd: PositiveAmount = Field(None, description="Monthly limit in USD; empty for none.")
-
-
 class LoggingSettings(SettingsGroup):
     """Logging."""
 
@@ -516,7 +503,6 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     ServerSettings,
     SchedulerSettings,
     DigestSettings,
-    BudgetSettings,
     LoggingSettings,
     TelemetrySettings,
 )
@@ -567,10 +553,6 @@ class Settings:
     @cached_property
     def digest(self) -> DigestSettings:
         return DigestSettings()
-
-    @cached_property
-    def budget(self) -> BudgetSettings:
-        return BudgetSettings()
 
     @cached_property
     def logging(self) -> LoggingSettings:
