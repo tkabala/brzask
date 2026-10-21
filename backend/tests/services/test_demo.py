@@ -23,7 +23,7 @@ TODAY = date(2026, 10, 21)
 ZONE = ZoneInfo("Europe/Warsaw")
 
 
-def test_a_month_of_digests_with_a_paused_weekend() -> None:
+def test_a_month_of_digests_with_a_pause() -> None:
     plan = demo_plan(TODAY, ZONE)
 
     days = plan.digest_days()

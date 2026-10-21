@@ -16,7 +16,7 @@ from brzask.db.models import RunKind, RunStatus, SourceStatus
 from brzask.services.demo.content import RELEASES, SOURCES, TOPICS, DemoSource
 
 DAYS = 30
-# Days before today without a digest: a paused weekend.
+# Days before today without a digest: a two-day pause.
 PAUSED = frozenset({12, 13})
 DIGEST_SIZE = 7
 CANDIDATES = 10  # stored each day; the rest were dropped as duplicates
