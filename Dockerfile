@@ -35,10 +35,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # --- Runtime -------------------------------------------------------------------
 FROM python:3.13-slim
 
-# Time zones for TZ; the slim image ships none.
+# Time zones for TZ; the slim image ships none. pip goes: nothing installs
+# packages at run time, and it vendors its own copies of libraries.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends tzdata \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall --yes --quiet --root-user-action=ignore pip
 RUN useradd --system --uid 10001 --user-group --no-create-home --home-dir /app brzask
 
 COPY --from=python /app/.venv /app/.venv
