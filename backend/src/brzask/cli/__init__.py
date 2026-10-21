@@ -25,6 +25,7 @@ from brzask.cli.extract_bench import extract_bench_command
 from brzask.cli.fit_weights import fit_weights_command
 from brzask.cli.judge_bench import judge_bench_command
 from brzask.cli.replay import replay_command
+from brzask.cli.setup import setup_command
 from brzask.config import get_settings
 from brzask.db import migrations
 from brzask.db.models import RunKind, RunStatus
@@ -46,6 +47,7 @@ app.command(name="extract-bench")(extract_bench_command)
 app.command(name="judge-bench")(judge_bench_command)
 app.command(name="fit-weights")(fit_weights_command)
 app.command(name="reembed")(reembed_command)
+app.command(name="setup")(setup_command)
 
 
 def run_cli() -> None:

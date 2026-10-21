@@ -1,0 +1,16 @@
+# deploy/compose.yaml as the end-to-end tests run it (see stack.sh): nothing
+# from a local .env, and a worker that schedules no pipeline.
+x-e2e: &e2e
+  env_file: !reset []
+  environment:
+    TZ: UTC
+    LOG_FORMAT: json
+    DIGEST_AT: 'off'
+    REVIEW_AT: 'off'
+    VISITED_AT: 'off'
+    DISCOVERY_AT: 'off'
+
+services:
+  migrate: *e2e
+  api: *e2e
+  worker: *e2e

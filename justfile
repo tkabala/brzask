@@ -54,7 +54,7 @@ api:
     docker compose up -d --wait db
     cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run brzask api
 
-# End-to-end tests: Playwright on the API with demo data and the built app
+# End-to-end tests: Playwright on deploy/compose.yaml with demo data, on an image of this checkout
 e2e:
     cd frontend && pnpm e2e
 

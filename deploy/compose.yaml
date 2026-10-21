@@ -1,0 +1,168 @@
+# brzask: the database, a one-shot migration, the API with the web app, and
+# the worker that runs the daily pipelines.
+#
+#   docker compose run --rm setup   # writes ./secrets, asks for a login password
+#   docker compose up -d            # then open http://localhost:8000
+#
+# Settings go in a .env file next to this one (see .env.example in the
+# repository; TZ sets the time zone of the schedule). Secrets stay in
+# ./secrets, one file each. Optional services:
+#   crawler  Crawl4AI for pages plain HTTP cannot read. In .env:
+#            COMPOSE_PROFILES=crawler and EXTRACTORS=feed,trafilatura,crawl4ai
+#   search   SearXNG for source discovery. In .env:
+#            COMPOSE_PROFILES=search and WEB_SEARCH=searxng
+# Both at once: COMPOSE_PROFILES=crawler,search.
+name: brzask
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-brzask: &brzask
+  image: ${BRZASK_IMAGE:-ghcr.io/tkabala/brzask:latest}
+  restart: unless-stopped
+  logging: *logging
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DB_HOST: db
+    DB_PASSWORD_FILE: /run/secrets/db_password
+    AUTH_PASSWORD_HASH_FILE: /run/secrets/auth_password_hash
+    AUTH_SESSION_SECRET_FILE: /run/secrets/auth_session_secret
+    LLM_API_KEY_FILE: /run/secrets/llm_api_key
+    CRAWL4AI_API_TOKEN_FILE: /run/secrets/crawl4ai_api_token
+    CRAWL4AI_BASE_URL: ${CRAWL4AI_BASE_URL:-http://crawl4ai:11235}
+    SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+  secrets:
+    - db_password
+    - auth_password_hash
+    - auth_session_secret
+    - llm_api_key
+    - crawl4ai_api_token
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17-trixie
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: brzask
+      POSTGRES_DB: brzask
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brzask -d brzask"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  migrate:
+    <<: *brzask
+    command: migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *brzask
+    command: api
+    ports:
+      # Loopback only; set BRZASK_PUBLISH=8000 to reach it from other machines,
+      # or put a reverse proxy with TLS in front.
+      - ${BRZASK_PUBLISH:-127.0.0.1:8000}:8000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=4)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: *brzask
+    command: worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # `docker compose run --rm setup` writes the secret files; existing ones are kept.
+  setup:
+    image: ${BRZASK_IMAGE:-ghcr.io/tkabala/brzask:latest}
+    profiles: [setup]
+    # Root inside the container, to write into this directory whoever owns it;
+    # ./secrets is then handed to that owner.
+    user: root
+    command: [setup, /deploy/secrets]
+    volumes:
+      - .:/deploy
+
+  crawl4ai:
+    image: unclecode/crawl4ai:0.9.5
+    profiles: [crawler]
+    restart: unless-stopped
+    logging: *logging
+    # Chromium needs more shared memory than Docker's default 64 MB.
+    shm_size: 1g
+    environment:
+      CRAWL4AI_NO_CLOUD_NOTICE: "1"
+    secrets:
+      # Its entrypoint reads the token from /run/secrets/api_token.
+      - source: crawl4ai_api_token
+        target: api_token
+
+  searxng:
+    image: searxng/searxng:2026.10.19-81371861f
+    profiles: [search]
+    restart: unless-stopped
+    logging: *logging
+    entrypoint:
+      - sh
+      - -c
+      - SEARXNG_SECRET="$$(cat /run/secrets/searxng_secret)" exec /usr/local/searxng/entrypoint.sh
+    secrets:
+      - searxng_secret
+    configs:
+      - source: searxng_settings
+        target: /etc/searxng/settings.yml
+
+volumes:
+  db-data:
+
+configs:
+  # Reachable only inside this network, where it answers brzask's JSON queries.
+  searxng_settings:
+    content: |
+      use_default_settings: true
+      server:
+        limiter: false
+        image_proxy: false
+      search:
+        formats: [html, json]
+
+secrets:
+  db_password:
+    file: ${BRZASK_SECRETS:-./secrets}/db_password
+  auth_password_hash:
+    file: ${BRZASK_SECRETS:-./secrets}/auth_password_hash
+  auth_session_secret:
+    file: ${BRZASK_SECRETS:-./secrets}/auth_session_secret
+  llm_api_key:
+    file: ${BRZASK_SECRETS:-./secrets}/llm_api_key
+  crawl4ai_api_token:
+    file: ${BRZASK_SECRETS:-./secrets}/crawl4ai_api_token
+  searxng_secret:
+    file: ${BRZASK_SECRETS:-./secrets}/searxng_secret

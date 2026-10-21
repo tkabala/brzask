@@ -14,7 +14,7 @@ from brzask.clients.feed_finder import FoundFeed
 from brzask.config.settings import LLMSettings, Settings
 from brzask.db.models import RunKind, RunStatus, SourceOrigin, SourceStatus
 from brzask.repositories import RunRepository
-from brzask.services import pipelines
+from brzask.services import auth, pipelines
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
 from tests.factories import Factories
@@ -91,7 +91,7 @@ def test_help_lists_the_commands() -> None:
 
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
-        "extract-bench", "reembed", "tokens", "hash-password", "demo-data",
+        "extract-bench", "reembed", "tokens", "hash-password", "demo-data", "setup",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
@@ -495,3 +495,64 @@ def test_demo_data(cli: Invoke) -> None:
     again = cli("demo-data")
     assert again.exit_code == 1
     assert "empty database" in again.stderr
+
+
+# --- setup ---------------------------------------------------------------------
+
+
+def test_setup_writes_the_secret_files(tmp_path: Path) -> None:
+    directory = tmp_path / "secrets"
+
+    result = runner.invoke(app, ["setup", str(directory)], input="pw\npw\nsk-key\n")
+
+    assert result.exit_code == 0, result.output
+    files = {path.name: path.read_text().strip() for path in directory.iterdir()}
+    assert set(files) == {
+        "db_password", "auth_session_secret", "auth_password_hash", "llm_api_key",
+        "crawl4ai_api_token", "searxng_secret",
+    }  # fmt: skip
+    for generated in ("db_password", "auth_session_secret", "crawl4ai_api_token", "searxng_secret"):
+        assert len(files[generated]) >= 32
+    assert auth.verify_password(files["auth_password_hash"], "pw")
+    assert files["llm_api_key"] == "sk-key"
+    assert directory.stat().st_mode & 0o777 == 0o700
+
+
+def test_setup_settings_read_the_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runner.invoke(app, ["setup", str(tmp_path)], input="pw\npw\n\n")
+    for name in (
+        "db_password", "auth_session_secret", "auth_password_hash", "llm_api_key",
+        "crawl4ai_api_token",
+    ):  # fmt: skip
+        monkeypatch.setenv(f"{name.upper()}_FILE", str(tmp_path / name))
+
+    settings = Settings()
+
+    assert settings.auth.mode == "password"
+    assert settings.database.password.get_secret_value()
+    assert settings.extractors.crawl4ai_api_token is not None
+    # An empty key, for a local server, counts as none.
+    assert settings.llm.api_key is None
+
+
+def test_setup_keeps_existing_files(tmp_path: Path) -> None:
+    # As Docker creates a missing bind-mounted directory.
+    tmp_path.chmod(0o755)
+    (tmp_path / "db_password").write_text("in use\n")
+    (tmp_path / "auth_password_hash").write_text("$argon2id$kept\n")
+
+    result = runner.invoke(app, ["setup", str(tmp_path)], input="key\n")
+
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "db_password").read_text() == "in use\n"
+    assert (tmp_path / "auth_password_hash").read_text() == "$argon2id$kept\n"
+    assert "Login password" not in result.output
+    assert (tmp_path / "llm_api_key").read_text() == "key\n"
+    assert tmp_path.stat().st_mode & 0o777 == 0o700
+
+
+def test_setup_asks_again_for_an_empty_password(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["setup", str(tmp_path)], input="\n\n")
+
+    assert result.exit_code != 0
+    assert not (tmp_path / "auth_password_hash").exists()

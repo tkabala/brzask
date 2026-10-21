@@ -21,7 +21,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       docs: ${{ steps.filter.outputs.docs }}
-      image: ${{ steps.filter.outputs.image }}
+      deploy: ${{ steps.filter.outputs.deploy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -43,12 +43,10 @@ jobs:
               - 'backend/pyproject.toml'
               - 'backend/uv.lock'
               - '.github/workflows/ci.yml'
-            image:
-              - 'backend/**'
-              - 'frontend/**'
+            deploy:
               - 'Dockerfile'
               - '.dockerignore'
-              - '.github/workflows/ci.yml'
+              - 'deploy/**'
 
   backend:
     needs: changes
@@ -112,19 +110,15 @@ jobs:
 
   e2e:
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    if: >-
+      needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          working-directory: backend
-          enable-cache: true
-      - run: uv sync --locked
-        working-directory: backend
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: frontend/package.json
@@ -135,7 +129,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      # Starts Postgres from compose.yaml, the API on demo data and the built app.
+      # Builds the image and runs deploy/compose.yaml on demo data (e2e/stack.sh).
       - run: pnpm e2e
         timeout-minutes: 15
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -156,20 +150,3 @@ jobs:
           working-directory: backend
           enable-cache: true
       - run: uv run --project backend --locked --only-group docs mkdocs build --strict
-
-  image:
-    needs: changes
-    if: needs.changes.outputs.image == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker build --tag brzask:ci .
-      - run: docker run --rm brzask:ci --version
-      # The web app and liveness need no database.
-      - name: Serve the web app
-        run: |
-          docker run --detach --name api --publish 8000:8000 \
-            --env AUTH_MODE=none --env DB_PASSWORD=unused brzask:ci
-          for _ in $(seq 30); do curl --silent --fail localhost:8000/healthz && break; sleep 1; done
-          curl --silent --fail localhost:8000/archive | grep --quiet '<div id="root">'
-          docker rm --force api
