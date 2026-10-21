@@ -37,7 +37,10 @@ export function ArticleCard({ article, onOpen, renderWhy }: Props) {
                 rel="noopener"
                 className="hover:underline"
                 onClick={open}
-                onAuxClick={open}
+                onAuxClick={(event) => {
+                  // The middle button opens a tab; others (a right click) only show a menu.
+                  if (event.button === 1) open()
+                }}
               >
                 {article.title}
               </a>

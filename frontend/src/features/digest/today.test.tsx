@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { digest, ranking } from '@/demo/data'
@@ -41,6 +41,27 @@ describe('today', () => {
     const card = link.closest('[data-slot="card"]')
     if (!(card instanceof HTMLElement)) throw new Error('the link is not in a card')
     expect(within(card).getByText('Opened')).toBeInTheDocument()
+  })
+
+  it('marks an article opened on a middle click, not on a right click', async () => {
+    loggedInApi({ 'GET /api/v1/digests/today': () => json(digest) })
+    renderApp('/')
+
+    const card = async (name: RegExp) => {
+      const link = await screen.findByRole('link', { name })
+      const found = link.closest('[data-slot="card"]')
+      if (!(found instanceof HTMLElement)) throw new Error('the link is not in a card')
+      return { link, card: within(found) }
+    }
+    const menu = await card(/Linus Torvalds/)
+    const tab = await card(/Hermes Agent/)
+    expect(tab.card.queryByText('Opened')).not.toBeInTheDocument()
+
+    fireEvent(menu.link, new MouseEvent('auxclick', { bubbles: true, button: 2 }))
+    fireEvent(tab.link, new MouseEvent('auxclick', { bubbles: true, button: 1 }))
+
+    expect(await tab.card.findByText('Opened')).toBeInTheDocument()
+    expect(menu.card.queryByText('Opened')).not.toBeInTheDocument()
   })
 
   it('explains why an article is where it is', async () => {
