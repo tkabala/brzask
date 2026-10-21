@@ -129,3 +129,14 @@ def test_tokens_work_behind_an_authenticating_proxy(app: FastAPI, session: Sessi
     stranger = TestClient(app, client=("203.0.113.9", 41000))
     assert stranger.get("/api/v1/status", headers=headers).status_code == 200
     assert stranger.get("/api/v1/status").status_code == 401
+
+
+def test_other_authorization_does_not_hide_a_session(client: TestClient) -> None:
+    from tests.api.conftest import PASSWORD
+
+    https = TestClient(client.app, base_url="https://testserver")
+    https.post("/api/v1/auth/login", json={"password": PASSWORD})
+
+    response = https.get("/api/v1/status", headers={"Authorization": "Basic dXNlcjpwYXNz"})
+
+    assert response.status_code == 200

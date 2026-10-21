@@ -69,7 +69,8 @@ def test_login_sets_a_session_cookie(client: TestClient) -> None:
     assert "secure" in session_cookie
     assert "samesite=lax" in session_cookie
     assert "max-age=2592000" in session_cookie  # 30 days
-    assert "httponly" not in cookies["brzask_csrf"].lower()  # the page reads it
+    # The page gets the CSRF token from the answer and /auth/session, not a cookie.
+    assert list(cookies) == ["brzask_session"]
     assert client.get("/api/v1/status").status_code == 200
     state = client.get("/api/v1/auth/session").json()
     assert (state["authenticated"], state["csrf_token"]) == (True, body["csrf_token"])

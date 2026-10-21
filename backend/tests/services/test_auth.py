@@ -34,10 +34,10 @@ def test_password_hashes_verify() -> None:
 def test_csrf_tokens_and_link_signatures_depend_on_the_secret() -> None:
     token = auth.csrf_token("a" * 32, "session")
 
-    assert auth.csrf_matches("a" * 32, "session", token)
-    assert not auth.csrf_matches("b" * 32, "session", token)
-    assert not auth.csrf_matches("a" * 32, "other", token)
-    assert not auth.csrf_matches("a" * 32, "session", None)
+    assert auth.same_token(auth.csrf_token("a" * 32, "session"), token)
+    assert not auth.same_token(auth.csrf_token("b" * 32, "session"), token)
+    assert not auth.same_token(auth.csrf_token("a" * 32, "other"), token)
+    assert not auth.same_token(token, None)
     signature = auth.link_signature("a" * 32, 7)
     assert len(signature) == 16
     assert auth.link_signature_matches("a" * 32, 7, signature)
@@ -119,7 +119,7 @@ def test_logging_in_clears_expired_sessions(session: Session) -> None:
 
 
 def test_non_ascii_tokens_simply_do_not_match() -> None:
-    assert not auth.csrf_matches("a" * 32, "session", "\x80é")
+    assert not auth.same_token(auth.csrf_token("a" * 32, "session"), "\x80é")
     assert not auth.link_signature_matches("a" * 32, 7, "\x80")
 
 

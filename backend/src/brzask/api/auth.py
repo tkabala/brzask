@@ -30,7 +30,6 @@ from brzask.db.models import TokenScope
 from brzask.services import auth, tokens
 
 SESSION_COOKIE = "brzask_session"
-CSRF_COOKIE = "brzask_csrf"
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -114,13 +113,16 @@ def identify(
 ) -> Identity | None:
     """Who sent the request, or None when it is not authenticated.
 
-    A request with an `Authorization` header is judged by it alone: a wrong
-    token is not saved by a session cookie sent along.
+    A brzask token in `Authorization` is judged alone: a wrong token is not
+    saved by a session cookie or a proxy's user sent along. Any other
+    `Authorization` header belongs to someone else, such as a proxy passing
+    on its own credentials, and is ignored.
     """
     if config.mode == "none":
         return Identity(actor=ACTOR)
-    if "authorization" in request.headers:
-        return _token_identity(session, request.headers["authorization"])
+    bearer = _brzask_token(request.headers.get("authorization", ""))
+    if bearer is not None:
+        return _token_identity(session, bearer)
     if config.mode == "header":
         if not auth.is_trusted(peer(request), config.settings.trusted_proxies):
             return None
@@ -144,11 +146,17 @@ def identify(
     )
 
 
-def _token_identity(session: DbSession, authorization: str) -> Identity | None:
+def _brzask_token(authorization: str) -> str | None:
+    """The token in `Bearer brz_...`, or None for any other value."""
     scheme, _, value = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not value.strip():
+    value = value.strip()
+    if scheme.lower() != "bearer" or not value.startswith(tokens.TOKEN_PREFIX):
         return None
-    token = tokens.authenticate_token(session, value.strip(), datetime.now(UTC))
+    return value
+
+
+def _token_identity(session: DbSession, value: str) -> Identity | None:
+    token = tokens.authenticate_token(session, value, datetime.now(UTC))
     if token is None:
         return None
     return Identity(f"token:{token.name}", read_only=token.scope is not TokenScope.WRITE)
@@ -232,7 +240,7 @@ def _over_https(request: Request, config: Auth) -> bool:
     return forwarded.lower() == "https"
 
 
-def _set_cookies(request: Request, response: Response, config: Auth, token: str, csrf: str) -> None:
+def _set_cookie(request: Request, response: Response, config: Auth, token: str) -> None:
     max_age = int(auth.SESSION_LIFETIME.total_seconds())
     setting = config.settings.cookie_secure
     # Browsers drop a Secure cookie that arrives over plain HTTP, even from
@@ -246,8 +254,6 @@ def _set_cookies(request: Request, response: Response, config: Auth, token: str,
         secure=secure,
         samesite="lax",
     )
-    # Readable by the page, so it can send the token after a reload.
-    response.set_cookie(CSRF_COOKIE, csrf, max_age=max_age, secure=secure, samesite="lax")
 
 
 @router.post(
@@ -282,7 +288,7 @@ def login(
         config.throttle.succeeded(client)
     new = auth.log_in(session, datetime.now(UTC))
     csrf = auth.csrf_token(config.signing_secret(), new.token)
-    _set_cookies(request, response, config, new.token, csrf)
+    _set_cookie(request, response, config, new.token)
     return SessionOut(
         mode=config.mode, authenticated=True, csrf_token=csrf, expires_at=new.expires_at
     )
@@ -300,7 +306,6 @@ def logout(response: Response, session: DbSession, token: SessionCookie) -> None
     if token is not None:
         auth.log_out(session, token)
     response.delete_cookie(SESSION_COOKIE)
-    response.delete_cookie(CSRF_COOKIE)
 
 
 @router.get("/session", summary="Whether this browser is logged in")

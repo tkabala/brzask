@@ -26,16 +26,13 @@
   everything, and the server says so in a warning at every start. Use it only
   on a machine nobody else can reach.
 
-With a password, `POST /api/v1/auth/login` with `{"password": "..."}` sets two
-cookies:
-
-| Cookie | What it holds |
-|---|---|
-| `brzask_session` | A random session token. `HttpOnly`, `Secure`, `SameSite=Lax`, valid for 30 days. The server stores only its SHA-256. |
-| `brzask_csrf` | The CSRF token that goes with the session, readable by the page. |
+With a password, `POST /api/v1/auth/login` with `{"password": "..."}` sets the
+`brzask_session` cookie: a random session token, `HttpOnly`, `Secure`,
+`SameSite=Lax`, valid for 30 days. The server stores only its SHA-256.
 
 Requests that change something (`POST`, `PUT`, `PATCH`, `DELETE`) send the CSRF
-token in `X-CSRF-Token`; without it they answer 403. The token is an HMAC of
+token in `X-CSRF-Token`; without it they answer 403. The login answer carries
+the token, and `GET /api/v1/auth/session` returns it again after a reload. The token is an HMAC of
 the session under `AUTH_SESSION_SECRET`, so a page on another site can neither
 read nor compute it. `GET /api/v1/auth/session` tells the page whether it is
 logged in (and returns the token again), and `POST /api/v1/auth/logout` ends
@@ -46,11 +43,11 @@ anywhere, login answers 429 with `Retry-After` and does not check passwords
 until the oldest failure is 15 minutes old. The count lives in memory and
 restarts with the server.
 
-Both cookies are `Secure` (sent over HTTPS only) when the login request came
+The cookie is `Secure` (sent over HTTPS only) when the login request came
 over HTTPS: directly, or through a proxy in `TRUSTED_PROXIES` that sends
 `X-Forwarded-Proto: https`. Over plain HTTP they are not, as browsers drop
 `Secure` cookies that arrive over HTTP, even from `localhost`.
-`AUTH_COOKIE_SECURE=true` marks them `Secure` always, `false` never. Behind a
+`AUTH_COOKIE_SECURE=true` marks it `Secure` always, `false` never. Behind a
 TLS proxy, list it in `TRUSTED_PROXIES` (or set `true`), so the cookie is never
 sent over plain HTTP.
 
@@ -72,8 +69,10 @@ $ curl -H "Authorization: Bearer brz_..." https://brzask.example/api/v1/status
 - `brzask tokens revoke <name>` stops it at once.
 - A token needs no CSRF token, since no browser sends it on its own. It works
   in both `password` and `header` modes, also from outside the proxy.
-- A request with an `Authorization` header is judged by it alone: a wrong
-  token answers 401 even when a session cookie comes along.
+- A request with a brzask token (`Bearer brz_...`) is judged by it alone: a
+  wrong token answers 401 even when a session cookie or a proxy's user comes
+  along. Any other `Authorization` header, such as the credentials an
+  authenticating proxy passes on, is ignored.
 - The change log records what a token changed as `token:<name>`, a user
   behind a proxy as `user:<name>`, and a password session as `user`.
 

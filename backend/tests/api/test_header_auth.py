@@ -102,3 +102,23 @@ def test_another_header_name(app: FastAPI, auth_settings: AuthSettings) -> None:
 
     assert proxy.get("/api/v1/status", headers=USER).status_code == 401
     assert proxy.get("/api/v1/status", headers={"X-Forwarded-User": "alice"}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "authorization", ["Basic YWxpY2U6c2VjcmV0", "Bearer eyJhbGciOiJSUzI1NiJ9.proxy.token"]
+)
+def test_a_proxys_own_authorization_is_ignored(app: FastAPI, authorization: str) -> None:
+    # e.g. oauth2-proxy passing on its access token, or basic auth at the proxy.
+    proxy = from_(app, PROXY)
+
+    response = proxy.get("/api/v1/status", headers={**USER, "Authorization": authorization})
+
+    assert response.status_code == 200
+
+
+def test_a_wrong_brzask_token_is_not_saved_by_the_proxy_user(app: FastAPI) -> None:
+    proxy = from_(app, PROXY)
+
+    response = proxy.get("/api/v1/status", headers={**USER, "Authorization": "Bearer brz_wrong"})
+
+    assert response.status_code == 401

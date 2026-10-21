@@ -75,10 +75,6 @@ def same_token(expected: str, sent: str | None) -> bool:
     return sent is not None and hmac.compare_digest(expected.encode(), sent.encode())
 
 
-def csrf_matches(secret: str, session_token: str, sent: str | None) -> bool:
-    return same_token(csrf_token(secret, session_token), sent)
-
-
 def link_signature(secret: str, article_id: int) -> str:
     """Signs `/open` links; 16 hex characters are 64 bits, plenty against guessing."""
     return _sign(secret, "open", str(article_id))[:16]
