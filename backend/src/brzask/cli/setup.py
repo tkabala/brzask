@@ -30,18 +30,22 @@ def setup_command(
     # The files are readable by everyone, as the containers that mount them run
     # as their own users; the directory keeps other users of the host out.
     directory.chmod(0o700)
-    _write(directory, DB_PASSWORD, lambda: secrets.token_urlsafe(32))
-    _write(directory, SESSION_SECRET, lambda: secrets.token_urlsafe(48))
-    _write(directory, PASSWORD_HASH, _password_hash)
-    _write(directory, LLM_API_KEY, _llm_api_key)
-    _write(directory, CRAWL4AI_API_TOKEN, lambda: secrets.token_urlsafe(32))
-    _write(directory, SEARXNG_SECRET, lambda: secrets.token_urlsafe(32))
-    if os.geteuid() == 0:
-        # Run as root in a container: hand everything to whoever owns the
-        # directory it lives in, the one mounted from the host.
-        owner = directory.resolve().parent.stat()
-        for path in (directory, *directory.iterdir()):
-            os.chown(path, owner.st_uid, owner.st_gid)
+    try:
+        _write(directory, DB_PASSWORD, lambda: secrets.token_urlsafe(32))
+        _write(directory, SESSION_SECRET, lambda: secrets.token_urlsafe(48))
+        _write(directory, PASSWORD_HASH, _password_hash)
+        _write(directory, LLM_API_KEY, _llm_api_key)
+        _write(directory, CRAWL4AI_API_TOKEN, lambda: secrets.token_urlsafe(32))
+        _write(directory, SEARXNG_SECRET, lambda: secrets.token_urlsafe(32))
+    finally:
+        # Also after an interrupted prompt, so the host user is never locked
+        # out of a half-written directory.
+        if os.geteuid() == 0:
+            # Run as root in a container: hand everything to whoever owns the
+            # directory it lives in, the one mounted from the host.
+            owner = directory.resolve().parent.stat()
+            for path in (directory, *directory.iterdir()):
+                os.chown(path, owner.st_uid, owner.st_gid)
 
 
 def _password_hash() -> str:

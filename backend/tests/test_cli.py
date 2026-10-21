@@ -556,3 +556,19 @@ def test_setup_asks_again_for_an_empty_password(tmp_path: Path) -> None:
 
     assert result.exit_code != 0
     assert not (tmp_path / "auth_password_hash").exists()
+
+
+def test_setup_as_root_hands_the_files_back_even_when_interrupted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owned: list[Path] = []
+    monkeypatch.setattr("os.geteuid", lambda: 0)
+    monkeypatch.setattr("os.chown", lambda path, uid, gid: owned.append(Path(path)))
+    directory = tmp_path / "secrets"
+
+    # No input: the login password prompt is aborted, as by Ctrl-C.
+    result = runner.invoke(app, ["setup", str(directory)], input="")
+
+    assert result.exit_code != 0
+    assert directory in owned
+    assert directory / "db_password" in owned
