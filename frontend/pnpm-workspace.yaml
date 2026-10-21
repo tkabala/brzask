@@ -1,0 +1,5 @@
+# Install scripts of dependencies run only when allowed here.
+allowBuilds:
+  # Its script only re-checks the platform binary, which pnpm already
+  # installs as an optional dependency (used by Storybook).
+  esbuild: false
