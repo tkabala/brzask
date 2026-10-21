@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.1](https://github.com/tkabala/brzask/compare/v0.1.0...v0.1.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **api:** answer 405 for API routes asked with another method ([623a1bf](https://github.com/tkabala/brzask/commit/623a1bf023a869b6aaa5a89b37a3d57bcce07aa1))
+* **cli:** hand the secrets back to the host user when setup is interrupted ([362deb5](https://github.com/tkabala/brzask/commit/362deb534f1cbccee69e47645741a7e0d8d73559))
+* **deploy:** let setup write to the BRZASK_SECRETS directory ([797d8de](https://github.com/tkabala/brzask/commit/797d8de8761dcbdd61e05059f1ce109dd383fa6e))
+* **deploy:** pin the API address and port inside the containers ([1349937](https://github.com/tkabala/brzask/commit/1349937ca425b998e25fbbaa5a800a28f4a164cd))
+* **deploy:** secret files win over the same variables in .env ([9c2eb3b](https://github.com/tkabala/brzask/commit/9c2eb3b86cec99d943c2e54761279bb7d1a041a8))
+
 ## 0.1.0 (2026-10-21)
 
 
