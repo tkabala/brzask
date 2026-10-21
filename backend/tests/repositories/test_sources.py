@@ -196,6 +196,20 @@ def test_stats_count_by_source_id_within_the_window(session: Session, make: Fact
     assert (stats[quiet.id].articles, stats[quiet.id].opened) == (0, 0)
 
 
+def test_stats_of_some_sources_only(session: Session, make: Factories) -> None:
+    wanted = make.source("Wanted")
+    quiet = make.source("Quiet")
+    other = make.source("Other")
+    make.article(wanted, first_seen_at=NOW)
+    make.article(other, first_seen_at=NOW)
+
+    stats = SourceRepository(session).stats(NOW - timedelta(days=1), [wanted.id, quiet.id])
+
+    assert set(stats) == {wanted.id, quiet.id}
+    assert stats[wanted.id].articles == 1
+    assert stats[quiet.id].articles == 0
+
+
 def test_stats_ignore_articles_without_a_source(session: Session, make: Factories) -> None:
     make.article(None, first_seen_at=NOW, state=ArticleState.SEEN)
 

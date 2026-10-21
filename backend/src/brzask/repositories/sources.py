@@ -173,13 +173,19 @@ class SourceRepository:
         )
         return [SourceRecord(*row) for row in self.session.execute(query)]
 
-    def stats(self, since: datetime) -> dict[int, SourceStats]:
+    def stats(
+        self, since: datetime, source_ids: Collection[int] | None = None
+    ) -> dict[int, SourceStats]:
         """Counts per source for articles first seen at or after `since`.
 
         Grouped by `source_id`, so renaming a source keeps its history. Every
-        source is present, with zeros when it published nothing.
+        source (or every one of `source_ids`) is present, with zeros when it
+        published nothing.
         """
-        window = _article_counts(Article.first_seen_at >= since)
+        where = [Article.first_seen_at >= since]
+        if source_ids is not None:
+            where.append(Article.source_id.in_(source_ids))
+        window = _article_counts(*where)
         query = select(
             Source.id,
             func.coalesce(window.c.articles, 0),
@@ -187,6 +193,8 @@ class SourceRepository:
             func.coalesce(window.c.shown, 0),
             func.coalesce(window.c.opened, 0),
         ).outerjoin(window, window.c.source_id == Source.id)
+        if source_ids is not None:
+            query = query.where(Source.id.in_(source_ids))
         return {
             source_id: SourceStats(source_id, articles, ranked, shown, opened)
             for source_id, articles, ranked, shown, opened in self.session.execute(query)

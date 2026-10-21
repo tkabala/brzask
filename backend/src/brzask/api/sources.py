@@ -134,7 +134,8 @@ def _key(source: Source) -> list[str]:
 
 
 def _out(session: DbSession, source: Source) -> SourceOut:
-    return SourceOut.of(source, sources.recent_stats(session, datetime.now(UTC)).get(source.id))
+    stats = sources.recent_stats(session, datetime.now(UTC), [source.id])
+    return SourceOut.of(source, stats.get(source.id))
 
 
 @router.get(
@@ -155,7 +156,7 @@ def list_sources(
     after = decode_cursor(cursor, _parse_key)
     rows = sources.page_sources(session, limit + 1, status or (), after)
     items, next_cursor = page(rows, limit, _key)
-    stats = sources.recent_stats(session, datetime.now(UTC))
+    stats = sources.recent_stats(session, datetime.now(UTC), [source.id for source in items])
     return Page(
         items=[SourceOut.of(source, stats.get(source.id)) for source in items],
         next_cursor=next_cursor,

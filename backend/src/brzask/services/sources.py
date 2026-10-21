@@ -153,9 +153,11 @@ def get_source(session: Session, source_id: int) -> Source:
     return source
 
 
-def recent_stats(session: Session, now: datetime) -> dict[int, SourceStats]:
-    """What each source produced over the last `RECENT` days."""
-    return SourceRepository(session).stats(now - RECENT)
+def recent_stats(
+    session: Session, now: datetime, source_ids: Collection[int]
+) -> dict[int, SourceStats]:
+    """What the sources `source_ids` produced over the last `RECENT` days."""
+    return SourceRepository(session).stats(now - RECENT, source_ids)
 
 
 def ensure_unknown(session: Session, url: str) -> None:
