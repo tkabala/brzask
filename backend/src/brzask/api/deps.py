@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.api.clients import ApiClients
 from brzask.services.refs import MAX_ID
 
-# Who changes are recorded as, until requests carry a user or a token.
+# Who changes are recorded as when no user name or token says more.
 ACTOR = "user"
 
 

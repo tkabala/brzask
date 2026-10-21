@@ -7,7 +7,9 @@ AUTH_MODE=none: everyone who reaches the server may do everything.
 
 In the first two, requests that change something also send a CSRF token in
 `X-CSRF-Token`: the browser sends the cookies on its own, even for a page on
-another site, but that page cannot learn the token.
+another site, but that page cannot learn the token. Scripts and agents send an
+API token instead (`Authorization: Bearer brz_...`), which no browser sends on
+its own, so it needs no CSRF token; a `read` token may only read.
 """
 
 from dataclasses import dataclass, field
@@ -16,20 +18,25 @@ from http import HTTPStatus
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from fastapi.security import APIKeyCookie
+from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
-from brzask.api.deps import NO_NUL, DbSession
+from brzask.api.deps import ACTOR, NO_NUL, DbSession
 from brzask.api.problems import ProblemError
 from brzask.config.settings import AuthSettings
-from brzask.services import auth
+from brzask.db.models import TokenScope
+from brzask.services import auth, tokens
 
 SESSION_COOKIE = "brzask_session"
 CSRF_COOKIE = "brzask_csrf"
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
+bearer_token = HTTPBearer(
+    auto_error=False,
+    description="An API token from `brzask tokens create`; a read token may only read.",
+)
 session_cookie = APIKeyCookie(
     name=SESSION_COOKIE,
     auto_error=False,
@@ -79,15 +86,18 @@ def get_auth(request: Request) -> Auth:
 
 AuthConfig = Annotated[Auth, Depends(get_auth)]
 SessionCookie = Annotated[str | None, Depends(session_cookie)]
+Bearer = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_token)]
 
 
 @dataclass(frozen=True, slots=True)
 class Identity:
     """Who a request comes from."""
 
-    user: str | None  # the proxy's user name; None for a password session or mode none
-    csrf_token: str | None  # None when no CSRF check applies (mode none)
+    actor: str  # as the change log records it: "user", "user:<name>", "token:<name>"
+    user: str | None = None  # the proxy's user name (mode header)
+    csrf_token: str | None = None  # None when no CSRF check applies (mode none, tokens)
     expires_at: datetime | None = None  # end of a password session
+    read_only: bool = False  # a read token
 
 
 def peer(request: Request) -> str | None:
@@ -98,26 +108,54 @@ def peer(request: Request) -> str | None:
 def identify(
     request: Request, session: DbSession, config: Auth, token: str | None
 ) -> Identity | None:
-    """Who sent the request, or None when it is not authenticated."""
+    """Who sent the request, or None when it is not authenticated.
+
+    A request with an `Authorization` header is judged by it alone: a wrong
+    token is not saved by a session cookie sent along.
+    """
     if config.mode == "none":
-        return Identity(user=None, csrf_token=None)
+        return Identity(actor=ACTOR)
+    if "authorization" in request.headers:
+        return _token_identity(session, request.headers["authorization"])
     if config.mode == "header":
         if not auth.is_trusted(peer(request), config.settings.trusted_proxies):
             return None
         user = request.headers.get(config.settings.header, "").strip()
         if not user:
             return None
-        return Identity(user, auth.header_csrf_token(config.signing_secret(), user))
+        return Identity(
+            f"user:{user}",
+            user=user,
+            csrf_token=auth.header_csrf_token(config.signing_secret(), user),
+        )
     if token is None:
         return None
     login = auth.current_login(session, token, datetime.now(UTC))
     if login is None:
         return None
-    return Identity(None, auth.csrf_token(config.signing_secret(), token), login.expires_at)
+    return Identity(
+        ACTOR,
+        csrf_token=auth.csrf_token(config.signing_secret(), token),
+        expires_at=login.expires_at,
+    )
+
+
+def _token_identity(session: DbSession, authorization: str) -> Identity | None:
+    scheme, _, value = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    token = tokens.authenticate_token(session, value.strip(), datetime.now(UTC))
+    if token is None:
+        return None
+    return Identity(f"token:{token.name}", read_only=token.scope is not TokenScope.WRITE)
 
 
 def require_user(
-    request: Request, session: DbSession, config: AuthConfig, token: SessionCookie
+    request: Request,
+    session: DbSession,
+    config: AuthConfig,
+    token: SessionCookie,
+    _bearer: Bearer,  # declares the scheme in the document; read in `identify`
 ) -> None:
     """Let the request through only when it is authenticated (always when AUTH_MODE=none)."""
     identity = identify(request, session, config, token)
@@ -128,6 +166,8 @@ def require_user(
                 f"No {config.settings.header} from a trusted proxy; sign in through it.",
             )
         raise ProblemError(HTTPStatus.UNAUTHORIZED, "Log in first.")
+    if identity.read_only and request.method not in SAFE_METHODS:
+        raise ProblemError(HTTPStatus.FORBIDDEN, "This token may only read.")
     if (
         identity.csrf_token is not None
         and request.method not in SAFE_METHODS
@@ -136,6 +176,16 @@ def require_user(
         raise ProblemError(
             HTTPStatus.FORBIDDEN, f"Missing or wrong {CSRF_HEADER}; reload and try again."
         )
+    request.state.identity = identity
+
+
+def get_actor(request: Request) -> str:
+    """Who to record changes as; set by `require_user`."""
+    identity: Identity = request.state.identity
+    return identity.actor
+
+
+Actor = Annotated[str, Depends(get_actor)]
 
 
 # --- Routes ------------------------------------------------------------------------

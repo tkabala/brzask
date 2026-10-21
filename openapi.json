@@ -17,6 +17,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -155,6 +158,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ]
       }
@@ -170,6 +176,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -242,6 +251,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -324,6 +336,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -407,6 +422,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -518,6 +536,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -641,6 +662,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "requestBody": {
@@ -742,6 +766,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -823,6 +850,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -938,6 +968,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -1012,6 +1045,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "requestBody": {
@@ -1102,6 +1138,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -1183,6 +1222,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -1298,6 +1340,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -1420,6 +1465,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -1535,6 +1583,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ]
       }
@@ -1583,6 +1634,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ]
       },
@@ -1661,6 +1715,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ]
       },
@@ -1701,6 +1758,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ]
       }
@@ -1818,6 +1878,9 @@
         "security": [
           {
             "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
           }
         ]
       }
@@ -3423,6 +3486,11 @@
         "description": "Set by POST /api/v1/auth/login. Requests that change something also send the CSRF token in X-CSRF-Token.",
         "in": "cookie",
         "name": "brzask_session"
+      },
+      "HTTPBearer": {
+        "type": "http",
+        "description": "An API token from `brzask tokens create`; a read token may only read.",
+        "scheme": "bearer"
       }
     }
   }

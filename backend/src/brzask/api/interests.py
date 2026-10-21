@@ -8,7 +8,8 @@ from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
-from brzask.api.deps import ACTOR, NO_NUL, DbSession, Id
+from brzask.api.auth import Actor
+from brzask.api.deps import NO_NUL, DbSession, Id
 from brzask.db.models import Interest
 from brzask.services import interests
 
@@ -91,9 +92,9 @@ def get_interest(session: DbSession, interest_id: Id) -> InterestOut:
     status_code=status.HTTP_201_CREATED,
     responses=problems.responses(HTTPStatus.BAD_REQUEST, HTTPStatus.CONFLICT),
 )
-def add_interest(session: DbSession, new: NewInterest) -> InterestOut:
+def add_interest(session: DbSession, actor: Actor, new: NewInterest) -> InterestOut:
     interest = interests.add_interest(
-        session, new.topic, actor=ACTOR, keywords=new.keywords, notes=new.notes
+        session, new.topic, actor=actor, keywords=new.keywords, notes=new.notes
     )
     return InterestOut.of(interest)
 
@@ -103,12 +104,14 @@ def add_interest(session: DbSession, new: NewInterest) -> InterestOut:
     summary="Change an interest or its notes",
     responses=problems.responses(HTTPStatus.BAD_REQUEST, HTTPStatus.NOT_FOUND, HTTPStatus.CONFLICT),
 )
-def change_interest(session: DbSession, interest_id: Id, change: InterestChange) -> InterestOut:
+def change_interest(
+    session: DbSession, actor: Actor, interest_id: Id, change: InterestChange
+) -> InterestOut:
     """Interests are not deleted; an inactive one keeps its history."""
     interest = interests.edit_interest(
         session,
         str(interest_id),
-        actor=ACTOR,
+        actor=actor,
         topic=change.topic,
         keywords=change.keywords,
         notes=change.notes,

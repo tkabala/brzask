@@ -91,13 +91,14 @@ def test_help_lists_the_commands() -> None:
 
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
-        "extract-bench", "reembed",
+        "extract-bench", "reembed", "tokens", "hash-password",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
     for group, commands in {
         "sources": ("list", "add", "mute", "enable", "stats"),
         "interests": ("list", "add", "edit"),
+        "tokens": ("create", "list", "revoke"),
     }.items():
         output = runner.invoke(app, [group, "--help"]).stdout
         assert all(command in output for command in commands)
@@ -455,3 +456,32 @@ def test_reembed_moves_vectors_and_switches(
     ]
     assert "Embedding model: new/embedding" in status.stdout
     assert models == ["new/embedding", "new/embedding"]
+
+
+# --- tokens --------------------------------------------------------------------
+
+
+def test_tokens_create_list_revoke(cli: Invoke) -> None:
+    created = cli("tokens", "create", "agent", "--scope", "write")
+    assert created.exit_code == 0, created.output
+    value = created.stdout.strip()
+    assert value.startswith("brz_")
+    assert "cannot be shown again" in created.stderr
+
+    listed = cli("tokens", "list")
+    assert "agent" in listed.stdout and "write" in listed.stdout and "never" in listed.stdout
+    assert value not in listed.stdout
+    assert f"{value[:12]}…" in listed.stdout
+
+    assert cli("tokens", "revoke", "agent").stdout.strip() == "Revoked agent."
+    assert cli("tokens", "revoke", "agent").stdout.strip() == "agent was already revoked."
+    missing = cli("tokens", "revoke", "nope")
+    assert missing.exit_code == 1
+    assert "no token 'nope'" in missing.stderr
+
+
+def test_tokens_default_to_read(cli: Invoke) -> None:
+    cli("tokens", "create", "reader")
+
+    assert "read" in cli("tokens", "list").stdout
+    assert cli("tokens", "create", "reader").exit_code == 1

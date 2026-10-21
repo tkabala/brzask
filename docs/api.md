@@ -51,6 +51,29 @@ restarts with the server.
 `AUTH_COOKIE_SECURE=false`; better, put the server behind a reverse proxy with
 TLS.
 
+### API tokens
+
+Scripts and agents use a token instead of a login:
+
+```console
+$ brzask tokens create backup-script --scope read
+brz_...
+$ curl -H "Authorization: Bearer brz_..." https://brzask.example/api/v1/status
+```
+
+- **`read`** (the default) may only read (`GET`, `HEAD`); anything else
+  answers 403. **`write`** may also change things.
+- The token is printed once. Only its SHA-256 is stored, with its first 12
+  characters, which `brzask tokens list` shows next to its scope, when it was
+  created, last used (to the hour) and revoked.
+- `brzask tokens revoke <name>` stops it at once.
+- A token needs no CSRF token, since no browser sends it on its own. It works
+  in both `password` and `header` modes, also from outside the proxy.
+- A request with an `Authorization` header is judged by it alone: a wrong
+  token answers 401 even when a session cookie comes along.
+- The change log records what a token changed as `token:<name>`, a user
+  behind a proxy as `user:<name>`, and a password session as `user`.
+
 ### Behind an authenticating proxy
 
 With `AUTH_MODE=header`, brzask believes the header only when the connection

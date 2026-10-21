@@ -8,7 +8,8 @@ from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
-from brzask.api.deps import ACTOR, NO_NUL, Clients, DbSession, Id, Sessions
+from brzask.api.auth import Actor
+from brzask.api.deps import NO_NUL, Clients, DbSession, Id, Sessions
 from brzask.api.pagination import DEFAULT_LIMIT, CursorParam, Limit, Page, decode_cursor, page
 from brzask.clients.feed_finder import with_scheme
 from brzask.db.models import Source, SourceKind, SourceOrigin, SourceStatus
@@ -176,7 +177,7 @@ def get_source(session: DbSession, source_id: Id) -> SourceOut:
     status_code=status.HTTP_201_CREATED,
     responses=problems.responses(HTTPStatus.BAD_REQUEST, HTTPStatus.NOT_FOUND, HTTPStatus.CONFLICT),
 )
-def add_source(sessions: Sessions, clients: Clients, new: NewSource) -> SourceOut:
+def add_source(sessions: Sessions, clients: Clients, actor: Actor, new: NewSource) -> SourceOut:
     """Looks up the feed of the page, then reads it from the next digest on.
 
     404 when the page has no RSS or Atom feed, 409 when it is already a source
@@ -192,7 +193,7 @@ def add_source(sessions: Sessions, clients: Clients, new: NewSource) -> SourceOu
         source = sources.add_source(
             session,
             found.url,
-            actor=ACTOR,
+            actor=actor,
             name=new.name,
             title=found.title,
             site_url=found.site_url,
@@ -205,12 +206,14 @@ def add_source(sessions: Sessions, clients: Clients, new: NewSource) -> SourceOu
     summary="Rename a source or change its status",
     responses=problems.responses(HTTPStatus.BAD_REQUEST, HTTPStatus.NOT_FOUND, HTTPStatus.CONFLICT),
 )
-def change_source(session: DbSession, source_id: Id, change: SourceChange) -> SourceOut:
+def change_source(
+    session: DbSession, actor: Actor, source_id: Id, change: SourceChange
+) -> SourceOut:
     """Sources are never deleted: a muted or rejected one keeps its history and
     is not proposed again."""
     source = sources.get_source(session, source_id)
     if change.name is not None:
-        sources.rename_source(session, source, change.name, actor=ACTOR)
+        sources.rename_source(session, source, change.name, actor=actor)
     if change.status is not None:
-        sources.change_status(session, source, change.status, actor=ACTOR, reason=change.reason)
+        sources.change_status(session, source, change.status, actor=actor, reason=change.reason)
     return _out(session, source)

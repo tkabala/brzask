@@ -7,7 +7,8 @@ from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from brzask.api import problems
-from brzask.api.deps import ACTOR, DbSession
+from brzask.api.auth import Actor
+from brzask.api.deps import DbSession
 from brzask.api.runs import RunOut
 from brzask.config import get_settings
 from brzask.db.models import RunKind, SourceStatus
@@ -73,13 +74,13 @@ def get_pause(session: DbSession) -> Pause:
     summary="Pause the digest",
     responses=problems.responses(HTTPStatus.BAD_REQUEST),
 )
-def set_pause(session: DbSession, new: NewPause) -> Pause:
+def set_pause(session: DbSession, actor: Actor, new: NewPause) -> Pause:
     """E.g. for a holiday; replaces a pause already set. 400 when `until` is not in the future."""
-    pausing.pause(session, new.until, datetime.now(UTC), actor=ACTOR)
+    pausing.pause(session, new.until, datetime.now(UTC), actor=actor)
     return Pause(until=new.until)
 
 
 @router.delete("/pause", summary="Resume the digest", status_code=status.HTTP_204_NO_CONTENT)
-def delete_pause(session: DbSession) -> None:
+def delete_pause(session: DbSession, actor: Actor) -> None:
     """Ends a pause now; nothing happens when the digest was not paused."""
-    pausing.resume(session, datetime.now(UTC), actor=ACTOR)
+    pausing.resume(session, datetime.now(UTC), actor=actor)
