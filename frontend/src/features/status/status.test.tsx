@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { runs, status } from '@/demo/data'
+import { nextDay } from '@/lib/format'
 import { json } from '@/test/fake-api'
 import { renderApp } from '@/test/render'
 import { loggedInApi } from '@/test/setup-screens'
@@ -41,6 +42,8 @@ describe('status', () => {
     renderApp('/status')
 
     const day = await screen.findByLabelText('Pause until')
+    // Today's midnight has passed, so the first day offered is tomorrow.
+    expect(day).toHaveAttribute('min', nextDay())
     await user.type(day, '2026-11-02')
     await user.click(screen.getByRole('button', { name: 'Pause' }))
 

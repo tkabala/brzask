@@ -5,7 +5,7 @@ import type { RunKind, RunOut, StatusOut } from '@/client/types.gen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { formatDay, formatMoment, runCost, seconds } from '@/lib/format'
+import { formatDay, formatMoment, nextDay, runCost, seconds } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const KINDS: RunKind[] = ['digest', 'review', 'visited', 'discovery']
@@ -111,6 +111,8 @@ export function StatusView({
                 id="pause-until"
                 type="date"
                 className="w-fit"
+                // Midnight today has passed, and the server takes only a future moment.
+                min={nextDay()}
                 value={day}
                 onChange={(event) => {
                   setDay(event.target.value)
