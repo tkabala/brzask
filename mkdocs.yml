@@ -36,6 +36,7 @@ nav:
   - Home: index.md
   - Data model: data-model.md
   - HTTP API: api.md
+  - Frontend: frontend.md
   - Measuring changes: measuring.md
   - Decisions:
       - decisions/index.md

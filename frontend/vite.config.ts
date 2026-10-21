@@ -19,6 +19,15 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  server: {
+    // The API in development: `just api` (or `brzask api`) on port 8000.
+    proxy: Object.fromEntries(
+      ['/api', '/open', '/healthz', '/readyz'].map((path) => [
+        path,
+        { target: process.env.BRZASK_API ?? 'http://127.0.0.1:8000' },
+      ]),
+    ),
+  },
   test: {
     environment: 'jsdom',
     globals: true,

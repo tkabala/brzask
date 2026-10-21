@@ -44,9 +44,10 @@ migration message: migrate
 env-example:
     cd backend && uv run python -m brzask.config.env_example > ../.env.example.tmp && mv ../.env.example.tmp ../.env.example
 
-# Regenerate openapi.json from the API
+# Regenerate openapi.json from the API, and the frontend client from it
 openapi:
     cd backend && uv run python -m brzask.api.openapi > ../openapi.json.tmp && mv ../openapi.json.tmp ../openapi.json
+    cd frontend && pnpm generate
 
 # Serve the API on the dev database
 api:

@@ -87,6 +87,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # The committed client must match openapi.json.
+      - name: Check the generated client
+        run: |
+          pnpm generate
+          git diff --exit-code -- src/client || { echo "::error::stale src/client, run 'just openapi'"; exit 1; }
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test:coverage
