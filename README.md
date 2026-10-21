@@ -77,11 +77,11 @@ Every variable, with its default and description, is in [`.env.example`](.env.ex
 
 ## Design decisions
 
-- **Rank, don't score.** Asked for 0–10 scores, the LLM gave exactly 8 to 196 of 294 articles in the daily top 15, so a threshold cannot separate them; ranking the pool and keeping a fixed 7 can. ([ADR 0006](docs/decisions/0006-llm-ranking-stays-the-default-over-composite-scores.md))
-- **Opens are the only signal.** In daily use, explicit ratings were given up within days, twice; opening an article costs nothing and says enough. ([decisions](docs/decisions/index.md))
-- **Deduplication measured per model.** Every real repeat of a shown article had cosine ≥ 0.962 and distinct articles ≤ 0.959, so 0.96 drops repeats across days; same-day duplicates sit at 0.80–0.88, where a threshold that adapts to the day and a judge for the grey zone decide. ([ADR 0007](docs/decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md))
+- **Rank, don't score.** Asked for 0–10 scores, the LLM gave exactly 8 to 196 of 294 articles in the daily top 15, so a threshold cannot separate them; ranking the pool and keeping a fixed 7 can. ([ADR 0010](docs/decisions/0010-rank-candidates-and-show-a-fixed-seven.md))
+- **Opens are the only signal.** In daily use, explicit ratings were given up within days, twice; opening an article costs nothing and says enough. ([ADR 0011](docs/decisions/0011-opens-are-the-only-preference-signal.md))
+- **Deduplication measured per model.** Every real repeat of a shown article had cosine ≥ 0.962 and distinct articles ≤ 0.959, so 0.96 drops repeats across days; same-day duplicates sit at 0.80–0.88, where a threshold that adapts to the day and a judge for the grey zone decide. ([ADR 0012](docs/decisions/0012-embedding-deduplication-across-days-and-within-the-day.md), [ADR 0007](docs/decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md))
 - **The article, not the page.** Trafilatura read 50 of 54 links (93%) at a median 262 ms, as often as a hosted reader at 3.4 s, so it is the default extractor. ([ADR 0002](docs/decisions/0002-trafilatura-as-the-default-page-extractor.md))
-- **Measure, don't guess.** `brzask replay` rebuilds past days with a candidate change and counts how many picks were actually opened. Baseline over 28 days: 19 of 195 shown articles were opened (10%); replayed picks, which can hardly beat that as only shown articles could be opened, got 10 of 193 (5%). Thresholds change only with such evidence. ([measuring](docs/measuring.md))
+- **Measure, don't guess.** `brzask replay` rebuilds past days with a candidate change and counts how many picks were actually opened. Baseline over 28 days: 19 of 195 shown articles were opened (10%); replayed picks, which can hardly beat that as only shown articles could be opened, got 10 of 193 (5%). Thresholds change only with such evidence. ([ADR 0017](docs/decisions/0017-measure-changes-by-replaying-past-days.md), [measuring](docs/measuring.md))
 
 All decisions are recorded in [`docs/decisions`](docs/decisions/index.md).
 

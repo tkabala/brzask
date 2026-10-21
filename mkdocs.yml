@@ -50,6 +50,19 @@ nav:
       - decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md
       - decisions/0008-jev-stays-the-default-judge.md
       - decisions/0009-hand-set-composite-weights-until-opens-can-train-them.md
+      - decisions/0010-rank-candidates-and-show-a-fixed-seven.md
+      - decisions/0011-opens-are-the-only-preference-signal.md
+      - decisions/0012-embedding-deduplication-across-days-and-within-the-day.md
+      - decisions/0013-reader-notes-outrank-keywords.md
+      - decisions/0014-sources-maintain-themselves.md
+      - decisions/0015-release-notes-are-judged-by-what-they-change.md
+      - decisions/0016-the-pool-takes-sources-in-turns.md
+      - decisions/0017-measure-changes-by-replaying-past-days.md
+      - decisions/0018-fastapi-with-a-generated-typed-client.md
+      - decisions/0019-typed-sqlalchemy-and-raw-sql-only-where-needed.md
+      - decisions/0020-one-worker-process-with-a-scheduler-and-no-queue.md
+      - decisions/0021-one-image-for-every-command.md
+      - decisions/0022-one-embedding-model-at-a-time-with-thresholds-per-model.md
       - Template: decisions/0000-template.md
 
 validation:
