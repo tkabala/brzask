@@ -29,6 +29,9 @@ x-brzask: &brzask
       required: false
   environment:
     DB_HOST: db
+    # The image listens on every address at 8000; BRZASK_PUBLISH picks the host side.
+    API_HOST: 0.0.0.0
+    API_PORT: "8000"
     DB_PASSWORD_FILE: /run/secrets/db_password
     AUTH_PASSWORD_HASH_FILE: /run/secrets/auth_password_hash
     AUTH_SESSION_SECRET_FILE: /run/secrets/auth_session_secret
