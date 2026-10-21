@@ -40,9 +40,10 @@ migrate:
 migration message: migrate
     cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run alembic revision --autogenerate -m {{quote(message)}}
 
-# Regenerate .env.example from the settings
+# Regenerate .env.example and the docs' configuration reference from the settings
 env-example:
     cd backend && uv run python -m brzask.config.env_example > ../.env.example.tmp && mv ../.env.example.tmp ../.env.example
+    cd backend && uv run python -m brzask.config.reference > ../docs/configuration.md.tmp && mv ../docs/configuration.md.tmp ../docs/configuration.md
 
 # Regenerate openapi.json from the API, and the frontend client from it
 openapi:

@@ -25,8 +25,10 @@ the files that exist. Then open <http://localhost:8000>.
 ## Configuration
 
 Settings go in a `.env` file next to `compose.yaml`; every variable is
-listed with its default in
-[`.env.example`](https://github.com/tkabala/brzask/blob/main/.env.example).
+described in [Configuration](configuration.md) and listed with its default
+in [`.env.example`](https://github.com/tkabala/brzask/blob/main/.env.example).
+Models and endpoints other than the OpenRouter defaults are covered in
+[Providers](providers.md).
 Set `TZ` (for example `TZ=Europe/Warsaw`) so the daily digest is built in
 your morning. Secrets are read from `./secrets` through `<NAME>_FILE`
 variables; set a secret either as a file there or in `.env`, not both.
@@ -41,8 +43,9 @@ Compose itself reads a few variables from the same `.env`:
 | `COMPOSE_PROFILES` | | Optional services, below |
 
 The web app is published on the loopback address only. To reach it from
-other machines, put a reverse proxy with TLS in front, or set
-`BRZASK_PUBLISH`.
+other machines, put a [reverse proxy](reverse-proxy.md) with TLS in front,
+or set `BRZASK_PUBLISH`. Back up the database with `pg_dump` as described in
+[Backup and restore](backup.md).
 
 ## Optional services
 

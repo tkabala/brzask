@@ -8,7 +8,7 @@ import pytest
 from pydantic import HttpUrl, ValidationError
 from pydantic_settings import SettingsError
 
-from brzask.config import Settings
+from brzask.config import Settings, reference
 from brzask.config.env_example import render
 from brzask.config.settings import (
     GROUPS,
@@ -370,6 +370,22 @@ def test_env_example_lists_every_setting() -> None:
     for group in GROUPS:
         for name in group.model_fields:
             assert f"{env_name(group, name)}=" in rendered
+
+
+def test_configuration_reference_is_up_to_date() -> None:
+    path = Path(__file__).parents[2] / "docs" / "configuration.md"
+
+    assert path.read_text() == reference.render(), (
+        "stale docs/configuration.md: run `just env-example`"
+    )
+
+
+def test_configuration_reference_lists_every_setting() -> None:
+    rendered = reference.render()
+
+    for group in GROUPS:
+        for name in group.model_fields:
+            assert f"| `{env_name(group, name)}` |" in rendered
 
 
 def test_log_level_is_case_insensitive(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/tkabala/brzask/actions/workflows/ci.yml/badge.svg)](https://github.com/tkabala/brzask/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/tkabala/brzask/graph/badge.svg)](https://codecov.io/gh/tkabala/brzask)
+[![Docs](https://img.shields.io/badge/docs-tkabala.github.io%2Fbrzask-blue)](https://tkabala.github.io/brzask/)
 
 **A calm, finite, personal news digest: exactly 7 articles a day, learned from what you open.**
 
@@ -47,7 +48,7 @@ docker compose up -d
 
 `setup` asks for a login password and an LLM API key and writes them, with generated secrets, to `./secrets`. Then open <http://localhost:8000>, add a few feeds under *Sources* and interests under *Interests*; the first digest is built at 07:00. To look around first, `docker compose run --rm migrate seed-demo` fills an empty instance with a month of invented digests.
 
-[Installation](docs/install.md) covers the optional crawler and search services, upgrades and verifying the signed image.
+The [documentation](https://tkabala.github.io/brzask/) covers [installation](https://tkabala.github.io/brzask/install/) with the optional crawler and search services, [providers](https://tkabala.github.io/brzask/providers/) such as Ollama for a fully local setup, a [reverse proxy](https://tkabala.github.io/brzask/reverse-proxy/), [backups](https://tkabala.github.io/brzask/backup/) and verifying the signed image.
 
 ## Configuration
 
@@ -63,10 +64,9 @@ Settings are environment variables, read from a `.env` file next to `compose.yam
 | `EMBEDDING_MODEL` | `google/gemini-embedding-001` | Embedding model; `brzask reembed` switches stored vectors |
 | `EXTRACTORS` | `feed,trafilatura,jina` | How article text is read, tried in order |
 | `WEB_SEARCH` | (off) | Source discovery: `llm-online`, `searxng` or `brave` |
-| `LLM_BUDGET_DAILY_USD` | (none) | Spending limit per day; also `LLM_BUDGET_MONTHLY_USD` |
 | `AUTH_MODE` | `password` | `password`, `header` (behind an auth proxy) or `none` |
 
-Every variable, with its default and description, is in [`.env.example`](.env.example). One OpenRouter key covers ranking, embeddings and the judge; for a fully local setup point the URLs at Ollama.
+Every variable, with its default and description, is in the [configuration reference](https://tkabala.github.io/brzask/configuration/) and in [`.env.example`](.env.example). One OpenRouter key covers ranking, embeddings and the judge; for a fully local setup point the URLs at Ollama.
 
 ## How is this different
 
@@ -96,7 +96,7 @@ just api      # the API on the dev database
 just check    # lint, type-check and test everything
 ```
 
-Conventions are in [`CLAUDE.md`](CLAUDE.md); the [documentation](docs/index.md) covers the data model, API, frontend and measuring changes.
+Conventions are in [`CLAUDE.md`](CLAUDE.md); the [documentation](https://tkabala.github.io/brzask/) covers the [architecture](https://tkabala.github.io/brzask/architecture/), data model, API, frontend and measuring changes.
 
 ## License
 

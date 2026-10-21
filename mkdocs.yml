@@ -1,5 +1,6 @@
 site_name: brzask
 site_description: Self-hosted daily news digest that picks exactly 7 articles worth reading.
+site_url: https://tkabala.github.io/brzask/
 repo_url: https://github.com/tkabala/brzask
 repo_name: tkabala/brzask
 edit_uri: edit/main/docs/
@@ -30,15 +31,27 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
   - Home: index.md
-  - Installation: install.md
-  - Data model: data-model.md
-  - HTTP API: api.md
-  - Frontend: frontend.md
-  - Measuring changes: measuring.md
+  - Running brzask:
+      - Installation: install.md
+      - Configuration: configuration.md
+      - Providers: providers.md
+      - Reverse proxy: reverse-proxy.md
+      - Backup and restore: backup.md
+  - How it works:
+      - Architecture: architecture.md
+      - Data model: data-model.md
+      - Measuring changes: measuring.md
+  - Development:
+      - HTTP API: api.md
+      - Frontend: frontend.md
   - Decisions:
       - decisions/index.md
       - decisions/0001-record-architecture-decisions.md

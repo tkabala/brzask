@@ -10,7 +10,8 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
       - id: check-yaml
-        args: [--allow-multiple-documents]  # pnpm-lock.yaml is multi-document
+        # pnpm-lock.yaml is multi-document; mkdocs.yml names a Python function (!!python/name)
+        args: [--allow-multiple-documents, --unsafe]
       - id: check-toml
       - id: check-json
         exclude: ^frontend/tsconfig.*\.json$  # JSONC

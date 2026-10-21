@@ -21,13 +21,13 @@ HEADER = """\
 """
 
 
-def _format(value: object) -> str:
+def format_value(value: object) -> str:
     if value is None:
         return ""
     if isinstance(value, SecretStr):
         return value.get_secret_value()
     if isinstance(value, list | tuple):
-        return ",".join(_format(item) for item in value)
+        return ",".join(format_value(item) for item in value)
     return str(value)
 
 
@@ -43,9 +43,9 @@ def _render_group(group: type[SettingsGroup]) -> list[str]:
         # Required values and secrets are left uncommented so they are easy to fill in.
         if field.default is PydanticUndefined or is_secret(field):
             example = field.examples[0] if field.examples else ""
-            lines.append(f"{variable}={_format(example)}")
+            lines.append(f"{variable}={format_value(example)}")
         else:
-            lines.append(f"# {variable}={_format(field.default)}")
+            lines.append(f"# {variable}={format_value(field.default)}")
     return lines
 
 
