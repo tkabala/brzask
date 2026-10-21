@@ -10,12 +10,16 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
     permissions:
       contents: write
       pull-requests: write
       issues: write # release-please creates its labels on first run
     steps:
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           # PRs opened with the default GITHUB_TOKEN do not trigger other workflows,
           # so the release PR would get no checks. A token in RELEASE_PLEASE_TOKEN
@@ -23,3 +27,16 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # A merged release PR creates the release; the image follows from its tag.
+  image:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+    uses: ./.github/workflows/image.yml
+    with:
+      version: ${{ needs.release-please.outputs.version }}

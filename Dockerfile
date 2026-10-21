@@ -2,7 +2,8 @@
 # or any other `brzask` command, e.g. `docker run --rm IMAGE status`.
 
 # --- Web app -------------------------------------------------------------------
-FROM node:24-slim AS web
+# Static files, the same for every platform: built natively, not emulated.
+FROM --platform=$BUILDPLATFORM node:24-slim AS web
 
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./

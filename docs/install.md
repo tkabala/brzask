@@ -55,6 +55,22 @@ Both at once: `COMPOSE_PROFILES=crawler,search`. Their secrets come from
 `setup` too. The Crawl4AI image is large (about 8 GB) and wants 2 GB of
 memory.
 
+## Images
+
+Releases are published to `ghcr.io/tkabala/brzask` for amd64 and arm64,
+tagged with the version (`0.1.0`, `0.1`) and `latest`. Pin a version in
+`BRZASK_IMAGE` to upgrade on your own schedule; `docker compose pull && docker
+compose up -d` upgrades, and `migrate` updates the schema on the way.
+
+Each image carries an SBOM and build provenance, and is signed with
+[cosign](https://github.com/sigstore/cosign) by the release workflow:
+
+```sh
+cosign verify ghcr.io/tkabala/brzask:latest \
+  --certificate-identity-regexp '^https://github.com/tkabala/brzask/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 ## Commands
 
 Every `brzask` command runs in the image, for example:
