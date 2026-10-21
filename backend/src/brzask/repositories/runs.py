@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Run, RunKind, RunStatus
@@ -48,6 +48,21 @@ class RunRepository:
         query = select(Run).order_by(Run.started_at.desc()).limit(limit)
         if kind is not None:
             query = query.where(Run.kind == kind)
+        return self.session.scalars(query).all()
+
+    def page(
+        self,
+        limit: int,
+        *,
+        kind: RunKind | None = None,
+        after: tuple[datetime, uuid.UUID] | None = None,
+    ) -> Sequence[Run]:
+        """Up to `limit` runs, newest first, that come after the (started_at, id) key `after`."""
+        query = select(Run).order_by(Run.started_at.desc(), Run.id.desc()).limit(limit)
+        if kind is not None:
+            query = query.where(Run.kind == kind)
+        if after is not None:
+            query = query.where(tuple_(Run.started_at, Run.id) < tuple_(*after))
         return self.session.scalars(query).all()
 
     def latest(self, kind: RunKind) -> Run | None:

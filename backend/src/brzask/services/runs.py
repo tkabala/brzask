@@ -13,7 +13,7 @@ recorded as skipped.
 import time
 import uuid
 import zlib
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -195,3 +195,14 @@ def _with_usage(context: RunContext) -> dict[str, Any]:
     if not context.usage.calls:
         return context.stats
     return {**context.stats, "usage": context.usage.summary()}
+
+
+def list_runs(
+    session: Session,
+    limit: int,
+    *,
+    kind: RunKind | None = None,
+    after: tuple[datetime, uuid.UUID] | None = None,
+) -> Sequence[Run]:
+    """Runs newest first; `after` is the (started_at, id) of the last run already seen."""
+    return RunRepository(session).page(limit, kind=kind, after=after)

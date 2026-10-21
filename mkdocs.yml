@@ -35,6 +35,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Data model: data-model.md
+  - HTTP API: api.md
   - Measuring changes: measuring.md
   - Decisions:
       - decisions/index.md

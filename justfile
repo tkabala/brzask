@@ -44,6 +44,15 @@ migration message: migrate
 env-example:
     cd backend && uv run python -m brzask.config.env_example > ../.env.example.tmp && mv ../.env.example.tmp ../.env.example
 
+# Regenerate openapi.json from the API
+openapi:
+    cd backend && uv run python -m brzask.api.openapi > ../openapi.json.tmp && mv ../openapi.json.tmp ../openapi.json
+
+# Serve the API on the dev database
+api:
+    docker compose up -d --wait db
+    cd backend && DB_PASSWORD="${DB_PASSWORD:-brzask}" uv run brzask api
+
 # Run all tests
 test:
     cd backend && uv run pytest

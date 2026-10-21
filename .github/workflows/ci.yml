@@ -30,9 +30,11 @@ jobs:
             backend:
               - 'backend/**'
               - '.env.example'
+              - 'openapi.json'
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
+              - 'openapi.json'
               - '.github/workflows/ci.yml'
             docs:
               - 'docs/**'

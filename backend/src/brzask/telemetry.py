@@ -1,22 +1,27 @@
 """Traces, metrics and error reports.
 
-Everything is off by default. `OTEL_EXPORTER_OTLP_ENDPOINT` turns on traces and
-metrics over OTLP/HTTP, with spans for outgoing HTTP requests, SQL queries and
-every LLM and embedding call; `SENTRY_DSN` turns on error reports. Without
-them, the OpenTelemetry API calls in the code are no-ops.
+Everything is off by default, except the metrics the API serves on `/metrics`.
+`OTEL_EXPORTER_OTLP_ENDPOINT` turns on traces and metrics over OTLP/HTTP, with
+spans for incoming and outgoing HTTP requests, SQL queries and every LLM and
+embedding call; `SENTRY_DSN` turns on error reports. Without them, the
+OpenTelemetry API calls in the code are no-ops.
 """
 
-from collections.abc import Iterator
+import os
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 
 import sentry_sdk
+from fastapi import FastAPI
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.metrics import MeterProvider as MeterProviderAPI
 from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.export import MetricReader, PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -31,9 +36,20 @@ log = get_logger(__name__)
 
 tracer = trace.get_tracer("brzask")
 
+# HTTP spans and metrics follow the stable semantic conventions (`http.route`,
+# durations in seconds); the instrumentations still default to an older set.
+# Read once, when the first instrumentation is set up.
+os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "http")
 
-def setup_telemetry(settings: TelemetrySettings, *, component: str) -> None:
-    """Configure what the settings turn on; `component` is e.g. "api", "worker" or "cli"."""
+
+def setup_telemetry(
+    settings: TelemetrySettings, *, component: str, metric_readers: Sequence[MetricReader] = ()
+) -> None:
+    """Configure what the settings turn on; `component` is e.g. "api", "worker" or "cli".
+
+    `metric_readers` collect metrics even without an OTLP endpoint (the API's
+    `/metrics`); traces are exported only to the endpoint.
+    """
     if settings.sentry_dsn is not None:
         sentry_sdk.init(
             dsn=settings.sentry_dsn.get_secret_value(),
@@ -45,9 +61,6 @@ def setup_telemetry(settings: TelemetrySettings, *, component: str) -> None:
         sentry_sdk.set_tag("component", component)
         log.info("sentry enabled", environment=settings.sentry_environment)
 
-    if settings.otlp_endpoint is None:
-        return
-    endpoint = str(settings.otlp_endpoint).rstrip("/")
     resource = Resource.create(
         {
             SERVICE_NAME: settings.service_name,
@@ -55,17 +68,36 @@ def setup_telemetry(settings: TelemetrySettings, *, component: str) -> None:
             "brzask.component": component,
         }
     )
+    if settings.otlp_endpoint is None:
+        if metric_readers:
+            metrics.set_meter_provider(
+                MeterProvider(resource=resource, metric_readers=list(metric_readers))
+            )
+        return
+    endpoint = str(settings.otlp_endpoint).rstrip("/")
     tracer_provider = TracerProvider(resource=resource)
     tracer_provider.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces"))
     )
     trace.set_tracer_provider(tracer_provider)
     reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=f"{endpoint}/v1/metrics"))
-    metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
+    metrics.set_meter_provider(
+        MeterProvider(resource=resource, metric_readers=[reader, *metric_readers])
+    )
 
     HTTPX2ClientInstrumentor().instrument()
     instrument_sqlalchemy()
     log.info("telemetry enabled", endpoint=endpoint, service=settings.service_name)
+
+
+def instrument_app(app: FastAPI, meter_provider: MeterProviderAPI | None = None) -> None:
+    """Trace and measure requests to `app`, except probes and metric scrapes.
+
+    Uses the global tracer and meter providers unless `meter_provider` is given.
+    """
+    FastAPIInstrumentor.instrument_app(
+        app, meter_provider=meter_provider, excluded_urls="/healthz,/readyz,/metrics"
+    )
 
 
 def instrument_sqlalchemy() -> None:

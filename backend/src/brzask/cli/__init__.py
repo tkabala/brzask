@@ -4,9 +4,12 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
+import uvicorn
 from pydantic import ValidationError
 
 from brzask import __version__
+from brzask.api.app import create_app
+from brzask.api.metrics import prometheus_reader
 from brzask.cli import common, interests, sources
 from brzask.cli.common import (
     ACTOR,
@@ -75,6 +78,8 @@ def main(
     """Self-hosted daily news digest."""
     settings = get_settings()
     configure_logging(settings.logging.level, settings.logging.format)
+    if context.invoked_subcommand == "api":
+        return  # `api` sets up telemetry with its /metrics reader
     component = "worker" if context.invoked_subcommand == "worker" else "cli"
     setup_telemetry(settings.telemetry, component=component)
 
@@ -83,6 +88,19 @@ def main(
 def migrate() -> None:
     """Create or upgrade the database schema. Safe to run repeatedly."""
     migrations.migrate()
+
+
+@app.command()
+def api(
+    host: Annotated[str, typer.Option(help="Address to listen on.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to listen on.")] = 8000,
+) -> None:
+    """Serve the HTTP API until stopped."""
+    reader, registry = prometheus_reader()
+    setup_telemetry(get_settings().telemetry, component="api", metric_readers=[reader])
+    application = create_app(common.get_sessions(), metrics_registry=registry)
+    # log_config=None keeps the structured logging configured above.
+    uvicorn.run(application, host=host, port=port, log_config=None)
 
 
 @app.command()

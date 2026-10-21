@@ -1,17 +1,21 @@
 """Applying database migrations."""
 
 import logging
+from functools import lru_cache
 
 from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine
+from alembic.script import ScriptDirectory
+from sqlalchemy import Connection, create_engine
 from sqlalchemy.pool import NullPool
 
 from brzask.config import get_settings
 from brzask.log import get_logger
 
 log = get_logger(__name__)
+
+SCRIPT_LOCATION = "brzask:migrations"
 
 
 class _AlembicSetupFilter(logging.Filter):
@@ -32,7 +36,7 @@ def alembic_config(url: str | None = None) -> Config:
     with '%' need no escaping.
     """
     config = Config()
-    config.set_main_option("script_location", "brzask:migrations")
+    config.set_main_option("script_location", SCRIPT_LOCATION)
     config.attributes["url"] = url or get_settings().database.url
     return config
 
@@ -44,6 +48,19 @@ def current_revision(url: str) -> str | None:
             return MigrationContext.configure(connection).get_current_revision()
     finally:
         engine.dispose()
+
+
+def is_current(connection: Connection) -> bool:
+    """Whether the database behind `connection` is at the latest revision."""
+    return MigrationContext.configure(connection).get_current_revision() == head_revision()
+
+
+@lru_cache(maxsize=1)
+def head_revision() -> str | None:
+    """The latest revision among the packaged migrations."""
+    config = Config()
+    config.set_main_option("script_location", SCRIPT_LOCATION)
+    return ScriptDirectory.from_config(config).get_current_head()
 
 
 def migrate(url: str | None = None) -> None:
