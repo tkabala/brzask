@@ -21,6 +21,7 @@ from brzask.config.settings import (
     LoggingSettings,
     Schedule,
     SchedulerSettings,
+    ServerSettings,
     WebSearchSettings,
     env_name,
 )
@@ -153,6 +154,22 @@ def test_embedding_base_url_may_be_empty(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("EMBEDDING_BASE_URL", "")
 
     assert EmbeddingSettings().base_url is None
+
+
+def test_server_serves_the_api_only_on_localhost_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("API_WEB_DIR", "")
+
+    server = ServerSettings()
+
+    assert (server.host, server.port, server.web_dir) == ("127.0.0.1", 8000, None)
+
+
+def test_server_web_dir_is_a_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("API_WEB_DIR", "/app/web")
+
+    assert ServerSettings().web_dir == Path("/app/web")
 
 
 def test_extractors_are_read_as_a_comma_separated_list(monkeypatch: pytest.MonkeyPatch) -> None:

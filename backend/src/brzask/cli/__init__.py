@@ -95,17 +95,28 @@ def migrate() -> None:
 
 @app.command()
 def api(
-    host: Annotated[str, typer.Option(help="Address to listen on.")] = "127.0.0.1",
-    port: Annotated[int, typer.Option(help="Port to listen on.")] = 8000,
+    host: Annotated[
+        str | None, typer.Option(help="Address to listen on. [default: API_HOST]")
+    ] = None,
+    port: Annotated[int | None, typer.Option(help="Port to listen on. [default: API_PORT]")] = None,
 ) -> None:
-    """Serve the HTTP API until stopped."""
+    """Serve the HTTP API, and the web app when API_WEB_DIR is set, until stopped."""
+    settings = get_settings()
     reader, registry = prometheus_reader()
-    setup_telemetry(get_settings().telemetry, component="api", metric_readers=[reader])
-    application = create_app(common.get_sessions(), metrics_registry=registry)
+    setup_telemetry(settings.telemetry, component="api", metric_readers=[reader])
+    application = create_app(
+        common.get_sessions(), metrics_registry=registry, web_dir=settings.server.web_dir
+    )
     # log_config=None keeps the structured logging configured above. Proxy
     # headers stay untouched: the app checks the connection's own address
     # against TRUSTED_PROXIES, which uvicorn would replace with X-Forwarded-For.
-    uvicorn.run(application, host=host, port=port, log_config=None, proxy_headers=False)
+    uvicorn.run(
+        application,
+        host=settings.server.host if host is None else host,
+        port=settings.server.port if port is None else port,
+        log_config=None,
+        proxy_headers=False,
+    )
 
 
 @app.command(name="hash-password")

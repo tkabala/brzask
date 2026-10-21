@@ -4,10 +4,12 @@ The JSON API lives under `/api/v1`; its OpenAPI document (`/api/v1/openapi.json`
 is the contract the frontend client is generated from. `/open` (links that
 record an open), probes (`/healthz`, `/readyz`) and `/metrics` sit at the
 root: the first ends up in feed readers and mail, the others where
-orchestrators and scrapers expect them.
+orchestrators and scrapers expect them. The built web app, when given, takes
+every other path.
 """
 
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -30,6 +32,7 @@ from brzask.api import (
     search,
     sources,
     status,
+    web,
 )
 from brzask.api.auth import Auth, require_user
 from brzask.api.clients import ApiClients
@@ -51,11 +54,13 @@ def create_app(
     meter_provider: MeterProvider | None = None,
     clients: ApiClients | None = None,
     auth_settings: AuthSettings | None = None,
+    web_dir: Path | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
     reach outside services (embeddings, feed lookup) and `auth_settings` say who
-    may use the API; both come from the settings unless given."""
+    may use the API; both come from the settings unless given. `web_dir` is the
+    built web app to serve at `/`; without it only the API is served."""
     app = FastAPI(
         title="brzask",
         version=__version__,
@@ -91,6 +96,9 @@ def create_app(
     app.include_router(opens.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
+    if web_dir is not None:
+        # Last, so every route above wins over a file of the same name.
+        app.mount("/", web.WebApp(web_dir), name="web")
 
     app.openapi = lambda: _openapi(app)  # type: ignore[method-assign]
     instrument_app(app, meter_provider)

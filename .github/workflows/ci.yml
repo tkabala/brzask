@@ -21,6 +21,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       docs: ${{ steps.filter.outputs.docs }}
+      image: ${{ steps.filter.outputs.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -41,6 +42,12 @@ jobs:
               - 'mkdocs.yml'
               - 'backend/pyproject.toml'
               - 'backend/uv.lock'
+              - '.github/workflows/ci.yml'
+            image:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'Dockerfile'
+              - '.dockerignore'
               - '.github/workflows/ci.yml'
 
   backend:
@@ -149,3 +156,20 @@ jobs:
           working-directory: backend
           enable-cache: true
       - run: uv run --project backend --locked --only-group docs mkdocs build --strict
+
+  image:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build --tag brzask:ci .
+      - run: docker run --rm brzask:ci --version
+      # The web app and liveness need no database.
+      - name: Serve the web app
+        run: |
+          docker run --detach --name api --publish 8000:8000 \
+            --env AUTH_MODE=none --env DB_PASSWORD=unused brzask:ci
+          for _ in $(seq 30); do curl --silent --fail localhost:8000/healthz && break; sleep 1; done
+          curl --silent --fail localhost:8000/archive | grep --quiet '<div id="root">'
+          docker rm --force api

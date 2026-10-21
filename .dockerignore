@@ -1,0 +1,14 @@
+# The image is built from frontend/ and backend/ sources only.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/src/
+!frontend/
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/storybook-static/
+frontend/test-results/
+frontend/playwright-report/
+**/__pycache__/
+**/*.tsbuildinfo

@@ -1,7 +1,10 @@
 # HTTP API
 
 `brzask api` serves the JSON API, the probes and the metrics on one port
-(`--host`, `--port`; 127.0.0.1:8000 by default).
+(`API_HOST`, `API_PORT` or `--host`, `--port`; 127.0.0.1:8000 by default).
+With `API_WEB_DIR` set to the built web app (`frontend/dist`) it serves the
+app on the same port; the Docker image does this from `/app/web` and
+listens on 0.0.0.0.
 
 | Path | What it is |
 |---|---|
@@ -12,6 +15,7 @@
 | `/healthz` | Liveness: the process answers |
 | `/readyz` | Readiness: the database answers and is fully migrated |
 | `/metrics` | Prometheus metrics |
+| `/…` | The web app, when `API_WEB_DIR` is set: its files, and `index.html` for every other path outside `/api` |
 
 ## Logging in
 

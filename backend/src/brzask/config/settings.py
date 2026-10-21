@@ -391,6 +391,20 @@ class AuthSettings(SettingsGroup):
         return self
 
 
+class ServerSettings(SettingsGroup):
+    """HTTP server of `brzask api`."""
+
+    model_config = SettingsConfigDict(env_prefix="API_")
+
+    host: str = Field("127.0.0.1", description="Address to listen on; 0.0.0.0 for all.")
+    port: int = Field(8000, ge=1, le=65535, description="Port to listen on.")
+    web_dir: Annotated[Path | None, BeforeValidator(_empty_to_none)] = Field(
+        None,
+        description="Directory of the built web app (frontend/dist) to serve at /; "
+        "empty serves the API only.",
+    )
+
+
 class SchedulerSettings(SettingsGroup):
     """Pipeline schedule for the worker. 'HH:MM' runs daily, '<mon..sun> HH:MM' weekly,
     'off' never."""
@@ -495,6 +509,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     ExtractorSettings,
     WebSearchSettings,
     AuthSettings,
+    ServerSettings,
     SchedulerSettings,
     DigestSettings,
     BudgetSettings,
@@ -536,6 +551,10 @@ class Settings:
     @cached_property
     def auth(self) -> AuthSettings:
         return AuthSettings()
+
+    @cached_property
+    def server(self) -> ServerSettings:
+        return ServerSettings()
 
     @cached_property
     def scheduler(self) -> SchedulerSettings:
