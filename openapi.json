@@ -1165,6 +1165,75 @@
         }
       }
     },
+    "/open": {
+      "get": {
+        "tags": [
+          "articles"
+        ],
+        "summary": "Open an article",
+        "description": "Redirects to the article and records its first open; later opens change nothing.",
+        "operationId": "open_link",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "description": "Article ID.",
+              "title": "Id"
+            },
+            "description": "Article ID."
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the article.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -1255,6 +1324,11 @@
           "link": {
             "type": "string",
             "title": "Link"
+          },
+          "open_url": {
+            "type": "string",
+            "title": "Open Url",
+            "description": "Follow this instead of `link` to record the open (relative to the server)."
           },
           "title": {
             "type": "string",
@@ -1385,6 +1459,7 @@
         "required": [
           "id",
           "link",
+          "open_url",
           "title",
           "original_title",
           "summary",

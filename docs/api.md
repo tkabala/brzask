@@ -8,6 +8,7 @@
 | `/api/v1/…` | The JSON API |
 | `/api/v1/openapi.json` | Its OpenAPI 3.1 document |
 | `/api/v1/docs` | Interactive documentation |
+| `/open?id=` | Redirects to an article and records that it was opened |
 | `/healthz` | Liveness: the process answers |
 | `/readyz` | Readiness: the database answers and is fully migrated |
 | `/metrics` | Prometheus metrics |
@@ -101,6 +102,22 @@ the last one. `limit` sets the page size (1–200, 50 by default). A cursor is
 opaque: it encodes the sort key of the last item, so a page never repeats or
 skips items when new ones arrive meanwhile. A cursor the API did not hand out
 answers 400; start again without one.
+
+## Opening articles
+
+Opening an article is the only preference signal, so every link to an article
+goes through `/open?id=<article>`; each article in the API carries it as
+`open_url`. It answers `302 Found` with the article's address in `Location`
+and records the first open. Following it again, from the digest, a feed reader
+or a bookmark, changes nothing, so the link can be shared and reused.
+
+- It lives outside `/api/v1`, since its URLs end up in feed readers and mail
+  and must keep working when the API changes.
+- `Cache-Control: no-store` keeps browsers from caching the redirect, which
+  would skip recording an open.
+- `HEAD` answers the same redirect without recording it, so link checkers and
+  previews that only look do not count as reading.
+- Only `http` and `https` links are followed; any other link answers 400.
 
 ## Probes and metrics
 

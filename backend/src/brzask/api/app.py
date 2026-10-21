@@ -1,9 +1,10 @@
 """The HTTP application.
 
 The JSON API lives under `/api/v1`; its OpenAPI document (`/api/v1/openapi.json`)
-is the contract the frontend client is generated from. Probes (`/healthz`,
-`/readyz`) and `/metrics` sit at the root, where orchestrators and scrapers
-expect them.
+is the contract the frontend client is generated from. `/open` (links that
+record an open), probes (`/healthz`, `/readyz`) and `/metrics` sit at the
+root: the first ends up in feed readers and mail, the others where
+orchestrators and scrapers expect them.
 """
 
 from http import HTTPStatus
@@ -22,6 +23,7 @@ from brzask.api import (
     health,
     interests,
     metrics,
+    opens,
     problems,
     runs,
     search,
@@ -67,6 +69,7 @@ def create_app(
     for module in (digests, articles, search, sources, interests, runs, status):
         api.include_router(module.router)
     app.include_router(api)
+    app.include_router(opens.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
 
