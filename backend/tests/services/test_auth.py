@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from ipaddress import ip_network
 
 from sqlalchemy.orm import Session
 
@@ -120,3 +121,32 @@ def test_logging_in_clears_expired_sessions(session: Session) -> None:
 def test_non_ascii_tokens_simply_do_not_match() -> None:
     assert not auth.csrf_matches("a" * 32, "session", "\x80é")
     assert not auth.link_signature_matches("a" * 32, 7, "\x80")
+
+
+PROXIES = [ip_network("10.0.0.0/24"), ip_network("fd00::/64")]
+
+
+def test_trusted_peers() -> None:
+    assert auth.is_trusted("10.0.0.5", PROXIES)
+    assert auth.is_trusted("::ffff:10.0.0.5", PROXIES)  # IPv4 on an IPv6 socket
+    assert auth.is_trusted("fd00::1", PROXIES)
+    assert not auth.is_trusted("10.0.1.5", PROXIES)
+    assert not auth.is_trusted("testclient", PROXIES)
+    assert not auth.is_trusted(None, PROXIES)
+    assert not auth.is_trusted("10.0.0.5", [])
+
+
+def test_client_address_behind_trusted_proxies() -> None:
+    # Directly connected: the peer, whatever the header says.
+    assert auth.client_address("203.0.113.9", "1.2.3.4", PROXIES) == "203.0.113.9"
+    # Through a proxy: the last hop that is not a proxy; a forged first entry is ignored.
+    assert auth.client_address("10.0.0.5", "6.6.6.6, 203.0.113.9", PROXIES) == "203.0.113.9"
+    assert auth.client_address("10.0.0.5", "203.0.113.9, 10.0.0.7", PROXIES) == "203.0.113.9"
+    assert auth.client_address("10.0.0.5", None, PROXIES) == "10.0.0.5"
+    assert auth.client_address("10.0.0.5", "10.0.0.7", PROXIES) == "10.0.0.7"
+    assert auth.client_address(None, None, PROXIES) == "unknown"
+
+
+def test_header_csrf_tokens_differ_from_session_ones() -> None:
+    assert auth.header_csrf_token("a" * 32, "alice") != auth.header_csrf_token("a" * 32, "bob")
+    assert auth.header_csrf_token("a" * 32, "alice") != auth.csrf_token("a" * 32, "alice")

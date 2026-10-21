@@ -19,6 +19,9 @@
 
 - **`password`** (the default): one password, its argon2 hash in
   `AUTH_PASSWORD_HASH`. Make the hash with `brzask hash-password`.
+- **`header`**: a reverse proxy that authenticates (Authelia, Authentik,
+  oauth2-proxy, ...) puts the user name in `AUTH_HEADER` (`Remote-User` by
+  default). See [Behind an authenticating proxy](#behind-an-authenticating-proxy).
 - **`none`**: no login at all. Anyone who reaches the port can read and change
   everything, and the server says so in a warning at every start. Use it only
   on a machine nobody else can reach.
@@ -47,6 +50,25 @@ restarts with the server.
 `localhost`. To log in over plain HTTP from another machine, set
 `AUTH_COOKIE_SECURE=false`; better, put the server behind a reverse proxy with
 TLS.
+
+### Behind an authenticating proxy
+
+With `AUTH_MODE=header`, brzask believes the header only when the connection
+itself comes from one of `TRUSTED_PROXIES` (addresses or networks, comma
+separated, e.g. `172.18.0.0/16` for a Docker network). The address is that of
+the connection, not of `X-Forwarded-For`, which any client can send. From
+anywhere else the header is ignored and the API answers 401.
+
+- The proxy must set the header itself and drop any copy a client sends;
+  otherwise anyone who can reach the proxy can claim to be anyone.
+- Keep brzask unreachable except through the proxy, or `TRUSTED_PROXIES` as
+  narrow as the proxy's address.
+- Changing requests still send `X-CSRF-Token`, since the proxy's own login
+  cookie travels with every request; `GET /api/v1/auth/session` returns the
+  token and the user name. Logging out happens at the proxy.
+
+Behind trusted proxies the login throttle and the logs use the client's
+address from `X-Forwarded-For`: the last entry that is not one of the proxies.
 
 Without a login: `/healthz`, `/readyz`, `/metrics`, the OpenAPI document and the
 interactive documentation, and `/open` links carrying their signature (below).

@@ -8,11 +8,11 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
 
 from brzask.api import problems
-from brzask.api.auth import AuthConfig, SessionCookie
+from brzask.api.auth import AuthConfig, SessionCookie, identify
 from brzask.api.deps import NO_NUL, DbSession
 from brzask.api.problems import ProblemError
 from brzask.services import auth
@@ -46,6 +46,7 @@ NO_STORE = {"Cache-Control": "no-store"}
     },
 )
 def open_link(
+    request: Request,
     session: DbSession,
     config: AuthConfig,
     token: SessionCookie,
@@ -56,13 +57,14 @@ def open_link(
 
     Works with the signature from the article's `open_url` or with a session.
     """
-    _check_access(session, config, token, article_id, sig)
+    _check_access(request, session, config, token, article_id, sig)
     link = open_article(session, article_id, datetime.now(UTC))
     return RedirectResponse(link, status_code=HTTPStatus.FOUND, headers=NO_STORE)
 
 
 @router.head("/open", include_in_schema=False)
 def peek_link(
+    request: Request,
     session: DbSession,
     config: AuthConfig,
     token: SessionCookie,
@@ -71,20 +73,25 @@ def peek_link(
 ) -> RedirectResponse:
     """The same redirect without recording, so link checkers and previews that
     only look do not count as reading."""
-    _check_access(session, config, token, article_id, sig)
+    _check_access(request, session, config, token, article_id, sig)
     link = article_link(session, article_id)
     return RedirectResponse(link, status_code=HTTPStatus.FOUND, headers=NO_STORE)
 
 
 def _check_access(
-    session: DbSession, config: AuthConfig, token: str | None, article_id: int, sig: str | None
+    request: Request,
+    session: DbSession,
+    config: AuthConfig,
+    token: str | None,
+    article_id: int,
+    sig: str | None,
 ) -> None:
     """Links are opened from feed readers and mail, which send no session: a
-    valid signature is enough, and a session works without one."""
+    valid signature is enough, and an authenticated request works without one."""
     if config.mode == "none":
         return
     if auth.link_signature_matches(config.signing_secret(), article_id, sig):
         return
-    if token is not None and auth.current_login(session, token, datetime.now(UTC)) is not None:
+    if identify(request, session, config, token) is not None:
         return
     raise ProblemError(HTTPStatus.UNAUTHORIZED, "This link is not signed; log in to open it.")

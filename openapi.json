@@ -2985,6 +2985,18 @@
             "title": "Authenticated",
             "description": "Whether this request may use the API."
           },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User",
+            "description": "The user name the proxy sent (mode header)."
+          },
           "csrf_token": {
             "anyOf": [
               {

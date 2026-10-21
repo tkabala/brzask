@@ -100,8 +100,10 @@ def api(
     reader, registry = prometheus_reader()
     setup_telemetry(get_settings().telemetry, component="api", metric_readers=[reader])
     application = create_app(common.get_sessions(), metrics_registry=registry)
-    # log_config=None keeps the structured logging configured above.
-    uvicorn.run(application, host=host, port=port, log_config=None)
+    # log_config=None keeps the structured logging configured above. Proxy
+    # headers stay untouched: the app checks the connection's own address
+    # against TRUSTED_PROXIES, which uvicorn would replace with X-Forwarded-For.
+    uvicorn.run(application, host=host, port=port, log_config=None, proxy_headers=False)
 
 
 @app.command(name="hash-password")

@@ -1,4 +1,4 @@
-"""Logging in with the password: sessions, CSRF tokens, signed links, throttling.
+"""Logging in: password sessions, trusted proxies, CSRF tokens, signed links, throttling.
 
 A session is a random token in an HttpOnly cookie; only its SHA-256 is stored,
 so a copy of the database cannot be used to log in, and logging out deletes
@@ -6,6 +6,10 @@ it. Requests that change something also send a CSRF token: an HMAC of the
 session token under AUTH_SESSION_SECRET, which a page on another site cannot
 read or compute. Article links carry an HMAC of the article ID, so they work
 from feed readers and mail without a session.
+
+Behind a reverse proxy that authenticates (AUTH_MODE=header), the user name
+comes from a header, believed only when the connection itself comes from one
+of TRUSTED_PROXIES; anyone else could send the same header.
 """
 
 import hashlib
@@ -14,9 +18,10 @@ import secrets
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from ipaddress import IPv4Network, IPv6Network, ip_address
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -65,13 +70,13 @@ def csrf_token(secret: str, session_token: str) -> str:
     return _sign(secret, "csrf", session_token)
 
 
-def _same(expected: str, sent: str | None) -> bool:
+def same_token(expected: str, sent: str | None) -> bool:
     # Compared as bytes: compare_digest refuses strings with non-ASCII characters.
     return sent is not None and hmac.compare_digest(expected.encode(), sent.encode())
 
 
 def csrf_matches(secret: str, session_token: str, sent: str | None) -> bool:
-    return _same(csrf_token(secret, session_token), sent)
+    return same_token(csrf_token(secret, session_token), sent)
 
 
 def link_signature(secret: str, article_id: int) -> str:
@@ -80,7 +85,46 @@ def link_signature(secret: str, article_id: int) -> str:
 
 
 def link_signature_matches(secret: str, article_id: int, sent: str | None) -> bool:
-    return _same(link_signature(secret, article_id), sent)
+    return same_token(link_signature(secret, article_id), sent)
+
+
+def is_trusted(peer: str | None, proxies: Sequence[IPv4Network | IPv6Network]) -> bool:
+    """Whether the address a connection comes from is one of the trusted proxies."""
+    if peer is None:
+        return False
+    try:
+        address = ip_address(peer)
+    except ValueError:  # e.g. a Unix socket, or a test client's name
+        return False
+    # An IPv4 client reaching an IPv6 socket appears as ::ffff:a.b.c.d.
+    if address.version == 6 and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return any(address in network for network in proxies)
+
+
+def client_address(
+    peer: str | None,
+    forwarded_for: str | None,
+    proxies: Sequence[IPv4Network | IPv6Network],
+) -> str:
+    """The client's address: the peer, or behind trusted proxies the last
+    address in X-Forwarded-For that is not one of them.
+
+    Read from the right, as only the proxies' own entries can be believed;
+    a client can put anything at the start.
+    """
+    if not is_trusted(peer, proxies) or not forwarded_for:
+        return peer or "unknown"
+    hops = [hop.strip() for hop in forwarded_for.split(",") if hop.strip()]
+    for hop in reversed(hops):
+        if not is_trusted(hop, proxies):
+            return hop
+    return hops[0] if hops else peer or "unknown"
+
+
+def header_csrf_token(secret: str, user: str) -> str:
+    """The CSRF token of a user authenticated by the proxy, who has no session."""
+    return _sign(secret, "csrf-user", user)
 
 
 @dataclass(frozen=True, slots=True)

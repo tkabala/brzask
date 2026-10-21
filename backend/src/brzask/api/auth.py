@@ -1,8 +1,13 @@
 """Authentication: who may use the API, and logging in and out.
 
-AUTH_MODE=password: a session cookie from `POST /api/v1/auth/login`; requests
-that change something also send its CSRF token in `X-CSRF-Token`.
+AUTH_MODE=password: a session cookie from `POST /api/v1/auth/login`.
+AUTH_MODE=header: the user name in AUTH_HEADER, set by a reverse proxy that
+authenticates; believed only from TRUSTED_PROXIES.
 AUTH_MODE=none: everyone who reaches the server may do everything.
+
+In the first two, requests that change something also send a CSRF token in
+`X-CSRF-Token`: the browser sends the cookies on its own, even for a page on
+another site, but that page cannot learn the token.
 """
 
 from dataclasses import dataclass, field
@@ -76,16 +81,57 @@ AuthConfig = Annotated[Auth, Depends(get_auth)]
 SessionCookie = Annotated[str | None, Depends(session_cookie)]
 
 
+@dataclass(frozen=True, slots=True)
+class Identity:
+    """Who a request comes from."""
+
+    user: str | None  # the proxy's user name; None for a password session or mode none
+    csrf_token: str | None  # None when no CSRF check applies (mode none)
+    expires_at: datetime | None = None  # end of a password session
+
+
+def peer(request: Request) -> str | None:
+    """The address the connection comes from, not what any header claims."""
+    return request.client.host if request.client else None
+
+
+def identify(
+    request: Request, session: DbSession, config: Auth, token: str | None
+) -> Identity | None:
+    """Who sent the request, or None when it is not authenticated."""
+    if config.mode == "none":
+        return Identity(user=None, csrf_token=None)
+    if config.mode == "header":
+        if not auth.is_trusted(peer(request), config.settings.trusted_proxies):
+            return None
+        user = request.headers.get(config.settings.header, "").strip()
+        if not user:
+            return None
+        return Identity(user, auth.header_csrf_token(config.signing_secret(), user))
+    if token is None:
+        return None
+    login = auth.current_login(session, token, datetime.now(UTC))
+    if login is None:
+        return None
+    return Identity(None, auth.csrf_token(config.signing_secret(), token), login.expires_at)
+
+
 def require_user(
     request: Request, session: DbSession, config: AuthConfig, token: SessionCookie
 ) -> None:
-    """Let the request through only for a logged-in user (or when AUTH_MODE=none)."""
-    if config.mode == "none":
-        return
-    if token is None or auth.current_login(session, token, datetime.now(UTC)) is None:
+    """Let the request through only when it is authenticated (always when AUTH_MODE=none)."""
+    identity = identify(request, session, config, token)
+    if identity is None:
+        if config.mode == "header":
+            raise ProblemError(
+                HTTPStatus.UNAUTHORIZED,
+                f"No {config.settings.header} from a trusted proxy; sign in through it.",
+            )
         raise ProblemError(HTTPStatus.UNAUTHORIZED, "Log in first.")
-    if request.method not in SAFE_METHODS and not auth.csrf_matches(
-        config.signing_secret(), token, request.headers.get(CSRF_HEADER)
+    if (
+        identity.csrf_token is not None
+        and request.method not in SAFE_METHODS
+        and not auth.same_token(identity.csrf_token, request.headers.get(CSRF_HEADER))
     ):
         raise ProblemError(
             HTTPStatus.FORBIDDEN, f"Missing or wrong {CSRF_HEADER}; reload and try again."
@@ -104,14 +150,17 @@ class Credentials(BaseModel):
 class SessionOut(BaseModel):
     mode: Literal["password", "header", "none"]
     authenticated: bool = Field(description="Whether this request may use the API.")
+    user: str | None = Field(None, description="The user name the proxy sent (mode header).")
     csrf_token: str | None = Field(
         description=f"Send in {CSRF_HEADER} with requests that change something."
     )
     expires_at: datetime | None = None
 
 
-def _client(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+def _client(request: Request, config: Auth) -> str:
+    return auth.client_address(
+        peer(request), request.headers.get("X-Forwarded-For"), config.settings.trusted_proxies
+    )
 
 
 def _set_cookies(response: Response, config: Auth, token: str, csrf: str) -> None:
@@ -146,7 +195,7 @@ def login(
     """Sets the session cookie. After too many wrong passwords, 429 with Retry-After."""
     if config.mode != "password":
         raise ProblemError(HTTPStatus.BAD_REQUEST, f"AUTH_MODE is {config.mode}: no password.")
-    client = _client(request)
+    client = _client(request, config)
     wait = config.throttle.retry_after(client)
     if wait is not None:
         raise ProblemError(
@@ -185,17 +234,13 @@ def logout(response: Response, session: DbSession, token: SessionCookie) -> None
 def get_session_state(request: Request, session: DbSession, config: AuthConfig) -> SessionOut:
     """Never fails: tells the page whether to show the login screen."""
     # Read directly, not as a security dependency: this route needs no login.
-    token = request.cookies.get(SESSION_COOKIE)
-    if config.mode == "none":
-        return SessionOut(mode="none", authenticated=True, csrf_token=None)
-    if token is None or config.secret is None:
-        return SessionOut(mode=config.mode, authenticated=False, csrf_token=None)
-    login = auth.current_login(session, token, datetime.now(UTC))
-    if login is None:
+    identity = identify(request, session, config, request.cookies.get(SESSION_COOKIE))
+    if identity is None:
         return SessionOut(mode=config.mode, authenticated=False, csrf_token=None)
     return SessionOut(
         mode=config.mode,
         authenticated=True,
-        csrf_token=auth.csrf_token(config.secret, token),
-        expires_at=login.expires_at,
+        user=identity.user,
+        csrf_token=identity.csrf_token,
+        expires_at=identity.expires_at,
     )

@@ -43,6 +43,7 @@ def test_api_needs_a_login(client: TestClient) -> None:
     assert client.get("/api/v1/auth/session").json() == {
         "mode": "password",
         "authenticated": False,
+        "user": None,
         "csrf_token": None,
         "expires_at": None,
     }
@@ -198,3 +199,33 @@ def test_cookie_without_secure_for_plain_http(
 
     assert "secure" not in response.headers["set-cookie"].lower()
     assert client.get("/api/v1/status").status_code == 200
+
+
+def test_lockout_is_per_client_behind_a_trusted_proxy(
+    sessions: sessionmaker[Session], password_auth: AuthSettings
+) -> None:
+    _, registry = prometheus_reader()
+    settings = AuthSettings.model_validate(
+        {**password_auth.model_dump(exclude={"trusted_proxies"}), "TRUSTED_PROXIES": "10.0.0.0/24"}
+    )
+    app = create_app(
+        sessions,
+        metrics_registry=registry,
+        meter_provider=NoOpMeterProvider(),
+        auth_settings=settings,
+    )
+    proxy = TestClient(app, base_url="https://testserver", client=("10.0.0.5", 41000))
+
+    def attempt(client: str, password: str) -> int:
+        response = proxy.post(
+            "/api/v1/auth/login",
+            json={"password": password},
+            headers={"X-Forwarded-For": client},
+        )
+        return response.status_code
+
+    for _ in range(FAILURES_PER_CLIENT):
+        attempt("198.51.100.1", "guess")
+
+    assert attempt("198.51.100.1", PASSWORD) == 429
+    assert attempt("198.51.100.2", PASSWORD) == 200
