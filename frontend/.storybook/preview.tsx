@@ -8,11 +8,24 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
+import { mswLoader } from 'msw-storybook-addon/csf3'
 import { I18nextProvider } from 'react-i18next'
 
+import { handlers, resetDemo } from '../src/demo/handlers'
 import { initI18n, LANGUAGES } from '../src/i18n'
+import { configureApi } from '../src/lib/api'
+
+configureApi()
 
 const preview: Preview = {
+  loaders: [mswLoader()],
+  parameters: {
+    // Every story can reach the demo API; a story may override single handlers.
+    msw: { handlers: { api: handlers } },
+  },
+  beforeEach: () => {
+    resetDemo()
+  },
   globalTypes: {
     locale: {
       description: 'Language',
@@ -26,6 +39,8 @@ const preview: Preview = {
   decorators: [
     (Story, context) => {
       const i18n = initI18n(context.globals.locale as 'en' | 'pl')
+      // Pages render the whole app, with its own router and query client.
+      if (context.parameters.app === true) return <Story />
       // Views take their data as props; a client only backs components that
       // run their own mutations, which stories never trigger.
       const queryClient = new QueryClient()

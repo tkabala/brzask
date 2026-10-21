@@ -27,10 +27,11 @@ function SourcesPage() {
   const queryClient = useQueryClient()
   const [busyId, setBusyId] = useState<number | null>(null)
 
-  const status: SourceStatus[] | undefined = show === 'all' ? undefined : [show]
+  // Pending sources have their own list above, so "all" leaves them out.
+  const status: SourceStatus[] = show === 'all' ? FILTERS.filter((f) => f !== 'all') : [show]
   const pending = useQuery(listSourcesOptions({ query: { status: ['pending'], limit: 200 } }))
   const sources = useInfiniteQuery({
-    ...listSourcesInfiniteOptions(status ? { query: { status } } : {}),
+    ...listSourcesInfiniteOptions({ query: { status } }),
     initialPageParam: FIRST_PAGE,
     getNextPageParam: nextCursor,
   })

@@ -1,6 +1,9 @@
-import { vi } from 'vitest'
+import { http, type HttpResponseResolver } from 'msw'
 
-import type { DigestOut, Problem, SessionOut } from '@/client/types.gen'
+import type { DigestOut, SessionOut } from '@/client/types.gen'
+import { problem as problemResponse } from '@/demo/handlers'
+
+import { server } from './server'
 
 type Handler = (request: Request) => Response | Promise<Response>
 
@@ -12,8 +15,7 @@ export function json(body: unknown, status = 200, headers: Record<string, string
 }
 
 export function problem(status: number, title: string, detail?: string, headers = {}): Response {
-  const body: Problem = { type: 'about:blank', title, status, ...(detail ? { detail } : {}) }
-  return json(body, status, { 'Content-Type': 'application/problem+json', ...headers })
+  return problemResponse(status, title, detail, headers)
 }
 
 export const loggedOut: SessionOut = {
@@ -33,6 +35,14 @@ export const loggedIn: SessionOut = {
 
 export const emptyDigest: DigestOut = { date: '2026-10-21', articles: [] }
 
+const METHODS = {
+  GET: http.get,
+  POST: http.post,
+  PUT: http.put,
+  PATCH: http.patch,
+  DELETE: http.delete,
+}
+
 function matches(pattern: string, key: string): boolean {
   const want = pattern.split('/')
   const have = key.split('/')
@@ -41,19 +51,21 @@ function matches(pattern: string, key: string): boolean {
   )
 }
 
-/** A fake API on `fetch`: handlers by "METHOD /path", where `:name` matches any
- * one segment and an exact path wins; records every request. */
+/**
+ * Overrides of the demo API for one test, by "METHOD /path" (`:name` matches
+ * a segment); the rest is answered by the demo handlers. Records every request.
+ */
 export function fakeApi(handlers: Record<string, Handler>) {
   const requests: Request[] = []
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = new Request(input, init)
-      requests.push(request.clone())
-      const key = `${request.method} ${new URL(request.url).pathname}`
-      const handler =
-        handlers[key] ?? Object.entries(handlers).find(([pattern]) => matches(pattern, key))?.[1]
-      return handler ? handler(request) : problem(404, 'Not Found', `no fake for ${key}`)
+  server.events.removeAllListeners('request:start')
+  server.events.on('request:start', ({ request }) => {
+    requests.push(request.clone())
+  })
+  server.use(
+    ...Object.entries(handlers).map(([key, handle]) => {
+      const [method, path] = key.split(' ') as [keyof typeof METHODS, string]
+      const resolver: HttpResponseResolver = ({ request }) => handle(request)
+      return METHODS[method](`*${path}`, resolver)
     }),
   )
   return {

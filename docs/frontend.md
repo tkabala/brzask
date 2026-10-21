@@ -35,10 +35,23 @@ marks the card opened at once in the cached digest, while the server records
 the open as the browser passes through `/open`.
 
 Each screen is a route that fetches and changes data (`src/routes/`) and a view
-that only takes props (`src/features/<screen>/`). Views have Storybook stories
-(`pnpm storybook`, `pnpm build-storybook`) on the demo data in
-`src/demo/data.ts`. Tests render whole routes against a fake API on `fetch`
-(`src/test/fake-api.ts`).
+that only takes props (`src/features/<screen>/`).
+
+## Demo API, stories and tests
+
+`src/demo/handlers.ts` is the API on demo data (`src/demo/data.ts`), written by
+hand with [MSW](https://mswjs.io/): the same paths, cursor pages and problem
+details as the server, a session (the password is `demo`), and changes that
+last until the next story or test. Storybook and the tests share it.
+
+- **Storybook** (`pnpm storybook`; CI runs `pnpm build-storybook`): each view
+  has stories with props, and *Pages* renders the whole app at every route
+  against the demo API in the browser. A story replaces single endpoints with
+  `parameters: withApi(http.get(...))`. The service worker is in
+  `.storybook/public`, so the app never ships it.
+- **Tests** (`pnpm test`): `msw/node` answers every request the app makes; a
+  request no handler answers fails the test. `fakeApi({...})` overrides
+  endpoints for one test and records what was sent.
 
 ## The API client
 

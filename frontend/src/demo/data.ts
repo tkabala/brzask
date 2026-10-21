@@ -116,7 +116,7 @@ function source(id: number, fields: Partial<SourceOut>): SourceOut {
   }
 }
 
-const phoronix = source(1, { name: 'Phoronix' })
+export const phoronix = source(1, { name: 'Phoronix' })
 
 export const sources: SourceOut[] = [
   phoronix,
