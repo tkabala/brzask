@@ -285,6 +285,10 @@ class ExtractorSettings(SettingsGroup):
     crawl4ai_base_url: Annotated[HttpUrl | None, BeforeValidator(_empty_to_none)] = Field(
         None, description="Crawl4AI server URL; required when crawl4ai is enabled."
     )
+    crawl4ai_api_token: OptionalSecret = Field(
+        None,
+        description="Crawl4AI API token; its server accepts outside connections only with one.",
+    )
 
     @model_validator(mode="after")
     def _check_extractors(self) -> Self:

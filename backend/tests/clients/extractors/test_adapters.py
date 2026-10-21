@@ -207,6 +207,15 @@ def test_crawl4ai_markdown_endpoint() -> None:
     assert extracted.text == "Body"
     assert str(server.requests[0].url) == "http://crawl4ai:11235/md"
     assert server.body() == {"url": URL, "f": "fit"}
+    assert "Authorization" not in server.requests[0].headers
+
+
+def test_crawl4ai_sends_its_api_token() -> None:
+    server = Server(httpx2.Response(200, json={"markdown": "Body", "success": True}))
+
+    Crawl4AIExtractor(server.client, "http://crawl4ai:11235", "token").extract(ExtractionInput(URL))
+
+    assert server.requests[0].headers["Authorization"] == "Bearer token"
 
 
 def test_crawl4ai_failure() -> None:

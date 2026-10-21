@@ -57,6 +57,9 @@ def build_chain(settings: ExtractorSettings, client: httpx2.Client | None = None
     firecrawl_key = (
         settings.firecrawl_api_key.get_secret_value() if settings.firecrawl_api_key else None
     )
+    crawl4ai_token = (
+        settings.crawl4ai_api_token.get_secret_value() if settings.crawl4ai_api_token else None
+    )
     extractors: list[Extractor] = []
     for name in settings.extractors:
         match name:
@@ -72,5 +75,7 @@ def build_chain(settings: ExtractorSettings, client: httpx2.Client | None = None
                 )
             case "crawl4ai":
                 assert settings.crawl4ai_base_url is not None  # noqa: S101  (settings validate it)
-                extractors.append(Crawl4AIExtractor(client, str(settings.crawl4ai_base_url)))
+                extractors.append(
+                    Crawl4AIExtractor(client, str(settings.crawl4ai_base_url), crawl4ai_token)
+                )
     return ExtractorChain(extractors, RobotsPolicy(client))

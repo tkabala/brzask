@@ -145,12 +145,15 @@ class Crawl4AIExtractor:
     name = "crawl4ai"
     fetches_page = True
 
-    def __init__(self, client: httpx2.Client, base_url: str) -> None:
+    def __init__(self, client: httpx2.Client, base_url: str, api_token: str | None = None) -> None:
         self.client = client
         self.url = base_url.rstrip("/") + "/md"
+        self.api_token = api_token
 
     def extract(self, item: ExtractionInput) -> Extracted | None:
-        response = _json(self.client, "POST", self.url, json={"url": item.url, "f": "fit"})
+        headers = {"Authorization": f"Bearer {self.api_token}"} if self.api_token else {}
+        body = {"url": item.url, "f": "fit"}
+        response = _json(self.client, "POST", self.url, headers=headers, json=body)
         markdown = response.get("markdown")
         if response.get("success") is False or not isinstance(markdown, str) or not markdown:
             return None
