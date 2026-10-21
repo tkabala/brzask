@@ -6,6 +6,7 @@ media type `application/problem+json` and the same shape: `type`, `title`,
 `errors`, one per invalid field. Clients show `detail` (or `title`) as it is.
 """
 
+import re
 from collections.abc import Mapping
 from http import HTTPStatus
 from typing import Any
@@ -16,6 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
 
+from brzask.clients.retry import APIError
 from brzask.log import get_logger
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 
@@ -88,6 +90,20 @@ def responses(*statuses: HTTPStatus) -> dict[int | str, dict[str, Any]]:
     }
 
 
+def allowed_methods(app: FastAPI, path: str) -> list[str]:
+    """Methods the OpenAPI document lists for `path`.
+
+    FastAPI makes one route per method, and Starlette's own `Allow` names only
+    the methods of the first route that matches the path.
+    """
+    methods: set[str] = set()
+    for template, operations in app.openapi().get("paths", {}).items():
+        pattern = re.sub(r"\\\{[^/]+?\\\}", "[^/]+", re.escape(template))
+        if re.fullmatch(pattern, path):
+            methods.update(method.upper() for method in operations)
+    return sorted(methods)
+
+
 def install(app: FastAPI) -> None:
     """Answer every error of `app` with a problem."""
 
@@ -95,7 +111,12 @@ def install(app: FastAPI) -> None:
     async def http_error(request: Request, error: HTTPException) -> JSONResponse:
         status = HTTPStatus(error.status_code)
         detail = error.detail if error.detail != status.phrase else None
-        return problem_response(request, status, detail, headers=error.headers)
+        headers = {name.lower(): value for name, value in (error.headers or {}).items()}
+        if status is HTTPStatus.METHOD_NOT_ALLOWED and (
+            methods := allowed_methods(app, request.url.path)
+        ):
+            headers["allow"] = ", ".join(methods)
+        return problem_response(request, status, detail, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, error: RequestValidationError) -> JSONResponse:
@@ -123,6 +144,12 @@ def install(app: FastAPI) -> None:
         else:
             status = HTTPStatus.BAD_REQUEST
         return problem_response(request, status, str(error))
+
+    @app.exception_handler(APIError)
+    async def upstream_error(request: Request, error: APIError) -> JSONResponse:
+        # An LLM, embedding or other API failed after its retries.
+        log.warning("upstream API failed", path=request.url.path, error=str(error))
+        return problem_response(request, HTTPStatus.BAD_GATEWAY, str(error))
 
     @app.exception_handler(Exception)
     async def unexpected(request: Request, error: Exception) -> JSONResponse:

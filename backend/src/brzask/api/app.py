@@ -16,7 +16,19 @@ from prometheus_client import CollectorRegistry
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask import __version__
-from brzask.api import health, metrics, problems, runs
+from brzask.api import (
+    articles,
+    digests,
+    health,
+    interests,
+    metrics,
+    problems,
+    runs,
+    search,
+    sources,
+    status,
+)
+from brzask.api.clients import ApiClients
 from brzask.telemetry import instrument_app
 
 API_PREFIX = "/api/v1"
@@ -28,9 +40,12 @@ def create_app(
     *,
     metrics_registry: CollectorRegistry,
     meter_provider: MeterProvider | None = None,
+    clients: ApiClients | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
-    global one unless given) must feed it through a Prometheus reader."""
+    global one unless given) must feed it through a Prometheus reader; `clients`
+    reach outside services (embeddings, feed lookup), built from the settings
+    unless given."""
     app = FastAPI(
         title="brzask",
         version=__version__,
@@ -38,13 +53,19 @@ def create_app(
         openapi_url=OPENAPI_URL,
         docs_url=f"{API_PREFIX}/docs",
         redoc_url=None,
+        swagger_ui_oauth2_redirect_url=None,
+        # Operation IDs are the route function names, e.g. list_sources, so the
+        # generated client reads naturally.
+        generate_unique_id_function=lambda route: route.name,
     )
     app.state.sessions = sessions
     app.state.metrics_registry = metrics_registry
+    app.state.clients = clients or ApiClients()
     problems.install(app)
 
     api = APIRouter(prefix=API_PREFIX)
-    api.include_router(runs.router)
+    for module in (digests, articles, search, sources, interests, runs, status):
+        api.include_router(module.router)
     app.include_router(api)
     app.include_router(health.router)
     app.include_router(metrics.router)

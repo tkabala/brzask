@@ -15,8 +15,10 @@ from brzask.api.openapi import render
 CONFIG = """
 [[operations]]
 include-path-regex = "^/api/v1/"
-# A cursor is any string to the schema; only the ones the API handed out are valid.
-checks.positive_data_acceptance.expected-statuses = ["2xx", "400"]
+# Beside the defaults (2xx, 404 for an unknown ID, 409 for a duplicate): 400, as
+# a cursor is any string to the schema but only the ones the API handed out are
+# valid, and services reject values a schema cannot describe (a blank topic).
+checks.positive_data_acceptance.expected-statuses = ["2xx", "400", "404", "409"]
 """
 
 

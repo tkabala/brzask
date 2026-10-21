@@ -82,3 +82,12 @@ def test_limit_out_of_range_is_a_validation_problem(client: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["errors"][0]["location"] == ["query", "limit"]
+
+
+def test_get_run(client: TestClient, session: Session) -> None:
+    [run_id] = add_runs(session, 1)
+
+    body = client.get(f"/api/v1/runs/{run_id}").json()
+
+    assert (body["id"], body["status"]) == (str(run_id), "ok")
+    assert client.get(f"/api/v1/runs/{uuid.uuid4()}").status_code == 404

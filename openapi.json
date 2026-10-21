@@ -6,6 +6,909 @@
     "version": "0.0.0"
   },
   "paths": {
+    "/api/v1/digests": {
+      "get": {
+        "tags": [
+          "digests"
+        ],
+        "summary": "List days with a digest",
+        "description": "Newest first, with how many articles each day had and how many were opened.",
+        "operationId": "list_digests",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Items per page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Items per page."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` of the previous page; leave out for the first page.",
+              "title": "Cursor"
+            },
+            "description": "`next_cursor` of the previous page; leave out for the first page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DigestDayOut_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/digests/today": {
+      "get": {
+        "tags": [
+          "digests"
+        ],
+        "summary": "Today's digest",
+        "description": "Today in the configured time zone (TZ); empty until the digest has run.",
+        "operationId": "get_today_digest",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/digests/{day}": {
+      "get": {
+        "tags": [
+          "digests"
+        ],
+        "summary": "A day's digest",
+        "description": "Empty when that day had no digest.",
+        "operationId": "get_digest",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "YYYY-MM-DD.",
+              "title": "Day"
+            },
+            "description": "YYYY-MM-DD."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/articles/{article_id}": {
+      "get": {
+        "tags": [
+          "articles"
+        ],
+        "summary": "Get an article",
+        "operationId": "get_article",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/articles/{article_id}/ranking": {
+      "get": {
+        "tags": [
+          "articles"
+        ],
+        "summary": "Why an article was ranked where it was",
+        "operationId": "get_article_ranking",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankingOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search articles by meaning",
+        "description": "Articles whose text is closest in meaning to `q`, read or not, shown or not.\n\nNot paginated: results are the nearest `limit`, and further ones are rarely\nworth reading.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "pattern": "^[^\\x00]*$",
+              "description": "What to look for.",
+              "title": "Q"
+            },
+            "description": "What to look for."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "How many results.",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "How many results."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "List sources",
+        "description": "By name, with fetch health and what each published in the last 30 days.",
+        "operationId": "list_sources",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceStatus"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sources with one of these statuses, e.g. pending ones.",
+              "title": "Status"
+            },
+            "description": "Only sources with one of these statuses, e.g. pending ones."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Items per page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Items per page."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` of the previous page; leave out for the first page.",
+              "title": "Cursor"
+            },
+            "description": "`next_cursor` of the previous page; leave out for the first page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SourceOut_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Add a source",
+        "description": "Looks up the feed of the page, then reads it from the next digest on.\n\n404 when the page has no RSS or Atom feed, 409 when it is already a source\n(whatever its status: enable a muted or rejected one instead).",
+        "operationId": "add_source",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSource"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Get a source",
+        "operationId": "get_source",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Rename a source or change its status",
+        "description": "Sources are never deleted: a muted or rejected one keeps its history and\nis not proposed again.",
+        "operationId": "change_source",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interests": {
+      "get": {
+        "tags": [
+          "interests"
+        ],
+        "summary": "List interests",
+        "description": "In the order they were added, as prompts list them. Not paginated: a reader has a handful.",
+        "operationId": "list_interests",
+        "parameters": [
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Leave out inactive interests.",
+              "default": false,
+              "title": "Active Only"
+            },
+            "description": "Leave out inactive interests."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InterestOut"
+                  },
+                  "title": "Response List Interests"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interests"
+        ],
+        "summary": "Add an interest",
+        "operationId": "add_interest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewInterest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interests/{interest_id}": {
+      "get": {
+        "tags": [
+          "interests"
+        ],
+        "summary": "Get an interest",
+        "operationId": "get_interest",
+        "parameters": [
+          {
+            "name": "interest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Interest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "interests"
+        ],
+        "summary": "Change an interest or its notes",
+        "description": "Interests are not deleted; an inactive one keeps its history.",
+        "operationId": "change_interest",
+        "parameters": [
+          {
+            "name": "interest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Interest Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterestChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runs": {
       "get": {
         "tags": [
@@ -13,7 +916,7 @@
         ],
         "summary": "List pipeline runs",
         "description": "Runs newest first, including ones still running.",
-        "operationId": "get_runs_api_v1_runs_get",
+        "operationId": "list_runs",
         "parameters": [
           {
             "name": "kind",
@@ -101,6 +1004,167 @@
         }
       }
     },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get a run",
+        "description": "With its stats (counts, costs) and stage timings.",
+        "operationId": "get_run",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Counts, the pause and the last runs",
+        "operationId": "read_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pause": {
+      "get": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Whether the digest is paused",
+        "operationId": "get_pause",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pause"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Pause the digest",
+        "description": "E.g. for a holiday; replaces a pause already set. 400 when `until` is not in the future.",
+        "operationId": "set_pause",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPause"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pause"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "status"
+        ],
+        "summary": "Resume the digest",
+        "description": "Ends a pause now; nothing happens when the digest was not paused.",
+        "operationId": "delete_pause",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -108,7 +1172,7 @@
         ],
         "summary": "The process is up",
         "description": "Answers as long as the process serves requests; touches nothing else.",
-        "operationId": "healthz_healthz_get",
+        "operationId": "healthz",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -130,7 +1194,7 @@
         ],
         "summary": "The process can serve the API",
         "description": "The database answers and its schema is at the latest migration.",
-        "operationId": "readyz_readyz_get",
+        "operationId": "readyz",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -159,6 +1223,239 @@
   },
   "components": {
     "schemas": {
+      "ArticleCountsOut": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "shown": {
+            "type": "integer",
+            "title": "Shown"
+          },
+          "opened": {
+            "type": "integer",
+            "title": "Opened"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "shown",
+          "opened"
+        ],
+        "title": "ArticleCountsOut"
+      },
+      "ArticleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "link": {
+            "type": "string",
+            "title": "Link"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "In the digest language when the article was in a digest."
+          },
+          "original_title": {
+            "type": "string",
+            "title": "Original Title",
+            "description": "As the feed published it."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic",
+            "description": "The interest it was picked for."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the source was removed."
+          },
+          "state": {
+            "$ref": "#/components/schemas/ArticleState"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "first_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen At"
+          },
+          "digest_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digest Date"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "description": "1-based place in its digest."
+          },
+          "shown_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shown At"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At",
+            "description": "First open."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "link",
+          "title",
+          "original_title",
+          "summary",
+          "why_it_matters",
+          "topic",
+          "source",
+          "state",
+          "published_at",
+          "first_seen_at",
+          "digest_date",
+          "position",
+          "shown_at",
+          "opened_at"
+        ],
+        "title": "ArticleOut"
+      },
+      "ArticleState": {
+        "type": "string",
+        "enum": [
+          "seen",
+          "shown"
+        ],
+        "title": "ArticleState"
+      },
+      "DigestDayOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "articles": {
+            "type": "integer",
+            "title": "Articles"
+          },
+          "opened": {
+            "type": "integer",
+            "title": "Opened"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "articles",
+          "opened"
+        ],
+        "title": "DigestDayOut"
+      },
+      "DigestOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "articles": {
+            "items": {
+              "$ref": "#/components/schemas/ArticleOut"
+            },
+            "type": "array",
+            "title": "Articles",
+            "description": "In digest order; empty when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "articles"
+        ],
+        "title": "DigestOut"
+      },
       "FieldError": {
         "properties": {
           "location": {
@@ -206,6 +1503,230 @@
         "type": "object",
         "title": "Health"
       },
+      "InterestChange": {
+        "properties": {
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[^\\x00]*$"
+                },
+                "type": "array",
+                "maxItems": 100,
+                "description": "Can only widen the topic."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000,
+                "pattern": "^[^\\x00]*$",
+                "description": "Free text, e.g. 'want: ..., skip: ...'; takes priority over keywords."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active",
+            "description": "Inactive interests are left out of prompts."
+          }
+        },
+        "type": "object",
+        "title": "InterestChange",
+        "description": "Fields to change; the ones left out (or null) stay as they are."
+      },
+      "InterestOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "topic",
+          "keywords",
+          "notes",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "InterestOut"
+      },
+      "NewInterest": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Topic"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^[^\\x00]*$"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Keywords",
+            "description": "Can only widen the topic.",
+            "default": []
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 10000,
+            "pattern": "^[^\\x00]*$",
+            "title": "Notes",
+            "description": "Free text, e.g. 'want: ..., skip: ...'; takes priority over keywords.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic"
+        ],
+        "title": "NewInterest"
+      },
+      "NewPause": {
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until",
+            "description": "When the digest resumes; with a time zone."
+          }
+        },
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "title": "NewPause"
+      },
+      "NewSource": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Url",
+            "description": "The feed, or any page of the site: its feed is looked up."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^\\x00]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name; defaults to the feed's title."
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "NewSource"
+      },
+      "Page_DigestDayOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DigestDayOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Page[DigestDayOut]"
+      },
       "Page_RunOut_": {
         "properties": {
           "items": {
@@ -234,6 +1755,57 @@
           "next_cursor"
         ],
         "title": "Page[RunOut]"
+      },
+      "Page_SourceOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SourceOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Page[SourceOut]"
+      },
+      "Pause": {
+        "properties": {
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until",
+            "description": "No digest is built before this; null: not paused."
+          }
+        },
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "title": "Pause"
       },
       "Problem": {
         "properties": {
@@ -303,6 +1875,162 @@
         ],
         "title": "Problem",
         "type": "object"
+      },
+      "RankingOut": {
+        "properties": {
+          "article_id": {
+            "type": "integer",
+            "title": "Article Id"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "description": "Place in its digest, chosen by the selection."
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic",
+            "description": "The interest the selection picked it for."
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters",
+            "description": "The selection's reason, for the reader."
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank",
+            "description": "Place in the ranking of the whole pool; null when it was not near the top."
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "Candidates the digest run considered."
+          },
+          "ranked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranked",
+            "description": "Candidates the ranking put in order."
+          },
+          "top": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top",
+            "description": "Best ranked candidates kept for the next stages."
+          },
+          "ranking_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking Method",
+            "description": "llm, judge, or a fallback."
+          },
+          "deduplicated_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deduplicated To",
+            "description": "Top candidates left after deduplication."
+          },
+          "deduplication_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deduplication Method"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id",
+            "description": "The digest run that showed it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "article_id",
+          "position",
+          "topic",
+          "why_it_matters",
+          "rank",
+          "pool",
+          "ranked",
+          "top",
+          "ranking_method",
+          "deduplicated_to",
+          "deduplication_method",
+          "run_id"
+        ],
+        "title": "RankingOut",
+        "description": "How the article reached its place; counts are null when the run did not record them."
       },
       "RunKind": {
         "type": "string",
@@ -393,6 +2121,433 @@
           "failed"
         ],
         "title": "RunStatus"
+      },
+      "SearchHit": {
+        "properties": {
+          "article": {
+            "$ref": "#/components/schemas/ArticleOut"
+          },
+          "similarity": {
+            "type": "number",
+            "title": "Similarity",
+            "description": "Cosine similarity to the query, at most 1."
+          }
+        },
+        "type": "object",
+        "required": [
+          "article",
+          "similarity"
+        ],
+        "title": "SearchHit"
+      },
+      "SearchResults": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Embedding model of the query and the articles."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Most similar first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "items"
+        ],
+        "title": "SearchResults"
+      },
+      "SourceActivity": {
+        "properties": {
+          "articles": {
+            "type": "integer",
+            "title": "Articles"
+          },
+          "ranked": {
+            "type": "integer",
+            "title": "Ranked",
+            "description": "Near the top of a day's ranking."
+          },
+          "shown": {
+            "type": "integer",
+            "title": "Shown",
+            "description": "In a digest."
+          },
+          "opened": {
+            "type": "integer",
+            "title": "Opened"
+          }
+        },
+        "type": "object",
+        "required": [
+          "articles",
+          "ranked",
+          "shown",
+          "opened"
+        ],
+        "title": "SourceActivity",
+        "description": "Articles first seen in the last 30 days."
+      },
+      "SourceChange": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "muted",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "active reads it (also approves a pending one), muted stops reading it, rejected declines a pending one so it is not proposed again."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "pattern": "^[^\\x00]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why, kept in the change log with a new status."
+          }
+        },
+        "type": "object",
+        "title": "SourceChange",
+        "description": "Fields to change; the ones left out (or null) stay as they are."
+      },
+      "SourceHealth": {
+        "properties": {
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At",
+            "description": "Last successful fetch."
+          },
+          "failing_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failing Since",
+            "description": "Start of the current failures."
+          },
+          "permanent_failing_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permanent Failing Since",
+            "description": "Start of the current permanent errors (404, 410, 403, not a feed)."
+          },
+          "failed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed At",
+            "description": "Last failed fetch."
+          },
+          "fetch_failures": {
+            "type": "integer",
+            "title": "Fetch Failures",
+            "description": "Failed fetches in a row."
+          },
+          "fetch_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetch Error",
+            "description": "Error of the last failed fetch."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fetched_at",
+          "failing_since",
+          "permanent_failing_since",
+          "failed_at",
+          "fetch_failures",
+          "fetch_error"
+        ],
+        "title": "SourceHealth",
+        "description": "How fetching the feed goes; the source review marks a long-failing source dead."
+      },
+      "SourceKind": {
+        "type": "string",
+        "enum": [
+          "feed",
+          "release"
+        ],
+        "title": "SourceKind"
+      },
+      "SourceOrigin": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "discovery",
+          "visited",
+          "opml"
+        ],
+        "title": "SourceOrigin"
+      },
+      "SourceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Feed URL."
+          },
+          "site_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Url"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SourceStatus"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/SourceOrigin"
+          },
+          "origin_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Detail",
+            "description": "What proposed it, e.g. a search adapter."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why it has its status, e.g. a judge's verdict."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "health": {
+            "$ref": "#/components/schemas/SourceHealth"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/SourceActivity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url",
+          "site_url",
+          "kind",
+          "status",
+          "origin",
+          "origin_detail",
+          "note",
+          "created_at",
+          "health",
+          "activity"
+        ],
+        "title": "SourceOut"
+      },
+      "SourceRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SourceRef"
+      },
+      "SourceStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "pending",
+          "rejected",
+          "muted",
+          "dead"
+        ],
+        "title": "SourceStatus"
+      },
+      "StatusOut": {
+        "properties": {
+          "articles": {
+            "$ref": "#/components/schemas/ArticleCountsOut"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/SourceStatus"
+            },
+            "type": "object",
+            "title": "Sources",
+            "description": "Every status, zero included."
+          },
+          "last_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Digest"
+          },
+          "paused_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Until"
+          },
+          "last_runs": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RunOut"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/RunKind"
+            },
+            "type": "object",
+            "title": "Last Runs",
+            "description": "Every pipeline; null when it never ran."
+          },
+          "embedding_model": {
+            "type": "string",
+            "title": "Embedding Model",
+            "description": "The model new vectors and queries use."
+          },
+          "embeddings": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Embeddings",
+            "description": "Stored vectors by model."
+          }
+        },
+        "type": "object",
+        "required": [
+          "articles",
+          "sources",
+          "last_digest",
+          "paused_until",
+          "last_runs",
+          "embedding_model",
+          "embeddings"
+        ],
+        "title": "StatusOut"
       }
     }
   }

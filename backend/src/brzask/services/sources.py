@@ -1,15 +1,28 @@
 """Adding, muting and enabling sources."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
+from datetime import datetime, timedelta
+from typing import Protocol
 from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
-from brzask.clients.feed_finder import FeedFinder, FoundFeed
+from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import ChangeStatus, Source, SourceKind, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository, SourceRepository
+from brzask.repositories.sources import SourceStats
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.refs import as_id
+
+
+class SiteFeedFinder(Protocol):
+    """Finds the feed of a site from any of its pages (`FeedFinder`)."""
+
+    def find(self, url: str) -> FoundFeed | None: ...
+
+
+# The window of the per-source counts shown next to each source.
+RECENT = timedelta(days=30)
 
 
 def is_release_feed(url: str) -> bool:
@@ -123,6 +136,28 @@ def list_sources(session: Session, *statuses: SourceStatus) -> Sequence[Source]:
     return SourceRepository(session).find(*statuses)
 
 
+def page_sources(
+    session: Session,
+    limit: int,
+    statuses: Collection[SourceStatus] = (),
+    after: tuple[str, int] | None = None,
+) -> Sequence[Source]:
+    """Sources by name, `limit` at a time; `after` is the (name, id) of the last one seen."""
+    return SourceRepository(session).page(limit, statuses, after)
+
+
+def get_source(session: Session, source_id: int) -> Source:
+    source = SourceRepository(session).get(source_id)
+    if source is None:
+        raise NotFoundError(f"no source {source_id}")
+    return source
+
+
+def recent_stats(session: Session, now: datetime) -> dict[int, SourceStats]:
+    """What each source produced over the last `RECENT` days."""
+    return SourceRepository(session).stats(now - RECENT)
+
+
 def ensure_unknown(session: Session, url: str) -> None:
     """Raise when `url` is already a source, whatever its status."""
     known = SourceRepository(session).get_by_url(url)
@@ -130,7 +165,7 @@ def ensure_unknown(session: Session, url: str) -> None:
         raise ConflictError(f"{url} is already a source ({known.status.value})")
 
 
-def find_feed(finder: FeedFinder, url: str) -> FoundFeed:
+def find_feed(finder: SiteFeedFinder, url: str) -> FoundFeed:
     """The feed of the site `url` belongs to; `url` may be the feed itself or any page."""
     found = finder.find(url)
     if found is None:
@@ -185,6 +220,33 @@ def add_source(
         after={"name": source.name, "url": source.url, "kind": source.kind.value},
     )
     return source
+
+
+def rename_source(session: Session, source: Source, name: str, *, actor: str) -> bool:
+    """Give a source another name, unique ignoring case. False when it already had it."""
+    name = name.strip()
+    if not name:
+        raise ServiceError("a source name must not be empty")
+    if as_id(name) is not None:
+        raise ServiceError(f"a source name cannot be a number ({name}); it would read as an ID")
+    if name == source.name:
+        return False
+    other = SourceRepository(session).get_by_name(name)
+    if other is not None and other.id != source.id:
+        raise ConflictError(f"a source named {name!r} already exists; choose another name")
+    before = source.name
+    source.name = name
+    session.flush()
+    ChangeRepository(session).record(
+        actor=actor,
+        action="source.rename",
+        entity_type="source",
+        entity_id=str(source.id),
+        status=ChangeStatus.APPLIED,
+        before={"name": before},
+        after={"name": name},
+    )
+    return True
 
 
 def mute_source(session: Session, ref: str, *, actor: str, reason: str | None = None) -> bool:

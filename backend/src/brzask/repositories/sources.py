@@ -4,7 +4,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, Subquery, func, select
+from sqlalchemy import ColumnElement, Subquery, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -58,6 +58,20 @@ class SourceRepository:
         query = select(Source).order_by(Source.name)
         if statuses:
             query = query.where(Source.status.in_(statuses))
+        return self.session.scalars(query).all()
+
+    def page(
+        self,
+        limit: int,
+        statuses: Collection[SourceStatus] = (),
+        after: tuple[str, int] | None = None,
+    ) -> Sequence[Source]:
+        """Up to `limit` sources by name, after the (name, id) key `after`."""
+        query = select(Source).order_by(Source.name, Source.id).limit(limit)
+        if statuses:
+            query = query.where(Source.status.in_(statuses))
+        if after is not None:
+            query = query.where(tuple_(Source.name, Source.id) > tuple_(*after))
         return self.session.scalars(query).all()
 
     def get_by_name(self, name: str) -> Source | None:

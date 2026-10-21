@@ -38,12 +38,16 @@ def test_unknown_route_is_a_problem(client: TestClient) -> None:
     }
 
 
-def test_wrong_method_keeps_the_allow_header(client: TestClient) -> None:
-    response = client.post("/healthz")
+def test_wrong_method_lists_every_method_of_the_path(client: TestClient) -> None:
+    response = client.post("/api/v1/pause")
 
     assert response.status_code == 405
     assert response.headers["content-type"] == TYPE
-    assert response.headers["allow"] == "GET"
+    # One route per method: Starlette alone would name only the first (GET).
+    assert response.headers.get_list("allow") == ["DELETE, GET, PUT"]
+    assert client.post("/healthz").headers["allow"] == "GET"
+    # Not in the document: Starlette's own header stays.
+    assert client.post("/metrics").headers["allow"] == "GET"
 
 
 def test_validation_errors_list_each_field() -> None:

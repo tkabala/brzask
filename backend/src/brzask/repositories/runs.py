@@ -65,5 +65,15 @@ class RunRepository:
             query = query.where(tuple_(Run.started_at, Run.id) < tuple_(*after))
         return self.session.scalars(query).all()
 
+    def digest_started_at(self, started_at: datetime) -> Run | None:
+        """The digest run (not a dry run) that started at `started_at`.
+
+        A digest's articles are marked shown with the start of their run.
+        """
+        query = select(Run).where(
+            Run.kind == RunKind.DIGEST, Run.dry_run.is_(False), Run.started_at == started_at
+        )
+        return self.session.scalars(query.limit(1)).first()
+
     def latest(self, kind: RunKind) -> Run | None:
         return next(iter(self.recent(1, kind)), None)

@@ -27,7 +27,7 @@ from brzask.clients.usage import UsageMeter
 from brzask.db.models import Run, RunKind, RunStatus
 from brzask.log import get_logger, logged_run
 from brzask.repositories import RunRepository
-from brzask.services.errors import ServiceError
+from brzask.services.errors import NotFoundError, ServiceError
 
 log = get_logger(__name__)
 
@@ -206,3 +206,10 @@ def list_runs(
 ) -> Sequence[Run]:
     """Runs newest first; `after` is the (started_at, id) of the last run already seen."""
     return RunRepository(session).page(limit, kind=kind, after=after)
+
+
+def get_run(session: Session, run_id: uuid.UUID) -> Run:
+    run = RunRepository(session).get(run_id)
+    if run is None:
+        raise NotFoundError(f"no run {run_id}")
+    return run

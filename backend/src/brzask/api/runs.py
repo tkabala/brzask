@@ -19,7 +19,7 @@ from brzask.api.pagination import (
     page,
 )
 from brzask.db.models import Run, RunKind, RunStatus
-from brzask.services.runs import list_runs
+from brzask.services import runs
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -52,7 +52,7 @@ def _parse_key(values: list[str]) -> tuple[datetime, uuid.UUID]:
     summary="List pipeline runs",
     responses=problems.responses(HTTPStatus.BAD_REQUEST),
 )
-def get_runs(
+def list_runs(
     session: DbSession,
     kind: Annotated[RunKind | None, Query(description="Only runs of this pipeline.")] = None,
     limit: Limit = DEFAULT_LIMIT,
@@ -60,6 +60,16 @@ def get_runs(
 ) -> Page[RunOut]:
     """Runs newest first, including ones still running."""
     after = decode_cursor(cursor, _parse_key)
-    rows = list_runs(session, limit + 1, kind=kind, after=after)
+    rows = runs.list_runs(session, limit + 1, kind=kind, after=after)
     items, next_cursor = page(rows, limit, _key)
     return Page(items=[RunOut.model_validate(run) for run in items], next_cursor=next_cursor)
+
+
+@router.get(
+    "/{run_id}",
+    summary="Get a run",
+    responses=problems.responses(HTTPStatus.NOT_FOUND),
+)
+def get_run(session: DbSession, run_id: uuid.UUID) -> RunOut:
+    """With its stats (counts, costs) and stage timings."""
+    return RunOut.model_validate(runs.get_run(session, run_id))

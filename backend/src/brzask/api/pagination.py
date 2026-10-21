@@ -47,8 +47,10 @@ def decode_cursor[K](cursor: str | None, parse: Callable[[list[str]], K]) -> K |
     try:
         raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
         values = json.loads(raw)
-        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
-            raise ValueError("not a list of strings")
+        if not isinstance(values, list) or not all(
+            isinstance(value, str) and "\x00" not in value for value in values
+        ):
+            raise ValueError("not a list of strings without NUL")
         return parse(values)
     except (ValueError, TypeError) as error:
         raise ProblemError(
