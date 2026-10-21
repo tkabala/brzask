@@ -186,7 +186,7 @@ def test_cookie_without_secure_for_plain_http(
     sessions: sessionmaker[Session], password_auth: AuthSettings
 ) -> None:
     _, registry = prometheus_reader()
-    settings = password_auth.model_copy(update={"cookie_secure": False})
+    settings = password_auth.model_copy(update={"cookie_secure": "false"})
     app = create_app(
         sessions,
         metrics_registry=registry,
@@ -229,3 +229,32 @@ def test_lockout_is_per_client_behind_a_trusted_proxy(
 
     assert attempt("198.51.100.1", PASSWORD) == 429
     assert attempt("198.51.100.2", PASSWORD) == 200
+
+
+def test_cookie_is_secure_when_the_login_came_over_https(
+    sessions: sessionmaker[Session], password_auth: AuthSettings
+) -> None:
+    _, registry = prometheus_reader()
+    settings = AuthSettings.model_validate(
+        {**password_auth.model_dump(exclude={"trusted_proxies"}), "TRUSTED_PROXIES": "10.0.0.0/24"}
+    )
+    app = create_app(
+        sessions,
+        metrics_registry=registry,
+        meter_provider=NoOpMeterProvider(),
+        auth_settings=settings,
+    )
+
+    def secure(client: TestClient, headers: dict[str, str] | None = None) -> bool:
+        response = client.post("/api/v1/auth/login", json={"password": PASSWORD}, headers=headers)
+        assert response.status_code == 200
+        return "secure" in response.headers["set-cookie"].lower()
+
+    assert secure(TestClient(app, base_url="https://testserver"))
+    assert not secure(TestClient(app))  # plain HTTP, e.g. localhost in development
+    proxy = TestClient(app, client=("10.0.0.5", 41000))
+    assert secure(proxy, {"X-Forwarded-Proto": "https"})
+    assert not secure(proxy, {"X-Forwarded-Proto": "http"})
+    # Only a trusted proxy is believed.
+    stranger = TestClient(app, client=("203.0.113.9", 41000))
+    assert not secure(stranger, {"X-Forwarded-Proto": "https"})

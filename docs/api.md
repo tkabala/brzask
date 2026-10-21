@@ -46,10 +46,13 @@ anywhere, login answers 429 with `Retry-After` and does not check passwords
 until the oldest failure is 15 minutes old. The count lives in memory and
 restarts with the server.
 
-`Secure` cookies travel only over HTTPS; browsers make an exception for
-`localhost`. To log in over plain HTTP from another machine, set
-`AUTH_COOKIE_SECURE=false`; better, put the server behind a reverse proxy with
-TLS.
+Both cookies are `Secure` (sent over HTTPS only) when the login request came
+over HTTPS: directly, or through a proxy in `TRUSTED_PROXIES` that sends
+`X-Forwarded-Proto: https`. Over plain HTTP they are not, as browsers drop
+`Secure` cookies that arrive over HTTP, even from `localhost`.
+`AUTH_COOKIE_SECURE=true` marks them `Secure` always, `false` never. Behind a
+TLS proxy, list it in `TRUSTED_PROXIES` (or set `true`), so the cookie is never
+sent over plain HTTP.
 
 ### API tokens
 

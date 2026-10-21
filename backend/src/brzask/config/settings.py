@@ -56,6 +56,11 @@ def _split_csv(value: object) -> object:
     return value
 
 
+def _lower_text(value: object) -> object:
+    # Booleans too, as `True` from an older .env reads as "true".
+    return str(value).lower() if isinstance(value, (str, bool)) else value
+
+
 def _empty_to_none(value: object) -> object:
     if isinstance(value, str) and value.strip() == "":
         return None
@@ -351,10 +356,13 @@ class AuthSettings(SettingsGroup):
         description="Random string of at least 32 characters that signs CSRF tokens "
         "and article links.",
     )
-    cookie_secure: bool = Field(
-        True,
-        description="Send the session cookie over HTTPS only; set false to log in "
-        "over plain HTTP from another machine (localhost works either way).",
+    cookie_secure: Annotated[Literal["auto", "true", "false"], BeforeValidator(_lower_text)] = (
+        Field(
+            "auto",
+            description="Mark the session cookie Secure (sent over HTTPS only): auto when the "
+            "request came over HTTPS, directly or as X-Forwarded-Proto from TRUSTED_PROXIES; "
+            "true always; false never.",
+        )
     )
     header: str = Field("Remote-User", description="Header with the user name (mode=header).")
     trusted_proxies: Annotated[list[ProxyNetwork], NoDecode, BeforeValidator(_parse_networks)] = (

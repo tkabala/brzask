@@ -213,9 +213,23 @@ def _client(request: Request, config: Auth) -> str:
     )
 
 
-def _set_cookies(response: Response, config: Auth, token: str, csrf: str) -> None:
+def _over_https(request: Request, config: Auth) -> bool:
+    """Whether the browser reached us over HTTPS, here or at a trusted proxy."""
+    if request.url.scheme == "https":
+        return True
+    if not auth.is_trusted(peer(request), config.settings.trusted_proxies):
+        return False
+    # The proxy closest to us wrote the last value.
+    forwarded = request.headers.get("X-Forwarded-Proto", "").split(",")[-1].strip()
+    return forwarded.lower() == "https"
+
+
+def _set_cookies(request: Request, response: Response, config: Auth, token: str, csrf: str) -> None:
     max_age = int(auth.SESSION_LIFETIME.total_seconds())
-    secure = config.settings.cookie_secure
+    setting = config.settings.cookie_secure
+    # Browsers drop a Secure cookie that arrives over plain HTTP, even from
+    # localhost (seen in Chrome 155), so `auto` follows how the request came.
+    secure = setting == "true" or (setting == "auto" and _over_https(request, config))
     response.set_cookie(
         SESSION_COOKIE,
         token,
@@ -259,7 +273,7 @@ def login(
     config.throttle.succeeded(client)
     new = auth.log_in(session, datetime.now(UTC))
     csrf = auth.csrf_token(config.signing_secret(), new.token)
-    _set_cookies(response, config, new.token, csrf)
+    _set_cookies(request, response, config, new.token, csrf)
     return SessionOut(
         mode=config.mode, authenticated=True, csrf_token=csrf, expires_at=new.expires_at
     )
