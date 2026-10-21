@@ -347,7 +347,14 @@ class AuthSettings(SettingsGroup):
         None, description="Argon2 hash of the login password (mode=password)."
     )
     session_secret: OptionalSecret = Field(
-        None, description="Random string of at least 32 characters that signs sessions."
+        None,
+        description="Random string of at least 32 characters that signs CSRF tokens "
+        "and article links.",
+    )
+    cookie_secure: bool = Field(
+        True,
+        description="Send the session cookie over HTTPS only; set false to log in "
+        "over plain HTTP from another machine (localhost works either way).",
     )
     header: str = Field("Remote-User", description="Header with the user name (mode=header).")
     trusted_proxies: Annotated[list[ProxyNetwork], NoDecode, BeforeValidator(_parse_networks)] = (

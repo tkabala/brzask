@@ -10,6 +10,7 @@ from brzask.repositories.articles import ArticleRepository
 from brzask.repositories.changes import ChangeRepository
 from brzask.repositories.embeddings import EmbeddingRepository
 from brzask.repositories.interests import InterestRepository
+from brzask.repositories.login_sessions import LoginSessionRepository
 from brzask.repositories.runs import RunRepository
 from brzask.repositories.settings import SettingRepository
 from brzask.repositories.sources import SourceRepository
@@ -21,6 +22,7 @@ __all__ = [
     "ChangeRepository",
     "EmbeddingRepository",
     "InterestRepository",
+    "LoginSessionRepository",
     "RunRepository",
     "SettingRepository",
     "SourceRepository",

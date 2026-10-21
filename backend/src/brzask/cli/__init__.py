@@ -29,6 +29,7 @@ from brzask.config import get_settings
 from brzask.db import migrations
 from brzask.db.models import RunKind, RunStatus
 from brzask.log import configure_logging
+from brzask.services import auth
 from brzask.services import pause as pausing
 from brzask.services.runs import run_pipeline
 from brzask.services.status import get_status
@@ -101,6 +102,15 @@ def api(
     application = create_app(common.get_sessions(), metrics_registry=registry)
     # log_config=None keeps the structured logging configured above.
     uvicorn.run(application, host=host, port=port, log_config=None)
+
+
+@app.command(name="hash-password")
+def hash_password_command() -> None:
+    """Print an argon2 hash of a password for AUTH_PASSWORD_HASH."""
+    password = typer.prompt("Password", hide_input=True, confirmation_prompt=True)
+    if not password:
+        raise typer.BadParameter("the password must not be empty")
+    typer.echo(auth.hash_password(password))
 
 
 @app.command()

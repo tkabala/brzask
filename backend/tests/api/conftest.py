@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.metrics import MeterProvider
+from pydantic import SecretStr
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.api.app import create_app
@@ -13,6 +14,8 @@ from brzask.api.metrics import prometheus_reader
 from brzask.clients.embeddings import EmbeddingKind
 from brzask.clients.feed_finder import FoundFeed
 from brzask.clients.retry import APIError
+from brzask.config.settings import AuthSettings
+from brzask.services.auth import hash_password
 from tests.factories import unit_vector
 
 
@@ -62,12 +65,37 @@ def feed_finder() -> FakeFeedFinder:
     return FakeFeedFinder()
 
 
+PASSWORD = "correct horse battery staple"
+SECRET = "s" * 32
+
+
+@pytest.fixture(scope="session")
+def password_hash() -> str:
+    return hash_password(PASSWORD)
+
+
+@pytest.fixture
+def auth_settings() -> AuthSettings:
+    """No login, so tests of the endpoints need none; auth tests switch to password."""
+    return AuthSettings(mode="none")
+
+
+@pytest.fixture
+def password_auth(password_hash: str) -> AuthSettings:
+    return AuthSettings(
+        mode="password",
+        password_hash=SecretStr(password_hash),
+        session_secret=SecretStr(SECRET),
+    )
+
+
 @pytest.fixture
 def app(
     sessions: sessionmaker[Session],
     embedders: dict[str, FakeEmbedder],
     query_vectors: dict[str, list[float]],
     feed_finder: FakeFeedFinder,
+    auth_settings: AuthSettings,
 ) -> FastAPI:
     """The API on the test database, with its own metrics and fake outside services."""
 
@@ -81,6 +109,7 @@ def app(
         metrics_registry=registry,
         meter_provider=MeterProvider(metric_readers=[reader]),
         clients=ApiClients(feed_finder=lambda: nullcontext(feed_finder), new_embedder=new_embedder),
+        auth_settings=auth_settings,
     )
 
 

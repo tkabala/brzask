@@ -308,3 +308,21 @@ class ApiToken(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     last_used_at: Mapped[datetime | None]
     revoked_at: Mapped[datetime | None]
+
+
+# --- Login sessions --------------------------------------------------------------
+
+
+class LoginSession(Base):
+    """A browser logged in with the password; logging out deletes it."""
+
+    __tablename__ = "login_sessions"
+
+    id: Mapped[int] = _id()
+    token_hash: Mapped[str] = mapped_column(
+        unique=True,
+        comment="SHA-256 of the cookie value; tokens are random, so a fast hash is enough.",
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    last_used_at: Mapped[datetime | None]

@@ -14,6 +14,11 @@
         "summary": "List days with a digest",
         "description": "Newest first, with how many articles each day had and how many were opened.",
         "operationId": "list_digests",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "limit",
@@ -55,6 +60,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_DigestDayOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -101,8 +128,35 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/api/v1/digests/{day}": {
@@ -113,6 +167,11 @@
         "summary": "A day's digest",
         "description": "Empty when that day had no digest.",
         "operationId": "get_digest",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "day",
@@ -138,6 +197,28 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Content",
             "content": {
@@ -158,6 +239,11 @@
         ],
         "summary": "Get an article",
         "operationId": "get_article",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "article_id",
@@ -178,6 +264,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ArticleOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -213,6 +321,11 @@
         ],
         "summary": "Why an article was ranked where it was",
         "operationId": "get_article_ranking",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "article_id",
@@ -233,6 +346,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RankingOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -269,6 +404,11 @@
         "summary": "Search articles by meaning",
         "description": "Articles whose text is closest in meaning to `q`, read or not, shown or not.\n\nNot paginated: results are the nearest `limit`, and further ones are rarely\nworth reading.",
         "operationId": "search",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "q",
@@ -306,6 +446,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -353,6 +515,11 @@
         "summary": "List sources",
         "description": "By name, with fetch health and what each published in the last 30 days.",
         "operationId": "list_sources",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "status",
@@ -419,6 +586,28 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -449,6 +638,11 @@
         "summary": "Add a source",
         "description": "Looks up the feed of the page, then reads it from the next digest on.\n\n404 when the page has no RSS or Atom feed, 409 when it is already a source\n(whatever its status: enable a muted or rejected one instead).",
         "operationId": "add_source",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -466,6 +660,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -523,6 +739,11 @@
         ],
         "summary": "Get a source",
         "operationId": "get_source",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "source_id",
@@ -543,6 +764,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -577,6 +820,11 @@
         "summary": "Rename a source or change its status",
         "description": "Sources are never deleted: a muted or rejected one keeps its history and\nis not proposed again.",
         "operationId": "change_source",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "source_id",
@@ -607,6 +855,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -665,6 +935,11 @@
         "summary": "List interests",
         "description": "In the order they were added, as prompts list them. Not paginated: a reader has a handful.",
         "operationId": "list_interests",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "active_only",
@@ -694,6 +969,28 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Content",
             "content": {
@@ -712,6 +1009,11 @@
         ],
         "summary": "Add an interest",
         "operationId": "add_interest",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -729,6 +1031,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InterestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -775,6 +1099,11 @@
         ],
         "summary": "Get an interest",
         "operationId": "get_interest",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "interest_id",
@@ -795,6 +1124,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InterestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -829,6 +1180,11 @@
         "summary": "Change an interest or its notes",
         "description": "Interests are not deleted; an inactive one keeps its history.",
         "operationId": "change_interest",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "interest_id",
@@ -859,6 +1215,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InterestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -917,6 +1295,11 @@
         "summary": "List pipeline runs",
         "description": "Runs newest first, including ones still running.",
         "operationId": "list_runs",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "kind",
@@ -980,6 +1363,28 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -1012,6 +1417,11 @@
         "summary": "Get a run",
         "description": "With its stats (counts, costs) and stage timings.",
         "operationId": "get_run",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "run_id",
@@ -1031,6 +1441,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -1076,8 +1508,35 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/api/v1/pause": {
@@ -1097,8 +1556,35 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -1128,6 +1614,28 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -1149,7 +1657,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -1161,6 +1674,172 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Log in with the password",
+        "description": "Sets the session cookie. After too many wrong passwords, 429 with Retry-After.",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Log out",
+        "description": "Ends the session, here and wherever its cookie was copied.",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Whether this browser is logged in",
+        "description": "Never fails: tells the page whether to show the login screen.",
+        "operationId": "get_session_state",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            }
           }
         }
       }
@@ -1171,8 +1850,13 @@
           "articles"
         ],
         "summary": "Open an article",
-        "description": "Redirects to the article and records its first open; later opens change nothing.",
+        "description": "Redirects to the article and records its first open; later opens change nothing.\n\nWorks with the signature from the article's `open_url` or with a session.",
         "operationId": "open_link",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -1186,6 +1870,26 @@
               "title": "Id"
             },
             "description": "Article ID."
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "From the article's `open_url`.",
+              "title": "Sig"
+            },
+            "description": "From the article's `open_url`."
           }
         ],
         "responses": {
@@ -1201,6 +1905,17 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/problem+json": {},
               "application/json": {
@@ -1328,7 +2043,7 @@
           "open_url": {
             "type": "string",
             "title": "Open Url",
-            "description": "Follow this instead of `link` to record the open (relative to the server)."
+            "description": "Follow this instead of `link` to record the open (relative to the server); signed, so it works without a session, e.g. from a feed reader."
           },
           "title": {
             "type": "string",
@@ -1483,6 +2198,22 @@
           "shown"
         ],
         "title": "ArticleState"
+      },
+      "Credentials": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "Credentials"
       },
       "DigestDayOut": {
         "properties": {
@@ -2238,6 +2969,55 @@
         ],
         "title": "SearchResults"
       },
+      "SessionOut": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "password",
+              "header",
+              "none"
+            ],
+            "title": "Mode"
+          },
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated",
+            "description": "Whether this request may use the API."
+          },
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token",
+            "description": "Send in X-CSRF-Token with requests that change something."
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "authenticated",
+          "csrf_token"
+        ],
+        "title": "SessionOut"
+      },
       "SourceActivity": {
         "properties": {
           "articles": {
@@ -2623,6 +3403,14 @@
           "embeddings"
         ],
         "title": "StatusOut"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "description": "Set by POST /api/v1/auth/login. Requests that change something also send the CSRF token in X-CSRF-Token.",
+        "in": "cookie",
+        "name": "brzask_session"
       }
     }
   }

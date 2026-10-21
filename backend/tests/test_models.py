@@ -23,6 +23,7 @@ def test_all_tables_are_registered() -> None:
         "settings",
         "change_log",
         "api_tokens",
+        "login_sessions",
     }
 
 

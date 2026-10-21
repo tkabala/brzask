@@ -10,7 +10,7 @@ orchestrators and scrapers expect them.
 from http import HTTPStatus
 from typing import Any
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.metrics import MeterProvider
 from prometheus_client import CollectorRegistry
@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask import __version__
 from brzask.api import (
     articles,
+    auth,
     digests,
     health,
     interests,
@@ -30,8 +31,14 @@ from brzask.api import (
     sources,
     status,
 )
+from brzask.api.auth import Auth, require_user
 from brzask.api.clients import ApiClients
+from brzask.config import get_settings
+from brzask.config.settings import AuthSettings
+from brzask.log import get_logger
 from brzask.telemetry import instrument_app
+
+log = get_logger(__name__)
 
 API_PREFIX = "/api/v1"
 OPENAPI_URL = f"{API_PREFIX}/openapi.json"
@@ -43,11 +50,12 @@ def create_app(
     metrics_registry: CollectorRegistry,
     meter_provider: MeterProvider | None = None,
     clients: ApiClients | None = None,
+    auth_settings: AuthSettings | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
-    reach outside services (embeddings, feed lookup), built from the settings
-    unless given."""
+    reach outside services (embeddings, feed lookup) and `auth_settings` say who
+    may use the API; both come from the settings unless given."""
     app = FastAPI(
         title="brzask",
         version=__version__,
@@ -63,12 +71,23 @@ def create_app(
     app.state.sessions = sessions
     app.state.metrics_registry = metrics_registry
     app.state.clients = clients or ApiClients()
+    app.state.auth = Auth(auth_settings or get_settings().auth)
+    if app.state.auth.mode == "none":
+        log.warning(
+            "AUTH_MODE=none: NO LOGIN. Anyone who can reach this server can read "
+            "and change everything. Use it only on a machine nobody else can reach."
+        )
     problems.install(app)
 
-    api = APIRouter(prefix=API_PREFIX)
+    api = APIRouter(
+        prefix=API_PREFIX,
+        dependencies=[Depends(require_user)],
+        responses=problems.responses(HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
+    )
     for module in (digests, articles, search, sources, interests, runs, status):
         api.include_router(module.router)
     app.include_router(api)
+    app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(opens.router)
     app.include_router(health.router)
     app.include_router(metrics.router)

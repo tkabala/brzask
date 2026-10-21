@@ -13,6 +13,44 @@
 | `/readyz` | Readiness: the database answers and is fully migrated |
 | `/metrics` | Prometheus metrics |
 
+## Logging in
+
+`AUTH_MODE` decides who may use the API:
+
+- **`password`** (the default): one password, its argon2 hash in
+  `AUTH_PASSWORD_HASH`. Make the hash with `brzask hash-password`.
+- **`none`**: no login at all. Anyone who reaches the port can read and change
+  everything, and the server says so in a warning at every start. Use it only
+  on a machine nobody else can reach.
+
+With a password, `POST /api/v1/auth/login` with `{"password": "..."}` sets two
+cookies:
+
+| Cookie | What it holds |
+|---|---|
+| `brzask_session` | A random session token. `HttpOnly`, `Secure`, `SameSite=Lax`, valid for 30 days. The server stores only its SHA-256. |
+| `brzask_csrf` | The CSRF token that goes with the session, readable by the page. |
+
+Requests that change something (`POST`, `PUT`, `PATCH`, `DELETE`) send the CSRF
+token in `X-CSRF-Token`; without it they answer 403. The token is an HMAC of
+the session under `AUTH_SESSION_SECRET`, so a page on another site can neither
+read nor compute it. `GET /api/v1/auth/session` tells the page whether it is
+logged in (and returns the token again), and `POST /api/v1/auth/logout` ends
+the session for good, wherever its cookie was copied.
+
+After 5 wrong passwords from one address within 15 minutes, or 20 from
+anywhere, login answers 429 with `Retry-After` and does not check passwords
+until the oldest failure is 15 minutes old. The count lives in memory and
+restarts with the server.
+
+`Secure` cookies travel only over HTTPS; browsers make an exception for
+`localhost`. To log in over plain HTTP from another machine, set
+`AUTH_COOKIE_SECURE=false`; better, put the server behind a reverse proxy with
+TLS.
+
+Without a login: `/healthz`, `/readyz`, `/metrics`, the OpenAPI document and the
+interactive documentation, and `/open` links carrying their signature (below).
+
 ## Endpoints
 
 The interactive documentation lists every field; in short:
@@ -106,8 +144,10 @@ answers 400; start again without one.
 ## Opening articles
 
 Opening an article is the only preference signal, so every link to an article
-goes through `/open?id=<article>`; each article in the API carries it as
-`open_url`. It answers `302 Found` with the article's address in `Location`
+goes through `/open?id=<article>&sig=<signature>`; each article in the API
+carries it as `open_url`. The signature is an HMAC of the article ID under
+`AUTH_SESSION_SECRET`: the link works from feed readers and mail, which send no
+cookie, while an ID alone needs a session. It answers `302 Found` with the article's address in `Location`
 and records the first open. Following it again, from the digest, a feed reader
 or a bookmark, changes nothing, so the link can be shared and reused.
 

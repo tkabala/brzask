@@ -7,8 +7,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
+from brzask.api.auth import Auth, AuthConfig
 from brzask.api.deps import DbSession, Id
-from brzask.api.opens import open_url
 from brzask.db.models import Article, ArticleState
 from brzask.services import digests
 
@@ -24,7 +24,8 @@ class ArticleOut(BaseModel):
     id: int
     link: str
     open_url: str = Field(
-        description="Follow this instead of `link` to record the open (relative to the server)."
+        description="Follow this instead of `link` to record the open (relative to the server); "
+        "signed, so it works without a session, e.g. from a feed reader."
     )
     title: str = Field(description="In the digest language when the article was in a digest.")
     original_title: str = Field(description="As the feed published it.")
@@ -41,12 +42,12 @@ class ArticleOut(BaseModel):
     opened_at: datetime | None = Field(description="First open.")
 
     @classmethod
-    def of(cls, article: Article) -> "ArticleOut":
+    def of(cls, article: Article, links: Auth) -> "ArticleOut":
         source = article.source
         return cls(
             id=article.id,
             link=article.link,
-            open_url=open_url(article.id),
+            open_url=links.open_url(article.id),
             title=article.digest_title or article.title,
             original_title=article.title,
             summary=article.summary,
@@ -87,8 +88,8 @@ class RankingOut(BaseModel):
     summary="Get an article",
     responses=problems.responses(HTTPStatus.NOT_FOUND),
 )
-def get_article(session: DbSession, article_id: Id) -> ArticleOut:
-    return ArticleOut.of(digests.get_article(session, article_id))
+def get_article(session: DbSession, config: AuthConfig, article_id: Id) -> ArticleOut:
+    return ArticleOut.of(digests.get_article(session, article_id), config)
 
 
 @router.get(

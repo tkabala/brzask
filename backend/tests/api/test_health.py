@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.api.app import create_app
 from brzask.api.metrics import prometheus_reader
+from brzask.config.settings import AuthSettings
 from brzask.db.session import create_db_engine, session_factory
 
 
@@ -36,7 +37,10 @@ def test_not_ready_before_migrations(client: TestClient, connection: Connection)
 def _app(sessions: sessionmaker[Session]) -> FastAPI:
     reader, registry = prometheus_reader()
     return create_app(
-        sessions, metrics_registry=registry, meter_provider=MeterProvider(metric_readers=[reader])
+        sessions,
+        metrics_registry=registry,
+        meter_provider=MeterProvider(metric_readers=[reader]),
+        auth_settings=AuthSettings(mode="none"),
     )
 
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from brzask.api import problems
 from brzask.api.articles import ArticleOut
+from brzask.api.auth import Auth, AuthConfig
 from brzask.api.deps import DbSession
 from brzask.api.pagination import DEFAULT_LIMIT, CursorParam, Limit, Page, decode_cursor, page
 from brzask.config import get_settings
@@ -40,9 +41,9 @@ class DigestDayOut(BaseModel):
     opened: int
 
 
-def _digest(session: DbSession, day: date) -> DigestOut:
+def _digest(session: DbSession, links: Auth, day: date) -> DigestOut:
     return DigestOut(
-        date=day, articles=[ArticleOut.of(article) for article in digests.digest_for(session, day)]
+        date=day, articles=[ArticleOut.of(a, links) for a in digests.digest_for(session, day)]
     )
 
 
@@ -73,13 +74,13 @@ def list_digests(
 
 
 @router.get("/today", summary="Today's digest")
-def get_today_digest(session: DbSession) -> DigestOut:
+def get_today_digest(session: DbSession, config: AuthConfig) -> DigestOut:
     """Today in the configured time zone (TZ); empty until the digest has run."""
     today = datetime.now(UTC).astimezone(get_settings().scheduler.timezone).date()
-    return _digest(session, today)
+    return _digest(session, config, today)
 
 
 @router.get("/{day}", summary="A day's digest")
-def get_digest(session: DbSession, day: Day) -> DigestOut:
+def get_digest(session: DbSession, config: AuthConfig, day: Day) -> DigestOut:
     """Empty when that day had no digest."""
-    return _digest(session, day)
+    return _digest(session, config, day)

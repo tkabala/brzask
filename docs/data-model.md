@@ -15,6 +15,7 @@ what the states mean and why some columns exist.
 | `settings` | Values changed at runtime, such as a pause (configuration lives in environment variables) |
 | `change_log` | Every change to sources, interests or configuration, by a person, a pipeline or an agent |
 | `api_tokens` | Hashed API tokens with a `read` or `write` scope |
+| `login_sessions` | Browsers logged in with the password, by hash of their cookie; logging out deletes the row |
 
 ## Articles
 

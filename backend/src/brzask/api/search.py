@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from brzask.api import problems
 from brzask.api.articles import ArticleOut
+from brzask.api.auth import AuthConfig
 from brzask.api.deps import NO_NUL, Clients, DbSession
 from brzask.config import get_settings
 from brzask.services.embeddings import active_model
@@ -36,6 +37,7 @@ class SearchResults(BaseModel):
 def search(
     session: DbSession,
     clients: Clients,
+    config: AuthConfig,
     q: Annotated[
         str, Query(min_length=1, max_length=500, pattern=NO_NUL, description="What to look for.")
     ],
@@ -50,5 +52,8 @@ def search(
     hits = search_articles(session, embedder, q, limit)
     return SearchResults(
         model=embedder.model,
-        items=[SearchHit(article=ArticleOut.of(h.article), similarity=h.similarity) for h in hits],
+        items=[
+            SearchHit(article=ArticleOut.of(h.article, config), similarity=h.similarity)
+            for h in hits
+        ],
     )

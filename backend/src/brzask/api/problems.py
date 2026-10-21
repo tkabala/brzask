@@ -49,10 +49,17 @@ class Problem(BaseModel):
 class ProblemError(Exception):
     """Raised by a router to answer with a problem."""
 
-    def __init__(self, status: HTTPStatus, detail: str | None = None) -> None:
+    def __init__(
+        self,
+        status: HTTPStatus,
+        detail: str | None = None,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         super().__init__(detail or status.phrase)
         self.status = status
         self.detail = detail
+        self.headers = headers
 
 
 def problem_response(
@@ -133,7 +140,7 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(ProblemError)
     async def problem(request: Request, error: ProblemError) -> JSONResponse:
-        return problem_response(request, error.status, error.detail)
+        return problem_response(request, error.status, error.detail, headers=error.headers)
 
     @app.exception_handler(ServiceError)
     async def service_error(request: Request, error: ServiceError) -> JSONResponse:
