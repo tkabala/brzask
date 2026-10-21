@@ -85,6 +85,19 @@ def test_api_routes_win_over_the_app(client: TestClient) -> None:
     assert client.get("/api/v1/status").status_code == 401
 
 
+@pytest.mark.parametrize(
+    ("method", "path"), [("HEAD", "/readyz"), ("POST", "/healthz"), ("POST", "/api/v1/status")]
+)
+def test_api_routes_answer_other_methods_themselves(
+    client: TestClient, method: str, path: str
+) -> None:
+    # Not index.html: a HEAD probe must not pass while the database is down.
+    response = client.request(method, path)
+
+    assert response.status_code == 405
+    assert response.headers["allow"] == "GET"
+
+
 def test_files_outside_the_app_are_not_served(client: TestClient, web_dir: Path) -> None:
     (web_dir.parent / "secret.txt").write_text("secret")
 

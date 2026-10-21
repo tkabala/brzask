@@ -2,15 +2,19 @@
 
 Paths without a file are the app's own routes (`/archive/2026-10-01`), so
 they get `index.html` and the app's router takes over. Paths under `/api`
-never do: an unknown API path stays a 404 problem.
+never do: an unknown API path stays a 404 problem. Neither does a route of
+the API asked with another method (`HEAD /readyz`, `POST /api/v1/status`):
+mounted at `/`, this app matches every path, so the router would hand it
+those requests instead of answering 405.
 """
 
 from pathlib import Path
 
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
+from starlette.routing import Match
 from starlette.staticfiles import StaticFiles
-from starlette.types import Scope
+from starlette.types import Receive, Scope, Send
 
 INDEX = "index.html"
 # Vite puts content-hashed bundles here; a new build writes new names.
@@ -28,6 +32,16 @@ class WebApp(StaticFiles):
         if not (directory / INDEX).is_file():
             raise RuntimeError(f"{directory} has no {INDEX}; is it the built web app?")
         super().__init__(directory=directory)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        # A route the router matched by path only (another method) answers
+        # itself, with its 405 and Allow header.
+        for route in getattr(scope.get("app"), "routes", ()):
+            match, child_scope = route.matches(scope)
+            if match is Match.PARTIAL:
+                await route.handle({**scope, **child_scope}, receive, send)
+                return
+        await super().__call__(scope, receive, send)
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         if path == "api" or path.startswith("api/"):
