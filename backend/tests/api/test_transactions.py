@@ -4,7 +4,7 @@ Otherwise a client that acts on the response at once (logging in, then
 asking whether it is logged in) can reach the database before the commit.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, MutableMapping
 from typing import Any
 
 import pytest
@@ -36,7 +36,7 @@ def order() -> Iterator[list[str]]:
 
 def test_commit_comes_before_the_response(app: FastAPI, order: list[str]) -> None:
     async def recording(scope: Any, receive: Any, send: Any) -> None:
-        async def send_and_note(message: dict[str, Any]) -> None:
+        async def send_and_note(message: MutableMapping[str, Any]) -> None:
             if message["type"] == "http.response.start":
                 order.append("response")
             await send(message)
