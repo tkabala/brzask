@@ -1,23 +1,10 @@
-import { createMemoryHistory } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { App } from '@/app'
 import type { DigestOut, SessionOut } from '@/client/types.gen'
 import { initI18n } from '@/i18n'
-import { configureApi } from '@/lib/api'
-import { createQueryClient } from '@/lib/query'
 import { emptyDigest, fakeApi, json, loggedIn, loggedOut, problem } from '@/test/fake-api'
-
-function renderApp() {
-  configureApi('http://localhost')
-  return render(
-    <App
-      queryClient={createQueryClient()}
-      history={createMemoryHistory({ initialEntries: ['/'] })}
-    />,
-  )
-}
+import { renderApp } from '@/test/render'
 
 beforeEach(() => {
   initI18n('en')

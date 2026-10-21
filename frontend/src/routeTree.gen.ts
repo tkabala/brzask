@@ -10,33 +10,115 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InterestsRouteImport } from './routes/interests'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as SourcesRouteImport } from './routes/sources'
+import { Route as StatusRouteImport } from './routes/status'
+import { Route as ArchiveIndexRouteImport } from './routes/archive/index'
+import { Route as ArchiveDayRouteImport } from './routes/archive/$day'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InterestsRoute = InterestsRouteImport.update({
+  id: '/interests',
+  path: '/interests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SourcesRoute = SourcesRouteImport.update({
+  id: '/sources',
+  path: '/sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatusRoute = StatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchiveIndexRoute = ArchiveIndexRouteImport.update({
+  id: '/archive/',
+  path: '/archive/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchiveDayRoute = ArchiveDayRouteImport.update({
+  id: '/archive/$day',
+  path: '/archive/$day',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/interests': typeof InterestsRoute
+  '/search': typeof SearchRoute
+  '/sources': typeof SourcesRoute
+  '/status': typeof StatusRoute
+  '/archive/$day': typeof ArchiveDayRoute
+  '/archive/': typeof ArchiveIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/interests': typeof InterestsRoute
+  '/search': typeof SearchRoute
+  '/sources': typeof SourcesRoute
+  '/status': typeof StatusRoute
+  '/archive/$day': typeof ArchiveDayRoute
+  '/archive': typeof ArchiveIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/interests': typeof InterestsRoute
+  '/search': typeof SearchRoute
+  '/sources': typeof SourcesRoute
+  '/status': typeof StatusRoute
+  '/archive/$day': typeof ArchiveDayRoute
+  '/archive/': typeof ArchiveIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/interests'
+    | '/search'
+    | '/sources'
+    | '/status'
+    | '/archive/$day'
+    | '/archive/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/interests'
+    | '/search'
+    | '/sources'
+    | '/status'
+    | '/archive/$day'
+    | '/archive'
+  id:
+    | '__root__'
+    | '/'
+    | '/interests'
+    | '/search'
+    | '/sources'
+    | '/status'
+    | '/archive/$day'
+    | '/archive/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InterestsRoute: typeof InterestsRoute
+  SearchRoute: typeof SearchRoute
+  SourcesRoute: typeof SourcesRoute
+  StatusRoute: typeof StatusRoute
+  ArchiveDayRoute: typeof ArchiveDayRoute
+  ArchiveIndexRoute: typeof ArchiveIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +130,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/interests': {
+      id: '/interests'
+      path: '/interests'
+      fullPath: '/interests'
+      preLoaderRoute: typeof InterestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sources': {
+      id: '/sources'
+      path: '/sources'
+      fullPath: '/sources'
+      preLoaderRoute: typeof SourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/status': {
+      id: '/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archive/': {
+      id: '/archive/'
+      path: '/archive'
+      fullPath: '/archive/'
+      preLoaderRoute: typeof ArchiveIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archive/$day': {
+      id: '/archive/$day'
+      path: '/archive/$day'
+      fullPath: '/archive/$day'
+      preLoaderRoute: typeof ArchiveDayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InterestsRoute: InterestsRoute,
+  SearchRoute: SearchRoute,
+  SourcesRoute: SourcesRoute,
+  StatusRoute: StatusRoute,
+  ArchiveDayRoute: ArchiveDayRoute,
+  ArchiveIndexRoute: ArchiveIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

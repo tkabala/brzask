@@ -33,7 +33,16 @@ export const loggedIn: SessionOut = {
 
 export const emptyDigest: DigestOut = { date: '2026-10-21', articles: [] }
 
-/** A fake API on `fetch`: handlers by "METHOD /path"; records every request. */
+function matches(pattern: string, key: string): boolean {
+  const want = pattern.split('/')
+  const have = key.split('/')
+  return (
+    want.length === have.length && want.every((part, i) => part.startsWith(':') || part === have[i])
+  )
+}
+
+/** A fake API on `fetch`: handlers by "METHOD /path", where `:name` matches any
+ * one segment and an exact path wins; records every request. */
 export function fakeApi(handlers: Record<string, Handler>) {
   const requests: Request[] = []
   vi.stubGlobal(
@@ -42,9 +51,15 @@ export function fakeApi(handlers: Record<string, Handler>) {
       const request = new Request(input, init)
       requests.push(request.clone())
       const key = `${request.method} ${new URL(request.url).pathname}`
-      const handler = handlers[key]
+      const handler =
+        handlers[key] ?? Object.entries(handlers).find(([pattern]) => matches(pattern, key))?.[1]
       return handler ? handler(request) : problem(404, 'Not Found', `no fake for ${key}`)
     }),
   )
-  return { requests, handlers }
+  return {
+    requests,
+    /** The requests sent to "METHOD /path" (patterns allowed). */
+    sent: (pattern: string) =>
+      requests.filter((r) => matches(pattern, `${r.method} ${new URL(r.url).pathname}`)),
+  }
 }

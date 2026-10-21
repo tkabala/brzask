@@ -19,6 +19,27 @@ API (`BRZASK_API` points it elsewhere), so the app and the API share one
 origin, as they do in production. Over plain HTTP the session cookie is not
 `Secure`, so logging in works on `localhost` without TLS.
 
+## Screens
+
+| Path | Screen |
+|---|---|
+| `/` | Today's digest: a card per article, "why here?" from the ranking explanation |
+| `/archive`, `/archive/<day>` | Days with a digest, and any day's digest |
+| `/search?q=` | Search by meaning; the query stays in the address |
+| `/sources?show=` | Pending decisions, every source with its fetch health and 30-day counts, adding one from any page of a site |
+| `/interests` | Topics, keywords and reader notes; turning one off |
+| `/status` | Counts, the last run of each pipeline, recent runs, pausing the digest |
+
+An article's link is its signed `open_url`, opened in a new tab. Following it
+marks the card opened at once in the cached digest, while the server records
+the open as the browser passes through `/open`.
+
+Each screen is a route that fetches and changes data (`src/routes/`) and a view
+that only takes props (`src/features/<screen>/`). Views have Storybook stories
+(`pnpm storybook`, `pnpm build-storybook`) on the demo data in
+`src/demo/data.ts`. Tests render whole routes against a fake API on `fetch`
+(`src/test/fake-api.ts`).
+
 ## The API client
 
 `src/client` is generated from `openapi.json` by

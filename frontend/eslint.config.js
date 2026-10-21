@@ -3,10 +3,12 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import globals from 'globals'
+import storybook from 'eslint-plugin-storybook'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'src/routeTree.gen.ts', 'src/client']),
+  globalIgnores(['dist', 'coverage', 'storybook-static', 'src/routeTree.gen.ts', 'src/client']),
+  ...storybook.configs['flat/recommended'],
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
