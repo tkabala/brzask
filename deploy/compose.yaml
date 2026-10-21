@@ -109,6 +109,8 @@ services:
     command: [setup, /deploy/secrets]
     volumes:
       - .:/deploy
+      # Where the secrets section below reads them from.
+      - ${BRZASK_SECRETS:-./secrets}:/deploy/secrets
 
   crawl4ai:
     image: unclecode/crawl4ai:0.9.5
