@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import type { ArticleOut } from '@/client/types.gen'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
 
 interface Props {
   article: ArticleOut
@@ -24,7 +23,7 @@ export function ArticleCard({ article, onOpen, renderWhy }: Props) {
   const open = () => onOpen?.(article)
 
   return (
-    <Card className={cn(opened && 'opacity-75')}>
+    <Card>
       <CardHeader>
         <div className="flex items-baseline gap-3">
           {article.position !== null ? (

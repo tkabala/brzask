@@ -19,22 +19,22 @@ export function RankingBreakdown({ ranking }: { ranking: RankingOut }) {
   const recorded = ranking.pool !== null || ranking.ranked !== null
 
   return (
-    <section className="rounded-md bg-muted p-3" aria-label={t('ranking.title')}>
+    <section className="rounded-md border p-3" aria-label={t('ranking.title')}>
       <h3 className="font-medium">{t('ranking.title')}</h3>
-      <ol className="mt-2 list-inside list-decimal space-y-1 text-muted-foreground">
+      <ol className="mt-2 list-inside list-decimal space-y-1">
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ol>
       {recorded ? (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs">
           {t('ranking.method', {
             method: ranking.ranking_method ?? t('ranking.unknown'),
             dedup: ranking.deduplication_method ?? t('ranking.unknown'),
           })}
         </p>
       ) : (
-        <p className="mt-2 text-xs text-muted-foreground">{t('ranking.notRecorded')}</p>
+        <p className="mt-2 text-xs">{t('ranking.notRecorded')}</p>
       )}
     </section>
   )

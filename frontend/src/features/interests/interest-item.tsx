@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 
 import { interestSchema, type InterestValues, splitKeywords } from './interest-form'
 
@@ -90,7 +89,7 @@ export function InterestItem({ interest, onChange, busy = false }: Props) {
   }
 
   return (
-    <article className={cn('grid gap-1 py-3', !interest.active && 'opacity-60')}>
+    <article className="grid gap-1 py-3">
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="font-medium">{interest.topic}</h3>
         <span className="text-xs text-muted-foreground">

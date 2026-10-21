@@ -7,7 +7,15 @@ import storybook from 'eslint-plugin-storybook'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'storybook-static', 'src/routeTree.gen.ts', 'src/client']),
+  globalIgnores([
+    'dist',
+    'coverage',
+    'storybook-static',
+    'playwright-report',
+    'test-results',
+    'src/routeTree.gen.ts',
+    'src/client',
+  ]),
   ...storybook.configs['flat/recommended'],
   {
     files: ['**/*.{ts,tsx}'],

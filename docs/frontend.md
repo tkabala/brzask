@@ -92,3 +92,17 @@ English, and Polish as a translation (`src/i18n/en.ts`, `src/i18n/pl.ts`).
 The language comes from an earlier choice, then the browser; the header
 switches it. `pl.ts` must have every key of `en.ts`, which the type checker
 enforces.
+
+## End-to-end tests
+
+`just e2e` (`pnpm e2e` in `frontend/`) runs Playwright against the real stack:
+`e2e/start-api.sh` recreates a `brzask_e2e` database on the compose Postgres
+(next to the development one, which it never touches), migrates it, fills it
+with `brzask demo-data` and starts the API with a test password; the built app
+runs under `vite preview`, which passes API requests on. The tests log in,
+use every screen and check each with [axe](https://github.com/dequelabs/axe-core)
+for WCAG 2.1 A and AA violations. They share one database and run one after
+another. CI runs them in the `e2e` job and keeps the report when they fail.
+
+`brzask demo-data` also works on its own, to try brzask without feeds: it
+fills an empty database with made-up sources, digests and runs.

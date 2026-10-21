@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "generate": "openapi-ts && node scripts/mark-client-runtime.mjs",
     "storybook": "storybook dev -p 6006 --no-open",
-    "build-storybook": "storybook build --quiet"
+    "build-storybook": "storybook build --quiet",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
@@ -39,8 +40,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
     "@hey-api/openapi-ts": "^0.99.0",
+    "@playwright/test": "^1.64.1",
     "@storybook/react-vite": "10.6.3",
     "@tanstack/router-plugin": "^1.168.46",
     "@testing-library/jest-dom": "^7.0.1",

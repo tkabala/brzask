@@ -4,3 +4,5 @@ pnpm-lock.yaml
 src/routeTree.gen.ts
 src/client
 storybook-static
+playwright-report
+test-results
