@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Article, ArticleState, Source, SourceKind, SourceOrigin, SourceStatus
+from brzask.urls import feed_key
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +52,13 @@ class SourceRepository:
         return {source.id: source for source in self.session.scalars(query)}
 
     def get_by_url(self, url: str) -> Source | None:
-        return self.session.scalars(select(Source).where(Source.url == url)).one_or_none()
+        """The source with this feed, its URL compared by `feed_key`."""
+        key = feed_key(url)
+        # A key only lowers case, so every match is among the case-insensitive ones.
+        query = (
+            select(Source).where(func.lower(Source.url) == url.strip().lower()).order_by(Source.id)
+        )
+        return next((s for s in self.session.scalars(query) if feed_key(s.url) == key), None)
 
     def find(self, *statuses: SourceStatus) -> Sequence[Source]:
         """All sources by name, or only those with one of `statuses`."""

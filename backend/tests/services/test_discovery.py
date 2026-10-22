@@ -274,7 +274,7 @@ def setup(make: Factories) -> tuple[FakeSearch, FakeFinder]:
             ],
             "Postgres": [
                 result("https://great.example/other-post"),  # same site, other interest
-                result("https://mirror.example/"),  # resolves to the rejected source's feed
+                result("https://mirror.example/"),  # the rejected source's feed, in another case
                 result("https://unjudged.example/", "Unjudged"),
             ],
         }
@@ -287,7 +287,7 @@ def setup(make: Factories) -> tuple[FakeSearch, FakeFinder]:
             "https://stale.example/": feed(
                 "https://stale.example/feed", "Stale", entries(2, newest_days_ago=90)
             ),
-            "https://mirror.example/": feed("https://rejected.example/feed", "Mirror"),
+            "https://mirror.example/": feed("HTTPS://Rejected.example/feed", "Mirror"),
             "https://unjudged.example/": feed("https://unjudged.example/feed", "Unjudged"),
         }
     )

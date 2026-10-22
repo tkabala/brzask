@@ -77,6 +77,17 @@ def test_add_source_rejects_known_urls_and_names(session: Session, make: Factori
         add_source(session, "https://new.example/feed", actor="user", name="known")
 
 
+def test_add_source_rejects_a_known_feed_written_in_another_case(
+    session: Session, make: Factories
+) -> None:
+    make.source("Hermes", url="https://github.com/NousResearch/hermes-agent/releases.atom")
+
+    with pytest.raises(ConflictError, match="already a source \\(active\\)"):
+        add_source(
+            session, "https://github.com/nousresearch/hermes-agent/releases.atom", actor="user"
+        )
+
+
 def test_add_source_reports_a_known_url_before_its_default_name(
     session: Session, make: Factories
 ) -> None:

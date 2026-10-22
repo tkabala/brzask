@@ -70,6 +70,10 @@ vectors come from a shorter input than the rest of the history.
 | `muted` | Switched off, by hand or by the source review |
 | `dead` | The feed no longer works |
 
+Two URLs are the same feed when they differ only in case that does not matter:
+the scheme and host, and the path on GitHub and Reddit, where owners,
+repositories and subreddits ignore case. Elsewhere a path's case counts.
+
 `kind` is `release` for release-note feeds, which are judged on their content
 instead of being dropped as noise. `origin` (`manual`, `discovery`, `visited`,
 `opml`) and `origin_detail` record where a source came from, so it is possible

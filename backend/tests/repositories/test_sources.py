@@ -30,6 +30,20 @@ def test_add_returns_the_new_source(session: Session) -> None:
     assert source.kind is SourceKind.RELEASE
 
 
+def test_get_by_url_ignores_case_only_where_it_does_not_matter(
+    session: Session, make: Factories
+) -> None:
+    github = make.source(url="https://github.com/NousResearch/hermes-agent/releases.atom")
+    blog = make.source(url="https://example.com/Feed")
+    sources = SourceRepository(session)
+
+    assert (
+        sources.get_by_url("https://GitHub.com/nousresearch/Hermes-Agent/releases.atom") is github
+    )
+    assert sources.get_by_url("HTTPS://EXAMPLE.COM/Feed") is blog
+    assert sources.get_by_url("https://example.com/feed") is None
+
+
 def test_add_skips_a_known_url_even_when_rejected(session: Session, make: Factories) -> None:
     make.source(url="https://example.com/feed.xml", status=SourceStatus.REJECTED)
 

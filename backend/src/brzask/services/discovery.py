@@ -39,7 +39,7 @@ from brzask.services.digest.ranking import interest_context
 from brzask.services.runs import RunContext, SkipRunError
 from brzask.services.sources import propose_source
 from brzask.services.visited import FindsFeeds, known_hosts
-from brzask.urls import host_matches, host_of
+from brzask.urls import feed_key, host_matches, host_of
 
 log = get_logger(__name__)
 
@@ -242,7 +242,7 @@ def discover_sources(
     with context.sessions.begin() as session:
         interests = interest_context(session)
         sources = SourceRepository(session).find()
-        known_urls = {source.url for source in sources}
+        known_urls = {feed_key(source.url) for source in sources}
         known_sites = known_hosts([s.url for s in sources] + [s.site_url for s in sources])
     if not interests:
         raise SkipRunError("no active interests")
@@ -268,8 +268,8 @@ def discover_sources(
     feed_urls = set(known_urls)
     for proposal, feed in zip(proposed, found, strict=True):
         # The same feed can come back for two proposals, or be a source already.
-        if feed is not None and feed.url not in feed_urls:
-            feed_urls.add(feed.url)
+        if feed is not None and feed_key(feed.url) not in feed_urls:
+            feed_urls.add(feed_key(feed.url))
             candidates.append(to_candidate(proposal, feed, now))
     active = [c for c in candidates if c.recent_count > 0]
 
