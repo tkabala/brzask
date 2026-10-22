@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/tkabala/brzask/compare/v0.1.1...v0.1.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **dedup:** let the judge decide same-site pairs above the zone ([e0b8b40](https://github.com/tkabala/brzask/commit/e0b8b40a83be84c01dd141029a27d0f48850bf36))
+* **extraction:** start the article text at its headline ([2eeaefe](https://github.com/tkabala/brzask/commit/2eeaefe9f5b0f3f21dcb37b55f3a149295e159f3))
+
 ## [0.1.1](https://github.com/tkabala/brzask/compare/v0.1.0...v0.1.1) (2026-10-21)
 
 
