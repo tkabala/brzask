@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/tkabala/brzask/compare/v0.1.2...v0.1.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **sources:** treat feed URLs that differ only in case as one feed ([7f81335](https://github.com/tkabala/brzask/commit/7f81335efb0e9632034c72f24fac999f541623e0))
+
 ## [0.1.2](https://github.com/tkabala/brzask/compare/v0.1.1...v0.1.2) (2026-10-22)
 
 
