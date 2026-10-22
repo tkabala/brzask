@@ -103,7 +103,10 @@ def extract_and_embed(
 
 def _input(candidate: Candidate) -> ExtractionInput:
     return ExtractionInput(
-        candidate.link, snippet=candidate.snippet, feed_content=candidate.content
+        candidate.link,
+        snippet=candidate.snippet,
+        feed_content=candidate.content,
+        title=candidate.title,
     )
 
 

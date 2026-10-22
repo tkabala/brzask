@@ -65,6 +65,7 @@ class BenchItem:
     source_url: str
     snippet: str | None = None
     feed_content: str | None = None  # set once the source's feed is fetched again
+    title: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +129,9 @@ def sample_items(
         if article.source is None or not host or taken[host] >= per_host:
             continue
         taken[host] += 1
-        items.append(BenchItem(article.link, host, article.source.url, article.snippet))
+        items.append(
+            BenchItem(article.link, host, article.source.url, article.snippet, title=article.title)
+        )
         if len(items) == size:
             break
     return items
@@ -180,7 +183,7 @@ def run_bench(
 
 
 def _attempt(chain: ExtractorChain, item: BenchItem) -> BenchAttempt:
-    result = chain.extract(ExtractionInput(item.url, item.snippet, item.feed_content))
+    result = chain.extract(ExtractionInput(item.url, item.snippet, item.feed_content, item.title))
     (attempt,) = result.attempts
     usable = attempt.outcome is Outcome.USABLE and result.extracted is not None
     text = result.extracted.text if usable and result.extracted else ""

@@ -45,7 +45,7 @@ def test_texts_are_cut_embedded_as_documents_and_stored(
     result = extract_and_embed(run, candidates, extractor, embedder)
 
     first, second, third = result
-    assert extractor.inputs[0] == ExtractionInput(full.link, None, "Feed text")
+    assert extractor.inputs[0] == ExtractionInput(full.link, None, "Feed text", candidates[0].title)
     assert first.text == long_text.strip()[:TEXT_CHARS].strip()
     assert (first.extracted_by, second.extracted_by, third.extracted_by) == (
         "trafilatura",

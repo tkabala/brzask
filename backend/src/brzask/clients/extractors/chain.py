@@ -2,7 +2,7 @@
 
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Protocol
 
@@ -13,6 +13,7 @@ from brzask.clients.extractors.base import (
     ExtractionError,
     ExtractionInput,
     Extractor,
+    from_headline,
     unusable_reason,
 )
 from brzask.clients.extractors.rules import DOMAIN_RULES, DomainRule, rule_for
@@ -120,6 +121,9 @@ class ExtractorChain:
         elapsed = _ms(started)
         if extracted is None:
             return self._record(extractor.name, host, Outcome.EMPTY, 0, elapsed), None
+        extracted = replace(
+            extracted, text=from_headline(extracted.text, item.title, extracted.title)
+        )
         chars = len(extracted.text.strip())
         reason = unusable_reason(extracted.text)
         if reason is not None:

@@ -27,6 +27,7 @@ class ExtractionInput:
     url: str
     snippet: str | None = None  # the feed summary: the final fallback
     feed_content: str | None = None  # full content the feed carried, if any
+    title: str | None = None  # the feed's title, to find where the article starts
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,30 @@ class Extractor(Protocol):
     def extract(self, item: ExtractionInput) -> Extracted | None:
         """The page text, None when there is none; raises ExtractionError on failures."""
         ...
+
+
+# A Markdown ATX heading: its text without the hashes.
+_HEADING = re.compile(r"^#{1,6}[ \t]+(.+?)[ \t#]*$", re.MULTILINE)
+_MARKUP = re.compile(r"[*_`]")
+
+
+def from_headline(text: str, *titles: str | None) -> str:
+    """`text` from the heading that matches one of `titles`, else unchanged.
+
+    Readers that render the whole page put the site's navigation, newsletter
+    forms and cookie notices before the article; on InfoQ the headline comes
+    after 12k characters of them, identical on every page. Only the start of
+    the text is embedded, so two such articles looked like one.
+    """
+    wanted = {_normalized(title) for title in titles if title and title.strip()}
+    for heading in _HEADING.finditer(text):
+        if _normalized(heading.group(1)) in wanted:
+            return text[heading.start() :]
+    return text
+
+
+def _normalized(title: str) -> str:
+    return " ".join(_MARKUP.sub("", title).casefold().split())
 
 
 def unusable_reason(text: str | None) -> str | None:

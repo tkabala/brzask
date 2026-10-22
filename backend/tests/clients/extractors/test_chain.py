@@ -107,6 +107,23 @@ def test_nothing_at_all() -> None:
     assert (result.text, result.extracted_by) == (None, None)
 
 
+def test_the_text_starts_at_the_headline_given_by_the_feed() -> None:
+    page = f"## Newsletter\n\nSign up.\n\n# The Headline\n\n{USABLE}"
+
+    result = chain(Fake("reader", page)).extract(ExtractionInput(URL, title="The headline"))
+
+    assert result.text == f"# The Headline\n\n{USABLE}".strip()
+    assert result.extracted is not None and result.extracted.text.startswith("# The Headline")
+
+
+def test_the_usable_check_reads_the_text_from_the_headline() -> None:
+    page = f"{USABLE}\n\n# The Headline\n\nA teaser."
+
+    result = chain(Fake("reader", page)).extract(ExtractionInput(URL, title="The Headline"))
+
+    assert [a.outcome for a in result.attempts] == [Outcome.TOO_SHORT]
+
+
 def test_site_rules_limit_the_extractors() -> None:
     feed = Fake("feed", USABLE, fetches_page=False)
     page = Fake("trafilatura")
