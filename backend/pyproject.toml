@@ -1,6 +1,6 @@
 [project]
 name = "brzask"
-version = "0.1.2"
+version = "0.1.3"
 description = "Self-hosted daily news digest: exactly 7 articles worth reading, learned from what you open."
 license = "MIT"
 requires-python = ">=3.13,<3.14"
