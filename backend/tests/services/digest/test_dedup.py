@@ -48,7 +48,7 @@ def near(similarity: float, to: int, other: int) -> list[float]:
 
 def candidate(rank: int, embedding: list[float] | None, **fields: Any) -> Candidate:
     return Candidate(
-        link=f"https://news.example/{rank}",
+        link=f"https://site{rank}.example/{rank}",
         title=f"Article {rank}",
         source_id=rank,
         source_name=f"Source {rank}",
@@ -284,11 +284,39 @@ def test_the_judge_decides_grey_pairs_and_above_the_zone_needs_no_judge() -> Non
 
     assert ranks(result.survivors) == [1, 3, *range(5, 14)]
     assert result.drops == [
-        Drop("https://news.example/2", "same_day", 0.85, "https://news.example/1", 0.9),
-        Drop("https://news.example/4", "same_day", 0.97, "https://news.example/1", None),
+        Drop("https://site2.example/2", "same_day", 0.85, "https://site1.example/1", 0.9),
+        Drop("https://site4.example/4", "same_day", 0.97, "https://site1.example/1", None),
     ]
     assert result.same_day_threshold is None
     assert result.judged_pairs == len(same_event.asked[0])
+
+
+def on_one_site(*candidates: Candidate) -> list[Candidate]:
+    return [replace(c, link=f"https://site.example/{c.rank}") for c in candidates]
+
+
+def test_pairs_from_one_site_are_judged_even_above_the_zone() -> None:
+    # Two articles whose embedded text is mostly the site's shared page chrome.
+    first, second, third = on_one_site(
+        candidate(1, axis(0)), candidate(2, near(0.97, 0, 2)), candidate(3, near(0.99, 0, 3))
+    )
+    candidates = [first, second, third, *distinct(4, 9)]
+
+    pairs = grey_pairs(candidates, GEMINI.same_day[0], GEMINI.cross_day)
+
+    assert [(a.rank, b.rank) for a, b in pairs] == [(1, 2), (1, 3), (2, 3)]
+
+
+def test_the_judge_keeps_different_articles_from_one_site_above_the_zone() -> None:
+    first, second, third = on_one_site(
+        candidate(1, axis(0)), candidate(2, near(0.97, 0, 2)), candidate(3, near(0.99, 0, 3))
+    )
+    candidates = [first, second, third, *distinct(4, 9)]
+    same_event = judged({(1, 2): 0.1, (1, 3): 0.9, (2, 3): 0.1})
+
+    result = deduplicate(candidates, [], GEMINI, same_event)
+
+    assert result.drops == [Drop(third.link, "same_day", 0.99, first.link, 0.9)]
 
 
 def test_an_undecided_judge_keeps_both() -> None:
@@ -320,7 +348,7 @@ def test_when_the_floor_binds_the_closest_duplicates_go_first() -> None:
     result = deduplicate(candidates, [], GEMINI, judged({(1, 2): 0.6}))
 
     assert len(result.survivors) == MIN_SURVIVORS
-    assert [drop.link for drop in result.drops] == ["https://news.example/10"]
+    assert [drop.link for drop in result.drops] == ["https://site10.example/10"]
 
 
 def test_without_grey_pairs_the_judge_is_not_asked() -> None:

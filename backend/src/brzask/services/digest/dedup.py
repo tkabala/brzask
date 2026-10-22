@@ -10,7 +10,12 @@ The same-day pass either picks a threshold by how many candidates it leaves
 from the lowest same-day threshold up to the cross-day one: there the
 similarity of two articles about one event and of two articles that merely
 share a topic overlap, and only reading them tells which it is. Pairs above
-the zone are duplicates without asking.
+the zone are duplicates without asking, unless both come from one site: the
+site's own navigation and forms can make up most of what was embedded, and
+then the judge, who sees the titles, decides. Measured over 1,106 embedded
+articles from daily use: 1,348 pairs from one site reached 0.96 (GitHub,
+Reddit, InfoQ, YouTube pages starting with the same chrome), pairs from
+different sites none.
 
 Thresholds depend on the embedding model: cosine values of one model mean
 nothing for another, so each model has its own, measured on its vectors.
@@ -28,6 +33,7 @@ from brzask.log import get_logger
 from brzask.repositories import ArticleRepository
 from brzask.services.digest.pool import Candidate
 from brzask.services.runs import RunContext
+from brzask.urls import host_of
 
 log = get_logger(__name__)
 
@@ -203,14 +209,22 @@ def _same_day(candidates: Sequence[Candidate], threshold: float) -> list[Drop]:
 def grey_pairs(
     candidates: Sequence[Candidate], lower: float, upper: float
 ) -> list[tuple[Candidate, Candidate]]:
-    """Pairs with similarity in [lower, upper), the better ranked one first."""
+    """Pairs with similarity in [lower, upper), the better ranked one first.
+
+    Pairs from one site have no upper bound (see the module docstring).
+    """
     ordered = [c for c in sorted(candidates, key=_rank) if c.embedding is not None]
     return [
         (first, second)
         for index, first in enumerate(ordered)
         for second in ordered[index + 1 :]
-        if lower <= _similarity(first, second) < upper
+        if lower <= _similarity(first, second) < _zone_top(first, second, upper)
     ]
+
+
+def _zone_top(a: Candidate, b: Candidate, upper: float) -> float:
+    """Where the grey zone of `a` and `b` ends; it does not for two pages of one site."""
+    return math.inf if host_of(a.link) == host_of(b.link) else upper
 
 
 def _same_day_judged(
@@ -237,7 +251,7 @@ def _same_day_judged(
                 continue
             similarity = _similarity(other, candidate)
             probability = same_event.get((other.link, candidate.link))
-            if similarity >= upper:
+            if similarity >= _zone_top(other, candidate, upper):
                 duplicates.append((similarity, other, None))
             elif (
                 similarity >= lower
