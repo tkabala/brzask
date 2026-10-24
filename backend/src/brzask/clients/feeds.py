@@ -4,7 +4,7 @@ A feed that fails to download or parse is reported in its result and never
 stops the others: one broken source must not cost the day's digest.
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -31,6 +31,22 @@ MAX_BYTES = 10 * 1024 * 1024
 ACCEPT = (
     "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.1"
 )
+
+# What an error response says about why it was refused, logged with the failure:
+# YouTube's feed endpoint answered 404 to every followed channel at 06:00 on
+# three days in a row while the same requests got 200 later in the day.
+DIAGNOSTIC_HEADERS = (
+    "Content-Type",
+    "Content-Length",
+    "Server",
+    "Date",
+    "Retry-After",
+    "Cache-Control",
+    "Location",
+)
+# Error pages carry their own styles: 8 KiB reaches the text after them.
+DIAGNOSTIC_BODY_BYTES = 8 * 1024
+DIAGNOSTIC_BODY_CHARS = 500
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,7 +133,16 @@ class FeedFetcher:
                         etag=request.etag,
                         last_modified=request.last_modified,
                     )
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except httpx2.HTTPStatusError as error:
+                    return self._failed(
+                        request.url,
+                        f"{type(error).__name__}: {error}",
+                        log_failure,
+                        temporary=is_temporary(error),
+                        details=response_details(response),
+                    )
                 body = read_limited(response, MAX_BYTES)
                 final_url = str(response.url)
                 content_type = response.headers.get("Content-Type", "")
@@ -149,11 +174,51 @@ class FeedFetcher:
         )
 
     def _failed(
-        self, url: str, error: str, log_failure: bool, *, temporary: bool = False
+        self,
+        url: str,
+        error: str,
+        log_failure: bool,
+        *,
+        temporary: bool = False,
+        details: Mapping[str, Any] | None = None,
     ) -> FeedResult:
         if log_failure:
-            log.warning("feed failed", url=url, error=error, temporary=temporary)
+            log.warning("feed failed", url=url, error=error, temporary=temporary, **(details or {}))
         return FeedResult(url, FetchStatus.FAILED, error=error, temporary=temporary)
+
+
+def response_details(response: httpx2.Response) -> dict[str, Any]:
+    """The request as sent and the start of the error response, for the failure log."""
+    sent = {
+        name: response.request.headers[name]
+        for name in ("If-None-Match", "If-Modified-Since")
+        if name in response.request.headers
+    }
+    try:
+        excerpt = b"".join(_first_bytes(response, DIAGNOSTIC_BODY_BYTES))
+        body = strip_html(excerpt.decode("utf-8", "replace"))[:DIAGNOSTIC_BODY_CHARS]
+    except REQUEST_ERRORS as error:
+        body = f"<unreadable: {type(error).__name__}>"
+    return {
+        "status_code": response.status_code,
+        "http_version": response.http_version,
+        "final_url": str(response.url),
+        "redirects": [str(hop.url) for hop in response.history],
+        "sent": sent,
+        "headers": {
+            name: response.headers[name] for name in DIAGNOSTIC_HEADERS if name in response.headers
+        },
+        "body": body,
+    }
+
+
+def _first_bytes(response: httpx2.Response, limit: int) -> Iterator[bytes]:
+    size = 0
+    for chunk in response.iter_bytes():
+        yield chunk[: limit - size]
+        size += len(chunk)
+        if size >= limit:
+            return
 
 
 def is_temporary(error: Exception) -> bool:

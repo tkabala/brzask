@@ -3,9 +3,11 @@ from pathlib import Path
 
 import httpx2
 import pytest
+from structlog.testing import capture_logs
 
 from brzask import PROJECT_URL
 from brzask.clients.feeds import (
+    DIAGNOSTIC_BODY_CHARS,
     MAX_BYTES,
     FeedFetcher,
     FeedRequest,
@@ -205,6 +207,48 @@ def test_a_youtube_feed_404_is_temporary(url: str, temporary: bool) -> None:
     error = httpx2.HTTPStatusError("404", request=request, response=response)
 
     assert is_temporary(error) is temporary
+
+
+def test_an_error_response_is_logged_with_what_was_sent_and_received() -> None:
+    page = "<html>\n  <body>" + "Not   Found " * 200 + "</body></html>"
+    server = FakeServer(
+        {
+            "/moved.xml": httpx2.Response(301, headers={"Location": f"{BASE}/gone.xml"}),
+            "/gone.xml": httpx2.Response(
+                404,
+                text=page,
+                headers={"Content-Type": "text/html", "Server": "ESF", "Set-Cookie": "id=1"},
+            ),
+        }
+    )
+
+    with capture_logs() as logs:
+        result = server.fetcher().fetch(
+            FeedRequest(f"{BASE}/moved.xml", etag='"v1"', last_modified="Sat, 17 Oct 2026")
+        )
+
+    assert result.error is not None
+    assert result.error.startswith("HTTPStatusError")
+    [entry] = [entry for entry in logs if entry["event"] == "feed failed"]
+    assert entry["status_code"] == 404
+    assert entry["final_url"] == f"{BASE}/gone.xml"
+    assert entry["redirects"] == [f"{BASE}/moved.xml"]
+    assert entry["sent"] == {"If-None-Match": '"v1"', "If-Modified-Since": "Sat, 17 Oct 2026"}
+    assert entry["headers"]["Server"] == "ESF"
+    assert "Set-Cookie" not in entry["headers"]
+    assert entry["body"].startswith("Not Found Not Found")
+    assert len(entry["body"]) == DIAGNOSTIC_BODY_CHARS
+
+
+def test_a_failure_without_a_response_logs_no_response_details() -> None:
+    server = FakeServer({"/down.xml": httpx2.ConnectError("refused")})
+
+    with capture_logs() as logs:
+        server.fetcher().fetch(FeedRequest(f"{BASE}/down.xml"))
+
+    [entry] = [entry for entry in logs if entry["event"] == "feed failed"]
+    assert "status_code" not in entry
+    assert "body" not in entry
 
 
 def test_a_url_httpx_refuses_is_a_failure() -> None:
