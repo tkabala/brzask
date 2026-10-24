@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/tkabala/brzask/compare/v0.1.3...v0.1.4) (2026-10-24)
+
+
+### Bug Fixes
+
+* **feeds:** log the error response a feed fetch failed on ([6cb1719](https://github.com/tkabala/brzask/commit/6cb171935f67a145a4935ad53a87b40a2853e9c9))
+
 ## [0.1.3](https://github.com/tkabala/brzask/compare/v0.1.2...v0.1.3) (2026-10-22)
 
 
