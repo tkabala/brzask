@@ -6,7 +6,12 @@ import httpx2
 import trafilatura
 from trafilatura.utils import decode_file
 
-from brzask.clients.extractors.base import Extracted, ExtractionError, ExtractionInput
+from brzask.clients.extractors.base import (
+    Extracted,
+    ExtractionBlockedError,
+    ExtractionError,
+    ExtractionInput,
+)
 from brzask.clients.http import REQUEST_ERRORS, read_limited
 
 # Article pages are rarely above 2 MB of HTML; larger responses are not articles.
@@ -153,7 +158,13 @@ class Crawl4AIExtractor:
     def extract(self, item: ExtractionInput) -> Extracted | None:
         headers = {"Authorization": f"Bearer {self.api_token}"} if self.api_token else {}
         body = {"url": item.url, "f": "fit"}
-        response = _json(self.client, "POST", self.url, headers=headers, json=body)
+        try:
+            response = _json(self.client, "POST", self.url, headers=headers, json=body)
+        except ExtractionError as error:
+            blocked = _crawl4ai_block(error)
+            if blocked is None:
+                raise
+            raise blocked from error.__cause__
         markdown = response.get("markdown")
         if response.get("success") is False or not isinstance(markdown, str) or not markdown:
             return None
@@ -170,6 +181,20 @@ def _json(client: httpx2.Client, method: str, url: str, **kwargs: Any) -> dict[s
     if not isinstance(data, dict):
         raise ExtractionError("unexpected response")
     return data
+
+
+def _crawl4ai_block(error: ExtractionError) -> ExtractionBlockedError | None:
+    """The block crawl4ai reports as an error, e.g. 502 "Blocked by anti-bot protection: ..."."""
+    cause = error.__cause__
+    if not isinstance(cause, httpx2.HTTPStatusError):
+        return None
+    try:
+        detail = cause.response.json().get("detail")
+    except (ValueError, AttributeError):
+        return None
+    if isinstance(detail, str) and "anti-bot" in detail.lower():
+        return ExtractionBlockedError(detail)
+    return None
 
 
 def _str(value: object) -> str | None:

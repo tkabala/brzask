@@ -8,6 +8,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoi
 from brzask.clients.extractors import (
     SNIPPET,
     Extracted,
+    ExtractionBlockedError,
     ExtractionError,
     ExtractionInput,
     ExtractorChain,
@@ -91,6 +92,16 @@ def test_unusable_and_failing_extractors_fall_through() -> None:
     ]
     assert result.attempts[0].chars == len("Too short.")
     assert result.attempts[2].error == "HTTPStatusError: 503"
+
+
+def test_a_site_that_refuses_the_extractor_counts_as_blocked() -> None:
+    refused = Fake("browser", ExtractionBlockedError("Blocked by anti-bot protection: HTTP 403"))
+
+    result = chain(refused, Fake("good")).extract(ExtractionInput(URL))
+
+    assert result.extracted_by == "good"
+    assert result.attempts[0].outcome is Outcome.BLOCKED
+    assert result.attempts[0].error == "Blocked by anti-bot protection: HTTP 403"
 
 
 def test_the_snippet_is_the_final_fallback() -> None:

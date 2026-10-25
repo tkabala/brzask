@@ -43,6 +43,10 @@ class ExtractionError(Exception):
     """The extractor could not get the page (network, HTTP status, unsupported content)."""
 
 
+class ExtractionBlockedError(ExtractionError):
+    """The site refused the extractor with an anti-bot page, and the extractor said so."""
+
+
 class Extractor(Protocol):
     name: str
     fetches_page: bool  # False only for extractors that read what the feed already gave

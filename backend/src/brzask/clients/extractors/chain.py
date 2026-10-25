@@ -10,6 +10,7 @@ from opentelemetry import metrics
 
 from brzask.clients.extractors.base import (
     Extracted,
+    ExtractionBlockedError,
     ExtractionError,
     ExtractionInput,
     Extractor,
@@ -42,7 +43,7 @@ class RobotsCheck(Protocol):
 class Outcome(StrEnum):
     USABLE = "usable"
     TOO_SHORT = "too_short"
-    BLOCKED = "blocked"  # an anti-bot or error page served with HTTP 200
+    BLOCKED = "blocked"  # an anti-bot or error page, served as the article or reported as one
     EMPTY = "empty"  # the extractor found no text
     FAILED = "failed"  # network error, HTTP error, unsupported content
     SKIPPED_RULE = "skipped_rule"  # the site's rule does not allow this extractor
@@ -116,8 +117,17 @@ class ExtractorChain:
             extracted = extractor.extract(item)
         except ExtractionError as error:
             elapsed = _ms(started)
-            log.info("extraction failed", extractor=extractor.name, url=item.url, error=str(error))
-            return self._record(extractor.name, host, Outcome.FAILED, 0, elapsed, str(error)), None
+            outcome = (
+                Outcome.BLOCKED if isinstance(error, ExtractionBlockedError) else Outcome.FAILED
+            )
+            log.info(
+                "extraction failed",
+                extractor=extractor.name,
+                url=item.url,
+                outcome=outcome.value,
+                error=str(error),
+            )
+            return self._record(extractor.name, host, outcome, 0, elapsed, str(error)), None
         elapsed = _ms(started)
         if extracted is None:
             return self._record(extractor.name, host, Outcome.EMPTY, 0, elapsed), None

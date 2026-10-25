@@ -5,7 +5,12 @@ from typing import Any
 import httpx2
 import pytest
 
-from brzask.clients.extractors import ExtractionError, ExtractionInput, unusable_reason
+from brzask.clients.extractors import (
+    ExtractionBlockedError,
+    ExtractionError,
+    ExtractionInput,
+    unusable_reason,
+)
 from brzask.clients.extractors.adapters import (
     FEED_MIN_CHARS,
     MAX_PAGE_BYTES,
@@ -225,6 +230,23 @@ def test_crawl4ai_failure() -> None:
         Crawl4AIExtractor(server.client, "http://crawl4ai:11235").extract(ExtractionInput(URL))
         is None
     )
+
+
+def test_crawl4ai_reports_a_site_that_blocks_the_browser() -> None:
+    # What crawl4ai answers when the page is a CloudFront "Request blocked" 403.
+    detail = "Blocked by anti-bot protection: HTTP 403 with HTML content (923 bytes)"
+    server = Server(httpx2.Response(502, json={"detail": detail}))
+
+    with pytest.raises(ExtractionBlockedError, match="anti-bot"):
+        Crawl4AIExtractor(server.client, "http://crawl4ai:11235").extract(ExtractionInput(URL))
+
+
+def test_crawl4ai_server_error_is_a_failure_not_a_block() -> None:
+    server = Server(httpx2.Response(502, text="Bad Gateway"))
+
+    with pytest.raises(ExtractionError) as raised:
+        Crawl4AIExtractor(server.client, "http://crawl4ai:11235").extract(ExtractionInput(URL))
+    assert not isinstance(raised.value, ExtractionBlockedError)
 
 
 def test_trafilatura_detects_a_charset_named_only_in_the_page() -> None:

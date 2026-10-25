@@ -18,6 +18,7 @@ from brzask.clients.extractors.adapters import (
 )
 from brzask.clients.extractors.base import (
     Extracted,
+    ExtractionBlockedError,
     ExtractionError,
     ExtractionInput,
     Extractor,
@@ -38,6 +39,7 @@ __all__ = [
     "SNIPPET",
     "Attempt",
     "Extracted",
+    "ExtractionBlockedError",
     "ExtractionError",
     "ExtractionInput",
     "ExtractionResult",
