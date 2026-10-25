@@ -8,6 +8,7 @@ invented is skipped, never stored.
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from brzask import prompts
 from brzask.log import get_logger
@@ -72,19 +73,27 @@ def parse_selection(
     """Picks from `{"articles": [...]}`, grouped by topic and numbered from 1.
 
     Topics keep the order in which they first appear; links are matched to the
-    candidates (ignoring a trailing slash), unknown and repeated ones skipped,
-    and at most `size` kept. A missing title falls back to the original one.
+    candidates (ignoring a trailing slash, and the query when the model dropped
+    it and only one candidate fits), unknown and repeated ones skipped, and at
+    most `size` kept. A missing title falls back to the original one.
     """
     items = answer.get("articles") if isinstance(answer, dict) else None
     if not isinstance(items, list):
         return []
     by_link = {_link_key(candidate.link): candidate for candidate in candidates}
+    # Models tend to drop long tracking queries (`?utm_...`) when copying a link.
+    by_path: dict[str, list[Candidate]] = {}
+    for each in candidates:
+        by_path.setdefault(_path_key(each.link), []).append(each)
     chosen: list[tuple[Candidate, dict[str, Any]]] = []
     used: set[str] = set()
     for item in items:
         if not isinstance(item, dict) or len(chosen) == size:
             continue
-        candidate = by_link.get(_link_key(_text(item.get("link"))))
+        link = _text(item.get("link"))
+        candidate = by_link.get(_link_key(link))
+        if candidate is None and len(fits := by_path.get(_path_key(link), [])) == 1:
+            candidate = fits[0]
         if candidate is None or candidate.link in used:
             log.info("selection names an unknown or repeated link", link=item.get("link"))
             continue
@@ -141,3 +150,7 @@ def _text(value: Any) -> str:
 
 def _link_key(link: str) -> str:
     return link.strip().rstrip("/")
+
+
+def _path_key(link: str) -> str:
+    return _link_key(urlsplit(link.strip())._replace(query="", fragment="").geturl())

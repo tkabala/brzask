@@ -23,13 +23,15 @@ POLISH = prompts.language("pl")
 
 
 def candidate(n: int, **fields: Any) -> Candidate:
-    defaults: dict[str, Any] = {"snippet": None, "published_at": NOW, "rank": n, "release": False}
+    defaults: dict[str, Any] = {
+        "link": f"https://news.example/{n}",
+        "snippet": None,
+        "published_at": NOW,
+        "rank": n,
+        "release": False,
+    }
     return Candidate(
-        link=f"https://news.example/{n}",
-        title=f"Article {n}",
-        source_id=n,
-        source_name=f"Source {n}",
-        **(defaults | fields),
+        title=f"Article {n}", source_id=n, source_name=f"Source {n}", **(defaults | fields)
     )
 
 
@@ -86,6 +88,24 @@ def test_unknown_and_repeated_links_are_skipped() -> None:
 
     assert [p.candidate.link for p in picks] == ["https://news.example/1", "https://news.example/2"]
     assert picks[0].title == "Title 1"
+
+
+def test_a_link_with_its_query_dropped_still_matches_one_candidate() -> None:
+    tracked = "https://www.infoq.com/news/argon/?utm_campaign=infoq_content&utm_source=infoq"
+    candidates = [candidate(1, link=tracked), candidate(2)]
+    answer = {"articles": [item(1, link="https://www.infoq.com/news/argon/")]}
+
+    assert [p.candidate.link for p in parse_selection(answer, candidates, ENGLISH)] == [tracked]
+
+
+def test_a_link_without_its_query_matching_two_candidates_is_skipped() -> None:
+    candidates = [
+        candidate(1, link="https://forum.example/view?t=1"),
+        candidate(2, link="https://forum.example/view?t=2"),
+    ]
+    answer = {"articles": [item(1, link="https://forum.example/view")]}
+
+    assert parse_selection(answer, candidates, ENGLISH) == []
 
 
 def test_at_most_digest_size_picks() -> None:
