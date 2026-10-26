@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/tkabala/brzask/compare/v0.1.4...v0.1.5) (2026-10-26)
+
+
+### Bug Fixes
+
+* **discovery:** judge a feed whose items carry no dates ([4ffbc0f](https://github.com/tkabala/brzask/commit/4ffbc0fc4285a0de6ab5a4195817abcc72a519d4))
+* **extractors:** count a crawl4ai anti-bot refusal as blocked ([fa45ac1](https://github.com/tkabala/brzask/commit/fa45ac16b68ec5f694d33ed35db1abbc3952123a))
+* **feeds:** follow a feed that moved permanently ([60a23e0](https://github.com/tkabala/brzask/commit/60a23e07db822fb49db102eb590b5814bed849f5))
+* **selection:** match a picked link whose query the model dropped ([5a76c35](https://github.com/tkabala/brzask/commit/5a76c35905543f6401530dbc4f97bf65ca248bf0))
+
 ## [0.1.4](https://github.com/tkabala/brzask/compare/v0.1.3...v0.1.4) (2026-10-24)
 
 
