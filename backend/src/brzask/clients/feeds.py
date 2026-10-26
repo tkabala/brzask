@@ -14,6 +14,7 @@ from typing import Any
 import feedparser
 import httpx2
 
+from brzask.clients.extractors.base import BLOCK_PAGE_MAX_CHARS, BLOCK_PHRASES
 from brzask.clients.http import REQUEST_ERRORS, USER_AGENT, read_limited
 from brzask.log import get_logger
 from brzask.text import from_struct_time, strip_html
@@ -139,12 +140,13 @@ class FeedFetcher:
                 try:
                     response.raise_for_status()
                 except httpx2.HTTPStatusError as error:
+                    details = response_details(response)
                     return self._failed(
                         request.url,
                         f"{type(error).__name__}: {error}",
                         log_failure,
-                        temporary=is_temporary(error),
-                        details=response_details(response),
+                        temporary=is_temporary(error) and not details["block_page"],
+                        details=details,
                     )
                 body = read_limited(response, MAX_BYTES)
                 final_url = str(response.url)
@@ -214,9 +216,9 @@ def response_details(response: httpx2.Response) -> dict[str, Any]:
     }
     try:
         excerpt = b"".join(_first_bytes(response, DIAGNOSTIC_BODY_BYTES))
-        body = strip_html(excerpt.decode("utf-8", "replace"))[:DIAGNOSTIC_BODY_CHARS]
+        text = strip_html(excerpt.decode("utf-8", "replace"))
     except REQUEST_ERRORS as error:
-        body = f"<unreadable: {type(error).__name__}>"
+        text = f"<unreadable: {type(error).__name__}>"
     return {
         "status_code": response.status_code,
         "http_version": response.http_version,
@@ -226,7 +228,8 @@ def response_details(response: httpx2.Response) -> dict[str, Any]:
         "headers": {
             name: response.headers[name] for name in DIAGNOSTIC_HEADERS if name in response.headers
         },
-        "body": body,
+        "body": text[:DIAGNOSTIC_BODY_CHARS],
+        "block_page": is_block_page(text),
     }
 
 
@@ -237,6 +240,15 @@ def _first_bytes(response: httpx2.Response, limit: int) -> Iterator[bytes]:
         size += len(chunk)
         if size >= limit:
             return
+
+
+def is_block_page(body: str) -> bool:
+    """An anti-bot page: a feed reader does not get past it however often it retries.
+
+    VentureBeat answers 429 with a browser check on every fetch, so the status
+    alone would keep the source "temporarily" failing for good.
+    """
+    return len(body) <= BLOCK_PAGE_MAX_CHARS and bool(BLOCK_PHRASES.search(body))
 
 
 def is_temporary(error: Exception) -> bool:

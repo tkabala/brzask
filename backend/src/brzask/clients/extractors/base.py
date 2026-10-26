@@ -9,10 +9,12 @@ MIN_CHARS = 200
 
 # Anti-bot and error pages served with HTTP 200 instead of the article; Reddit,
 # for one, answers fetchers with "You've been blocked by network security", the
-# JetBrains blog (after a few dozen requests) with "verify that you're not a robot".
+# JetBrains blog (after a few dozen requests) with "verify that you're not a robot",
+# VentureBeat's feeds (429) with a "Vercel Security Checkpoint: we're verifying
+# your browser" page.
 BLOCK_PHRASES = re.compile(
     r"blocked by network security|access denied|are you a human|not a robot|"
-    r"enable javascript and cookies|captcha",
+    r"enable javascript and cookies|captcha|verifying your browser",
     re.IGNORECASE,
 )
 # Block pages are a few hundred characters; an article about CAPTCHAs or access

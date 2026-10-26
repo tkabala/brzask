@@ -6,6 +6,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from brzask import PROJECT_URL
+from brzask.clients.extractors.base import BLOCK_PAGE_MAX_CHARS
 from brzask.clients.feeds import (
     DIAGNOSTIC_BODY_CHARS,
     MAX_BYTES,
@@ -343,3 +344,29 @@ def test_a_feed_that_moved_for_good_reports_where_to(
 
     assert result.status is FetchStatus.OK
     assert result.moved_to == moved_to
+
+
+VERCEL_CHECKPOINT = (
+    "<html><head><style>body{margin:0}</style><title>Vercel Security Checkpoint</title></head>"
+    "<body><p>We're verifying your browser</p><p>Website owner? Click here to fix</p>"
+    "<noscript>Enable JavaScript to continue</noscript></body></html>"
+)
+
+
+@pytest.mark.parametrize(
+    ("response", "temporary"),
+    [
+        (httpx2.Response(429, text=VERCEL_CHECKPOINT, headers={"Server": "Vercel"}), False),
+        (httpx2.Response(503, text="<p>Are you a human?</p>"), False),
+        (httpx2.Response(429), True),  # Reddit: an empty refusal may pass with time
+        (httpx2.Response(503, text="<p>Down for maintenance</p>"), True),
+        (httpx2.Response(503, text="captcha " + "x" * BLOCK_PAGE_MAX_CHARS), True),
+    ],
+)
+def test_an_anti_bot_page_is_a_permanent_failure(
+    response: httpx2.Response, temporary: bool
+) -> None:
+    result = fetch("feed.xml", FakeServer({"/feed.xml": response}))
+
+    assert result.status is FetchStatus.FAILED
+    assert result.temporary is temporary
