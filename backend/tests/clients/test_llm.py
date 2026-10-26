@@ -153,6 +153,20 @@ def test_each_call_logs_its_provider_and_reasoning() -> None:
     ]
 
 
+def test_an_odd_usage_shape_only_leaves_the_log_details_out() -> None:
+    body = answer("Hi").json()
+    body["provider"] = {"name": "x"}
+    body["usage"]["completion_tokens_details"] = [25]
+    fake = Fake(httpx2.Response(200, json=body))
+
+    with capture_logs() as logs:
+        completion = fake.llm.complete("Greet", purpose="selection")
+
+    assert completion.content == "Hi"
+    [call] = [entry for entry in logs if entry["event"] == "llm call"]
+    assert (call["provider"], call["reasoning_tokens"]) == (None, None)
+
+
 def test_json_mode_and_cost_reporting_are_requested() -> None:
     fake = Fake(answer('{"ranking": [1]}'), report_cost=True)
 

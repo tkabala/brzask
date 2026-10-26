@@ -172,11 +172,14 @@ def _call_details(response: ChatCompletion, content: str) -> dict[str, Any]:
     or 22.6k output tokens (and 42 s or 141 s); the answer's length tells
     reasoning apart from answer tokens when the provider does not report them.
     """
-    usage = response.usage
-    tokens = usage.completion_tokens_details if usage else None
+    # Read defensively: these only feed the log, and providers send odd shapes
+    # that must not discard an answer already paid for.
+    tokens = getattr(response.usage, "completion_tokens_details", None)
+    reasoning = getattr(tokens, "reasoning_tokens", None)
+    provider = (response.model_extra or {}).get("provider")
     return {
-        "provider": (response.model_extra or {}).get("provider"),
-        "reasoning_tokens": tokens.reasoning_tokens if tokens else None,
+        "provider": provider if isinstance(provider, str) else None,
+        "reasoning_tokens": reasoning if isinstance(reasoning, int) else None,
         "answer_chars": len(content),
     }
 
