@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.6](https://github.com/tkabala/brzask/compare/v0.1.5...v0.1.6) (2026-10-26)
+
+
+### Features
+
+* **llm:** log the provider and reasoning tokens of each call ([f0c4689](https://github.com/tkabala/brzask/commit/f0c4689d60221e31ff3e1e3736055aa8d02bd986))
+
+
+### Bug Fixes
+
+* **feeds:** count an anti-bot page as a permanent fetch failure ([b5ab102](https://github.com/tkabala/brzask/commit/b5ab102d98bdb87f828de0c875158264a12dc072))
+
+
+### Chores
+
+* release 0.1.6 ([c13b6ae](https://github.com/tkabala/brzask/commit/c13b6ae46a763d71aa0f5d1653dfa33b59944ab3))
+
 ## [0.1.5](https://github.com/tkabala/brzask/compare/v0.1.4...v0.1.5) (2026-10-26)
 
 
