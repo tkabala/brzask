@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.8](https://github.com/tkabala/brzask/compare/v0.1.7...v0.1.8) (2026-10-26)
+
+
+### Bug Fixes
+
+* **feeds:** fail a feed with a malformed URL without stopping the others ([bebb55f](https://github.com/tkabala/brzask/commit/bebb55f78ec7a27c2b7f471f4af34f04935334f2))
+* **feeds:** report moves with 304, ignore query changes, judge whole block pages ([2f8f21d](https://github.com/tkabala/brzask/commit/2f8f21d43a20e57b880cb60b3cf5e832aea8cea5))
+* **llm:** read the logged call details defensively ([a63edde](https://github.com/tkabala/brzask/commit/a63edde471dbe8bcf32b5804bafa1bca034803b1))
+* **selection:** fall back to the path only for a link without a query ([f8fbbd3](https://github.com/tkabala/brzask/commit/f8fbbd38762c79c850f717cb040a9ca184ac7f7b))
+* **sources:** log a rejection by hand as source.reject ([7e6d226](https://github.com/tkabala/brzask/commit/7e6d22616e7527a7bfb92ad24063ca2cdc3fcfbf))
+* **sources:** move a source onto its own URL in another case, keep merged articles ([144c0a0](https://github.com/tkabala/brzask/commit/144c0a0012fce41545cfbe914636871f730e70f3))
+
 ## [0.1.7](https://github.com/tkabala/brzask/compare/v0.1.6...v0.1.7) (2026-10-26)
 
 
