@@ -1,8 +1,8 @@
 """Discovery: new sources from a web search per interest, vetted by a judge.
 
 For each active interest the web search proposes sites; each is resolved to a
-feed (blog, YouTube channel, GitHub releases), feeds without recent items are
-dropped, and the judge scores the rest on what they actually publish: how
+feed (blog, YouTube channel, GitHub releases), feeds whose dated items are
+all old are dropped, and the judge scores the rest on what they actually publish: how
 regularly it serves an interest, and how much of it is substance rather than
 marketing. Code turns the two scores into a status:
 
@@ -109,7 +109,9 @@ class Candidate:
     proposal: Proposal
     feed: FoundFeed
     sample: list[FeedEntry]  # newest first
-    recent_count: int
+    # None when no sampled item has a date: some feeds (formula1.com) date
+    # nothing, and the digest keeps undated entries, so such a feed is judged.
+    recent_count: int | None
     latest: datetime | None
     name_mismatch: bool
 
@@ -169,7 +171,9 @@ def to_candidate(proposal: Proposal, feed: FoundFeed, now: datetime) -> Candidat
         proposal=proposal,
         feed=feed,
         sample=sample,
-        recent_count=sum(date >= now - RECENT_WINDOW for date in dates),
+        recent_count=(
+            None if sample and not dates else sum(date >= now - RECENT_WINDOW for date in dates)
+        ),
         latest=max(dates, default=None),
         name_mismatch=name_mismatch(proposal.title, feed.title),
     )
@@ -271,7 +275,7 @@ def discover_sources(
         if feed is not None and feed_key(feed.url) not in feed_urls:
             feed_urls.add(feed_key(feed.url))
             candidates.append(to_candidate(proposal, feed, now))
-    active = [c for c in candidates if c.recent_count > 0]
+    active = [c for c in candidates if c.recent_count != 0]
 
     with context.stage("judge"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
         verdicts = list(pool.map(lambda c: judge_feed(c, judge, interests, context.usage), active))

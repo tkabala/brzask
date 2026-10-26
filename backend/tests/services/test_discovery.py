@@ -131,6 +131,20 @@ def test_inactive_feeds_have_no_recent_items() -> None:
     assert candidate.recent_count == 0
 
 
+def test_a_feed_that_dates_nothing_has_unknown_activity_and_an_empty_one_none() -> None:
+    undated = tuple(
+        FeedEntry(f"https://x.example/{n}", f"Post {n}", None, None, None) for n in range(3)
+    )
+    empty = FoundFeed("https://y.example/feed", "Empty", "https://y.example", ())
+
+    candidate = to_candidate(
+        proposal("https://x.example/"), feed("https://x.example/feed", items=undated), NOW
+    )
+
+    assert candidate.recent_count is None
+    assert to_candidate(proposal("https://y.example/"), empty, NOW).recent_count == 0
+
+
 @pytest.mark.parametrize(
     ("fit", "substance", "status"),
     [
