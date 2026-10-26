@@ -123,6 +123,10 @@ class FeedFetcher:
         return results
 
     def fetch(self, request: FeedRequest, *, log_failure: bool = True) -> FeedResult:
+        if not is_http_url(request.url):
+            # httpx2 raises a plain ValueError for some of these (a relative
+            # URL), which would stop every other feed in `fetch_all` too.
+            return self._failed(request.url, "not an http(s) URL", log_failure)
         headers = {}
         if request.etag:
             headers["If-None-Match"] = request.etag

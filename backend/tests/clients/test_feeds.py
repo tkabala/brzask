@@ -260,6 +260,19 @@ def test_a_url_httpx_refuses_is_a_failure() -> None:
     assert not result.temporary
 
 
+def test_a_relative_url_fails_alone_instead_of_stopping_the_others() -> None:
+    requests = [FeedRequest("/feed"), FeedRequest(f"{BASE}/rss2.xml")]
+
+    broken, ok = FakeServer().fetcher().fetch_all(requests)
+
+    assert (broken.status, broken.error, broken.temporary) == (
+        FetchStatus.FAILED,
+        "not an http(s) URL",
+        False,
+    )
+    assert ok.status is FetchStatus.OK
+
+
 def test_oversized_responses_are_refused() -> None:
     huge = httpx2.Response(200, content=b"<rss>" + b" " * (MAX_BYTES + 1))
 
