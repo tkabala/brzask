@@ -113,6 +113,28 @@ def test_vectors_move_to_their_own_table_and_back(empty_database_url: str, engin
     ]
 
 
+def test_manual_rejections_take_discoverys_action_name(
+    empty_database_url: str, engine: Engine
+) -> None:
+    config = alembic_config(empty_database_url)
+    command.upgrade(config, "01745d57d6ab")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO change_log (actor, action, entity_type, status) VALUES "
+                "('user', 'source.rejected', 'source', 'applied'), "
+                "('pipeline:discovery', 'source.reject', 'source', 'applied'), "
+                "('user', 'source.mute', 'source', 'applied')"
+            )
+        )
+
+    command.upgrade(config, "91bf7f43d22e")
+
+    with engine.connect() as connection:
+        actions = connection.execute(text("SELECT action FROM change_log ORDER BY id")).all()
+    assert [row[0] for row in actions] == ["source.reject", "source.reject", "source.mute"]
+
+
 def test_cli_migrate_uses_the_database_settings(
     empty_database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

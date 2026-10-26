@@ -267,7 +267,9 @@ def move_source(session: Session, source: Source, url: str, *, actor: str) -> bo
         return False
     sources = SourceRepository(session)
     other = sources.get_by_url(url)
-    if other is not None and (other.id == source.id or other.status is SourceStatus.ACTIVE):
+    if other is not None and other.id == source.id:
+        other = None  # the same feed in another case (`/r/Python` → `/r/python`)
+    if other is not None and other.status is SourceStatus.ACTIVE:
         log.warning("source moved to a followed feed", source=source.id, other=other.id, url=url)
         return False
     before: dict[str, Any] = {"url": source.url}

@@ -329,3 +329,30 @@ def test_a_feed_moved_to_a_muted_duplicate_merges_it(session: Session, make: Fac
     assert change.reason == (
         "the feed redirects here permanently; merged muted source 'Duplicate' (1 articles)"
     )
+
+
+def test_a_feed_moved_to_its_own_url_in_another_case_takes_it(
+    session: Session, make: Factories
+) -> None:
+    source = make.source(url="https://www.reddit.com/r/Python/.rss")
+
+    moved = move_source(session, source, "https://www.reddit.com/r/python/.rss", actor="user")
+
+    assert moved is True
+    assert source.url == "https://www.reddit.com/r/python/.rss"
+
+
+def test_merging_keeps_the_articles_of_a_loaded_duplicate(
+    session: Session, make: Factories
+) -> None:
+    old = make.source(url="https://github.com/old/app/releases.atom")
+    duplicate = make.source(
+        url="https://github.com/new/app/releases.atom", status=SourceStatus.MUTED
+    )
+    article = make.article(duplicate)
+    assert duplicate.articles == [article]  # loaded before the merge
+
+    move_source(session, old, duplicate.url, actor="pipeline:digest")
+    session.expire_all()
+
+    assert article.source_id == old.id

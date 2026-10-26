@@ -142,6 +142,9 @@ class SourceRepository:
         result = self.session.execute(
             update(Article).where(Article.source_id == other.id).values(source_id=source.id)
         )
+        # A loaded `other.articles` would be cleared on delete, setting the
+        # moved articles' source to NULL; reloaded, it is empty.
+        self.session.expire(other, ["articles"])
         self.session.delete(other)
         self.session.flush()
         return int(result.rowcount)  # type: ignore[attr-defined]
