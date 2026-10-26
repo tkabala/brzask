@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/tkabala/brzask/compare/v0.1.6...v0.1.7) (2026-10-26)
+
+
+### Bug Fixes
+
+* **discovery:** ask the web search for repositories that publish releases ([6acec5e](https://github.com/tkabala/brzask/commit/6acec5eaf79e602fa8d621b355f44f10078dcc5b))
+* **sources:** merge a muted duplicate when a feed moves onto its URL ([ca06654](https://github.com/tkabala/brzask/commit/ca066545a8acad05516455c7ca9191e2d77b28db))
+
 ## [0.1.6](https://github.com/tkabala/brzask/compare/v0.1.5...v0.1.6) (2026-10-26)
 
 
