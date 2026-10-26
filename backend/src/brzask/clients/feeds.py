@@ -84,6 +84,9 @@ class FeedResult:
     # Whether a failure may go away by itself (429, 5xx, timeouts, network errors),
     # as opposed to a feed that is gone or broken (404, 410, 403, not a feed).
     temporary: bool = False
+    # The final URL when every redirect on the way was permanent (301, 308): the
+    # feed has moved for good, e.g. a GitHub repository moved to another owner.
+    moved_to: str | None = None
 
 
 class FeedFetcher:
@@ -145,6 +148,7 @@ class FeedFetcher:
                     )
                 body = read_limited(response, MAX_BYTES)
                 final_url = str(response.url)
+                moved_to = permanent_move(response, request.url)
                 content_type = response.headers.get("Content-Type", "")
                 etag = response.headers.get("ETag")
                 last_modified = response.headers.get("Last-Modified")
@@ -171,6 +175,7 @@ class FeedFetcher:
             title=strip_html(parsed.feed.get("title")) or None,
             etag=etag,
             last_modified=last_modified,
+            moved_to=moved_to,
         )
 
     def _failed(
@@ -185,6 +190,19 @@ class FeedFetcher:
         if log_failure:
             log.warning("feed failed", url=url, error=error, temporary=temporary, **(details or {}))
         return FeedResult(url, FetchStatus.FAILED, error=error, temporary=temporary)
+
+
+PERMANENT_REDIRECTS = frozenset({301, 308})
+
+
+def permanent_move(response: httpx2.Response, requested: str) -> str | None:
+    """Where the feed now lives, when every redirect to it was permanent."""
+    final_url = str(response.url)
+    if not response.history or final_url == requested:
+        return None
+    if all(hop.status_code in PERMANENT_REDIRECTS for hop in response.history):
+        return final_url
+    return None
 
 
 def response_details(response: httpx2.Response) -> dict[str, Any]:

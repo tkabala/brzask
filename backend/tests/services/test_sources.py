@@ -11,6 +11,7 @@ from brzask.services.sources import (
     enable_source,
     find_source,
     is_release_feed,
+    move_source,
     mute_source,
     name_from_feed,
     propose_source,
@@ -270,3 +271,36 @@ def test_propose_source_skips_a_known_url_whatever_its_status(
     )
 
     assert source is None
+
+
+def test_a_moved_feed_takes_its_new_url_with_the_change_recorded(
+    session: Session, make: Factories
+) -> None:
+    source = make.source(url="https://github.com/old/app/releases.atom")
+
+    moved = move_source(
+        session, source, "https://github.com/new/app/releases.atom", actor="pipeline:digest"
+    )
+
+    assert moved is True
+    assert source.url == "https://github.com/new/app/releases.atom"
+    [change] = ChangeRepository(session).find(
+        limit=10, entity_type="source", entity_id=str(source.id)
+    )
+    assert (change.action, change.actor, change.before, change.after) == (
+        "source.move",
+        "pipeline:digest",
+        {"url": "https://github.com/old/app/releases.atom"},
+        {"url": "https://github.com/new/app/releases.atom"},
+    )
+
+
+def test_a_feed_moved_to_a_followed_url_keeps_both_sources(
+    session: Session, make: Factories
+) -> None:
+    old = make.source(url="https://github.com/old/app/releases.atom")
+    new = make.source(url="https://github.com/new/app/releases.atom")
+
+    assert move_source(session, old, new.url, actor="pipeline:digest") is False
+    assert move_source(session, new, new.url, actor="pipeline:digest") is False
+    assert old.url == "https://github.com/old/app/releases.atom"

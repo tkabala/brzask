@@ -247,6 +247,25 @@ def test_a_temporary_failure_is_recorded_as_one(
     assert (busy.failing_since, busy.permanent_failing_since, busy.fetch_failures) == (NOW, None, 1)
 
 
+def test_a_source_whose_feed_moved_for_good_follows_it(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    source = make.source(url="https://github.com/old/app/releases.atom")
+    new_url = "https://github.com/new/app/releases.atom"
+    feeds = FakeFeeds(
+        {
+            source.url: FeedResult(
+                new_url, FetchStatus.OK, [entry("https://x.example/1")], moved_to=new_url
+            )
+        }
+    )
+
+    gather_candidates(context(sessions), feeds)
+    session.expire_all()
+
+    assert (source.url, source.fetched_at) == (new_url, NOW)
+
+
 def test_a_dry_run_writes_nothing(
     sessions: sessionmaker[Session], session: Session, make: Factories
 ) -> None:

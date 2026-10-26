@@ -1,4 +1,4 @@
-"""Adding, muting and enabling sources."""
+"""Adding, muting, enabling and moving sources."""
 
 from collections.abc import Collection, Sequence
 from datetime import datetime, timedelta
@@ -9,10 +9,13 @@ from sqlalchemy.orm import Session
 
 from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import ChangeStatus, Source, SourceKind, SourceOrigin, SourceStatus
+from brzask.log import get_logger
 from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.repositories.sources import SourceStats
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.refs import as_id
+
+log = get_logger(__name__)
 
 
 class SiteFeedFinder(Protocol):
@@ -247,6 +250,35 @@ def rename_source(session: Session, source: Source, name: str, *, actor: str) ->
         status=ChangeStatus.APPLIED,
         before={"name": before},
         after={"name": name},
+    )
+    return True
+
+
+def move_source(session: Session, source: Source, url: str, *, actor: str) -> bool:
+    """Point a source at the URL its feed moved to for good. False when nothing changed.
+
+    Keeping the old URL would let discovery add the new one as a second source
+    of the same feed. When another source already has the new URL, both stay as
+    they are and a person decides which to keep.
+    """
+    if url == source.url:
+        return False
+    other = SourceRepository(session).get_by_url(url)
+    if other is not None:
+        log.warning("source moved to a followed feed", source=source.id, other=other.id, url=url)
+        return False
+    before = source.url
+    source.url = url
+    session.flush()
+    ChangeRepository(session).record(
+        actor=actor,
+        action="source.move",
+        entity_type="source",
+        entity_id=str(source.id),
+        status=ChangeStatus.APPLIED,
+        before={"url": before},
+        after={"url": url},
+        reason="the feed redirects here permanently",
     )
     return True
 

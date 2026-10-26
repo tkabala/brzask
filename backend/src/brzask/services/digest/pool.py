@@ -18,9 +18,11 @@ from brzask.log import get_logger
 from brzask.repositories import ArticleRepository, SourceRepository
 from brzask.repositories.articles import NewArticle
 from brzask.services.runs import RunContext
-from brzask.services.sources import is_release_feed
+from brzask.services.sources import is_release_feed, move_source
 
 log = get_logger(__name__)
+
+ACTOR = "pipeline:digest"
 
 # Feeds bring old entries back to the top; without this cut, stale entries were
 # ~89% of the pool (the oldest 340 days old).
@@ -286,3 +288,5 @@ def _record_fetches(
         repository.record_fetch(source, at)
         if result.status is FetchStatus.OK:
             repository.set_fetch_validators(source, result.etag, result.last_modified)
+        if result.moved_to:
+            move_source(session, source, result.moved_to, actor=ACTOR)

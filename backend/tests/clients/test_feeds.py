@@ -316,3 +316,30 @@ def test_fetch_all_keeps_the_order_and_isolates_failures() -> None:
         FetchStatus.OK,
     ]
     assert len(server.requests) == len(names)
+
+
+@pytest.mark.parametrize(
+    ("hops", "moved_to"),
+    [
+        ((301,), f"{BASE}/rss2.xml"),
+        ((308, 301), f"{BASE}/rss2.xml"),
+        ((302,), None),  # a temporary redirect keeps the URL
+        ((301, 307), None),
+        ((), None),
+    ],
+)
+def test_a_feed_that_moved_for_good_reports_where_to(
+    hops: tuple[int, ...], moved_to: str | None
+) -> None:
+    paths = [f"/hop{n}" for n in range(len(hops))] + ["/rss2.xml"]
+    server = FakeServer(
+        {
+            path: httpx2.Response(status, headers={"Location": paths[n + 1]})
+            for n, (path, status) in enumerate(zip(paths, hops, strict=False))
+        }
+    )
+
+    result = server.fetcher().fetch(FeedRequest(f"{BASE}{paths[0]}"))
+
+    assert result.status is FetchStatus.OK
+    assert result.moved_to == moved_to
