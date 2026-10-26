@@ -383,3 +383,46 @@ def test_an_anti_bot_page_is_a_permanent_failure(
 
     assert result.status is FetchStatus.FAILED
     assert result.temporary is temporary
+
+
+def test_a_move_is_reported_with_a_not_modified_answer_too() -> None:
+    server = FakeServer(
+        {
+            "/old.xml": httpx2.Response(301, headers={"Location": "/new.xml"}),
+            "/new.xml": httpx2.Response(304),
+        }
+    )
+
+    result = server.fetcher().fetch(FeedRequest(f"{BASE}/old.xml", etag='"v1"'))
+
+    assert (result.status, result.moved_to) == (FetchStatus.NOT_MODIFIED, f"{BASE}/new.xml")
+
+
+def test_a_redirect_that_changes_the_query_is_no_move() -> None:
+    server = FakeServer(
+        {"/rss": httpx2.Response(301, headers={"Location": "/rss2.xml?token=abc&expires=1"})}
+    )
+
+    result = server.fetcher().fetch(FeedRequest(f"{BASE}/rss"))
+
+    assert result.status is FetchStatus.OK
+    assert result.moved_to is None
+
+
+@pytest.mark.parametrize(
+    ("scripts", "temporary"),
+    [
+        (30_000, False),  # Vercel's browser check: 34 KB, 276 characters of text
+        (70_000, True),  # longer than what is read: not judged by its start
+    ],
+)
+def test_a_block_page_is_judged_only_when_read_whole(scripts: int, temporary: bool) -> None:
+    page = (
+        f"<html><head><script>{'x' * scripts}</script></head>"
+        "<body>Vercel Security Checkpoint. We're verifying your browser.</body></html>"
+    )
+    server = FakeServer({"/feed.xml": httpx2.Response(429, text=page)})
+
+    result = server.fetcher().fetch(FeedRequest(f"{BASE}/feed.xml"))
+
+    assert result.temporary is temporary

@@ -82,11 +82,16 @@ def _normalized(title: str) -> str:
     return " ".join(_MARKUP.sub("", title).casefold().split())
 
 
+def is_block_page(text: str) -> bool:
+    """Short text with a block phrase: an anti-bot or error page, not content."""
+    return len(text) <= BLOCK_PAGE_MAX_CHARS and bool(BLOCK_PHRASES.search(text))
+
+
 def unusable_reason(text: str | None) -> str | None:
     """Why `text` cannot stand in for the article, or None when it can."""
     stripped = (text or "").strip()
     if len(stripped) < MIN_CHARS:
         return "too_short"
-    if len(stripped) <= BLOCK_PAGE_MAX_CHARS and BLOCK_PHRASES.search(stripped):
+    if is_block_page(stripped):
         return "blocked"
     return None

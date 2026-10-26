@@ -10,11 +10,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
+from urllib.parse import urlsplit
 
 import feedparser
 import httpx2
 
-from brzask.clients.extractors.base import BLOCK_PAGE_MAX_CHARS, BLOCK_PHRASES
+from brzask.clients.extractors.base import is_block_page
 from brzask.clients.http import REQUEST_ERRORS, USER_AGENT, read_limited
 from brzask.log import get_logger
 from brzask.text import from_struct_time, strip_html
@@ -45,8 +46,10 @@ DIAGNOSTIC_HEADERS = (
     "Cache-Control",
     "Location",
 )
-# Error pages carry their own styles: 8 KiB reaches the text after them.
-DIAGNOSTIC_BODY_BYTES = 8 * 1024
+# Error pages carry their own styles and scripts: Vercel's browser check is
+# 34 KB for 276 characters of text. A page is judged a block page only when
+# read whole, so a long page is never judged by its first part.
+DIAGNOSTIC_BODY_BYTES = 64 * 1024
 DIAGNOSTIC_BODY_CHARS = 500
 
 
@@ -134,12 +137,14 @@ class FeedFetcher:
             headers["If-Modified-Since"] = request.last_modified
         try:
             with self.client.stream("GET", request.url, headers=headers) as response:
+                moved_to = permanent_move(response, request.url)
                 if response.status_code == 304:
                     return FeedResult(
                         request.url,
                         FetchStatus.NOT_MODIFIED,
                         etag=request.etag,
                         last_modified=request.last_modified,
+                        moved_to=moved_to,
                     )
                 try:
                     response.raise_for_status()
@@ -154,7 +159,6 @@ class FeedFetcher:
                     )
                 body = read_limited(response, MAX_BYTES)
                 final_url = str(response.url)
-                moved_to = permanent_move(response, request.url)
                 content_type = response.headers.get("Content-Type", "")
                 etag = response.headers.get("ETag")
                 last_modified = response.headers.get("Last-Modified")
@@ -202,9 +206,15 @@ PERMANENT_REDIRECTS = frozenset({301, 308})
 
 
 def permanent_move(response: httpx2.Response, requested: str) -> str | None:
-    """Where the feed now lives, when every redirect to it was permanent."""
+    """Where the feed now lives, when every redirect to it was permanent.
+
+    Only a move that keeps the query counts: a query added on the way (a
+    signed or expiring token, a session) belongs to that one response.
+    """
     final_url = str(response.url)
     if not response.history or final_url == requested:
+        return None
+    if urlsplit(final_url).query != urlsplit(requested).query:
         return None
     if all(hop.status_code in PERMANENT_REDIRECTS for hop in response.history):
         return final_url
@@ -218,9 +228,11 @@ def response_details(response: httpx2.Response) -> dict[str, Any]:
         for name in ("If-None-Match", "If-Modified-Since")
         if name in response.request.headers
     }
+    whole = False
     try:
-        excerpt = b"".join(_first_bytes(response, DIAGNOSTIC_BODY_BYTES))
-        text = strip_html(excerpt.decode("utf-8", "replace"))
+        excerpt = b"".join(_first_bytes(response, DIAGNOSTIC_BODY_BYTES + 1))
+        whole = len(excerpt) <= DIAGNOSTIC_BODY_BYTES
+        text = strip_html(excerpt[:DIAGNOSTIC_BODY_BYTES].decode("utf-8", "replace"))
     except REQUEST_ERRORS as error:
         text = f"<unreadable: {type(error).__name__}>"
     return {
@@ -233,7 +245,10 @@ def response_details(response: httpx2.Response) -> dict[str, Any]:
             name: response.headers[name] for name in DIAGNOSTIC_HEADERS if name in response.headers
         },
         "body": text[:DIAGNOSTIC_BODY_CHARS],
-        "block_page": is_block_page(text),
+        # An anti-bot page: a feed reader does not get past it however often
+        # it retries. VentureBeat answers 429 with a browser check on every
+        # fetch, so the status alone would keep it "temporarily" failing.
+        "block_page": whole and is_block_page(text),
     }
 
 
@@ -244,15 +259,6 @@ def _first_bytes(response: httpx2.Response, limit: int) -> Iterator[bytes]:
         size += len(chunk)
         if size >= limit:
             return
-
-
-def is_block_page(body: str) -> bool:
-    """An anti-bot page: a feed reader does not get past it however often it retries.
-
-    VentureBeat answers 429 with a browser check on every fetch, so the status
-    alone would keep the source "temporarily" failing for good.
-    """
-    return len(body) <= BLOCK_PAGE_MAX_CHARS and bool(BLOCK_PHRASES.search(body))
 
 
 def is_temporary(error: Exception) -> bool:
