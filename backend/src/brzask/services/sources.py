@@ -2,7 +2,7 @@
 
 from collections.abc import Collection, Sequence
 from datetime import datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
@@ -258,16 +258,25 @@ def move_source(session: Session, source: Source, url: str, *, actor: str) -> bo
     """Point a source at the URL its feed moved to for good. False when nothing changed.
 
     Keeping the old URL would let discovery add the new one as a second source
-    of the same feed. When another source already has the new URL, both stay as
-    they are and a person decides which to keep.
+    of the same feed. A source that is not active and holds the new URL (often
+    the duplicate discovery added, then muted) is merged into this one: its
+    articles move here and its row goes. Two active sources both stay, and a
+    person decides which to keep.
     """
     if url == source.url:
         return False
-    other = SourceRepository(session).get_by_url(url)
-    if other is not None:
+    sources = SourceRepository(session)
+    other = sources.get_by_url(url)
+    if other is not None and (other.id == source.id or other.status is SourceStatus.ACTIVE):
         log.warning("source moved to a followed feed", source=source.id, other=other.id, url=url)
         return False
-    before = source.url
+    before: dict[str, Any] = {"url": source.url}
+    reason = "the feed redirects here permanently"
+    if other is not None:
+        merged = {"id": other.id, "name": other.name, "status": other.status.value}
+        articles = sources.absorb(source, other)
+        before["merged"] = merged
+        reason += f"; merged {merged['status']} source {merged['name']!r} ({articles} articles)"
     source.url = url
     session.flush()
     ChangeRepository(session).record(
@@ -276,9 +285,9 @@ def move_source(session: Session, source: Source, url: str, *, actor: str) -> bo
         entity_type="source",
         entity_id=str(source.id),
         status=ChangeStatus.APPLIED,
-        before={"url": before},
+        before=before,
         after={"url": url},
-        reason="the feed redirects here permanently",
+        reason=reason,
     )
     return True
 

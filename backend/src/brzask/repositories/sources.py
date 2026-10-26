@@ -4,7 +4,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, Subquery, func, select, tuple_
+from sqlalchemy import ColumnElement, Subquery, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -136,6 +136,15 @@ class SourceRepository:
         source.etag = etag
         source.last_modified = last_modified
         self.session.flush()
+
+    def absorb(self, source: Source, other: Source) -> int:
+        """Give `other`'s articles to `source` and delete `other`; returns the articles moved."""
+        result = self.session.execute(
+            update(Article).where(Article.source_id == other.id).values(source_id=source.id)
+        )
+        self.session.delete(other)
+        self.session.flush()
+        return int(result.rowcount)  # type: ignore[attr-defined]
 
     def reset_fetch_health(self, source: Source) -> None:
         """Forget past fetch failures; the next fetch starts a new record."""

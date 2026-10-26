@@ -295,12 +295,37 @@ def test_a_moved_feed_takes_its_new_url_with_the_change_recorded(
     )
 
 
-def test_a_feed_moved_to_a_followed_url_keeps_both_sources(
-    session: Session, make: Factories
-) -> None:
+def test_a_feed_moved_to_an_active_source_keeps_both(session: Session, make: Factories) -> None:
     old = make.source(url="https://github.com/old/app/releases.atom")
     new = make.source(url="https://github.com/new/app/releases.atom")
 
     assert move_source(session, old, new.url, actor="pipeline:digest") is False
     assert move_source(session, new, new.url, actor="pipeline:digest") is False
     assert old.url == "https://github.com/old/app/releases.atom"
+
+
+def test_a_feed_moved_to_a_muted_duplicate_merges_it(session: Session, make: Factories) -> None:
+    old = make.source(name="App", url="https://github.com/old/app/releases.atom")
+    duplicate = make.source(
+        name="Duplicate",
+        url="https://github.com/new/app/releases.atom",
+        status=SourceStatus.MUTED,
+    )
+    article = make.article(duplicate)
+    duplicate_id = duplicate.id
+
+    moved = move_source(session, old, duplicate.url, actor="pipeline:digest")
+
+    assert moved is True
+    assert old.url == "https://github.com/new/app/releases.atom"
+    assert SourceRepository(session).get(duplicate_id) is None
+    session.refresh(article)
+    assert article.source_id == old.id
+    [change] = ChangeRepository(session).find(limit=10, entity_type="source", entity_id=str(old.id))
+    assert change.before == {
+        "url": "https://github.com/old/app/releases.atom",
+        "merged": {"id": duplicate_id, "name": "Duplicate", "status": "muted"},
+    }
+    assert change.reason == (
+        "the feed redirects here permanently; merged muted source 'Duplicate' (1 articles)"
+    )
