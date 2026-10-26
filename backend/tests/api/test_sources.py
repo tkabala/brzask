@@ -120,13 +120,16 @@ def test_approves_a_pending_source_with_a_reason(
     assert (change.action, change.reason) == ("source.enable", "looks good")
 
 
-def test_rejects_mutes_and_renames(client: TestClient, make: Factories) -> None:
+def test_rejects_mutes_and_renames(client: TestClient, session: Session, make: Factories) -> None:
     source = make.source("Old")
     url = f"/api/v1/sources/{source.id}"
 
     assert client.patch(url, json={"status": "muted"}).json()["status"] == "muted"
     assert client.patch(url, json={"status": "rejected"}).json()["status"] == "rejected"
     assert client.patch(url, json={"name": " New "}).json()["name"] == "New"
+    actions = session.scalars(select(Change.action).order_by(Change.id)).all()
+    # A rejection by hand is named as discovery names its own.
+    assert actions == ["source.mute", "source.reject", "source.rename"]
 
 
 def test_cannot_mark_a_source_dead_or_pending_by_hand(client: TestClient, make: Factories) -> None:

@@ -312,6 +312,8 @@ _STATUS_ACTIONS = {
     SourceStatus.MUTED: "source.mute",
     SourceStatus.ACTIVE: "source.enable",
     SourceStatus.DEAD: "source.dead",
+    # The same action as discovery's rejections, so one filter finds both.
+    SourceStatus.REJECTED: "source.reject",
 }
 
 
