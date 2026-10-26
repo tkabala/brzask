@@ -3,7 +3,7 @@
   "info": {
     "title": "brzask",
     "summary": "Self-hosted daily news digest.",
-    "version": "0.1.5"
+    "version": "0.1.6"
   },
   "paths": {
     "/api/v1/digests": {
