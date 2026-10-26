@@ -104,13 +104,15 @@ class LLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        def attempt() -> tuple[str, CallUsage]:
+        def attempt() -> tuple[str, CallUsage, dict[str, Any]]:
             started = time.perf_counter()
             response = self._create(messages, json_mode=json_mode)
-            return _content(response), _usage(response, self.model, purpose, started)
+            content = _content(response)
+            usage = _usage(response, self.model, purpose, started)
+            return content, usage, _call_details(response, content)
 
         with api_call_span("chat", self.model, purpose) as span:
-            content, usage = call_with_retries(
+            content, usage, details = call_with_retries(
                 attempt, purpose=purpose, error=LLMError, sleep=self._sleep
             )
             span.record(usage)
@@ -124,6 +126,7 @@ class LLMClient:
             output_tokens=usage.output_tokens,
             cost_usd=usage.cost_usd,
             duration_ms=usage.duration_ms,
+            **details,
         )
         return Completion(content, usage)
 
@@ -160,6 +163,22 @@ def _content(response: ChatCompletion) -> str:
         error = (response.model_extra or {}).get("error")
         raise EmptyResponseError(f"empty answer{f': {error}' if error else ''}")
     return content
+
+
+def _call_details(response: ChatCompletion, content: str) -> dict[str, Any]:
+    """Who served the call and how much of its output was reasoning, for the log.
+
+    With the same model and nearly the same prompt, a day's ranking took 3.5k
+    or 22.6k output tokens (and 42 s or 141 s); the answer's length tells
+    reasoning apart from answer tokens when the provider does not report them.
+    """
+    usage = response.usage
+    tokens = usage.completion_tokens_details if usage else None
+    return {
+        "provider": (response.model_extra or {}).get("provider"),
+        "reasoning_tokens": tokens.reasoning_tokens if tokens else None,
+        "answer_chars": len(content),
+    }
 
 
 def _usage(response: ChatCompletion, model: str, purpose: str, started: float) -> CallUsage:

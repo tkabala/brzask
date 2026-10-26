@@ -4,6 +4,7 @@ from typing import Any
 import httpx2
 import openai
 import pytest
+from structlog.testing import capture_logs
 
 from brzask.clients.llm import (
     InvalidJSONError,
@@ -132,6 +133,24 @@ def test_complete_sends_the_prompt_and_records_usage() -> None:
         0.00042,
     )
     assert meter.calls == [usage]
+
+
+def test_each_call_logs_its_provider_and_reasoning() -> None:
+    reasoned = answer('{"ranking": [1]}')
+    body = reasoned.json()
+    body["provider"] = "DeepInfra"
+    body["usage"]["completion_tokens_details"] = {"reasoning_tokens": 25}
+    fake = Fake(httpx2.Response(200, json=body), answer("Hi"))
+
+    with capture_logs() as logs:
+        fake.llm.complete("Rank", purpose="ranking")
+        fake.llm.complete("Greet", purpose="selection")
+
+    calls = [entry for entry in logs if entry["event"] == "llm call"]
+    assert [(c["provider"], c["reasoning_tokens"], c["answer_chars"]) for c in calls] == [
+        ("DeepInfra", 25, 16),
+        (None, None, 2),
+    ]
 
 
 def test_json_mode_and_cost_reporting_are_requested() -> None:
