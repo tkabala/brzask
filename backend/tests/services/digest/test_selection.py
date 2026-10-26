@@ -108,6 +108,21 @@ def test_a_link_without_its_query_matching_two_candidates_is_skipped() -> None:
     assert parse_selection(answer, candidates, ENGLISH) == []
 
 
+def test_a_link_with_another_query_is_not_the_one_candidate_on_its_path() -> None:
+    candidates = [candidate(1, link="https://www.youtube.com/watch?v=AAA")]
+    answer = {"articles": [item(1, link="https://www.youtube.com/watch?v=BBB")]}
+
+    assert parse_selection(answer, candidates, ENGLISH) == []
+
+
+def test_a_link_urlsplit_rejects_is_skipped() -> None:
+    answer = {"articles": [item(1, link="https://[article-url]/x"), item(2)]}
+
+    picks = parse_selection(answer, CANDIDATES, ENGLISH)
+
+    assert [p.candidate.link for p in picks] == ["https://news.example/2"]
+
+
 def test_at_most_digest_size_picks() -> None:
     answer = {"articles": [item(n) for n in range(1, 11)]}
 

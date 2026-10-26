@@ -84,7 +84,8 @@ def parse_selection(
     # Models tend to drop long tracking queries (`?utm_...`) when copying a link.
     by_path: dict[str, list[Candidate]] = {}
     for each in candidates:
-        by_path.setdefault(_path_key(each.link), []).append(each)
+        if (key := _path_key(each.link)) is not None:
+            by_path.setdefault(key, []).append(each)
     chosen: list[tuple[Candidate, dict[str, Any]]] = []
     used: set[str] = set()
     for item in items:
@@ -92,7 +93,10 @@ def parse_selection(
             continue
         link = _text(item.get("link"))
         candidate = by_link.get(_link_key(link))
-        if candidate is None and len(fits := by_path.get(_path_key(link), [])) == 1:
+        # Only a link without a query falls back: one with another query
+        # (`watch?v=`, `item?id=`) names another article.
+        path = _path_key(link) if candidate is None and _query(link) == "" else None
+        if path is not None and len(fits := by_path.get(path, [])) == 1:
             candidate = fits[0]
         if candidate is None or candidate.link in used:
             log.info("selection names an unknown or repeated link", link=item.get("link"))
@@ -152,5 +156,17 @@ def _link_key(link: str) -> str:
     return link.strip().rstrip("/")
 
 
-def _path_key(link: str) -> str:
-    return _link_key(urlsplit(link.strip())._replace(query="", fragment="").geturl())
+def _path_key(link: str) -> str | None:
+    """The link without query and fragment; None for a link `urlsplit` rejects."""
+    try:
+        parts = urlsplit(link.strip())
+    except ValueError:
+        return None
+    return _link_key(parts._replace(query="", fragment="").geturl())
+
+
+def _query(link: str) -> str | None:
+    try:
+        return urlsplit(link.strip()).query
+    except ValueError:
+        return None
