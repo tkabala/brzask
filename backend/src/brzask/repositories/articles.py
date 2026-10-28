@@ -125,6 +125,23 @@ class ArticleRepository:
             query = query.where(Article.shown_at >= since)
         return set(self.session.scalars(query))
 
+    def repeat_links(self) -> set[str]:
+        """Links of articles dropped as repeats of shown ones."""
+        query = select(Article.link).where(Article.state == ArticleState.REPEAT)
+        return set(self.session.scalars(query))
+
+    def mark_repeats(self, article_ids: Iterable[int]) -> None:
+        """Keep these articles out of later pools; a shown article stays shown."""
+        ids = list(article_ids)
+        if ids:
+            self.session.execute(
+                update(Article)
+                .where(Article.id.in_(ids), Article.state == ArticleState.SEEN)
+                .values(state=ArticleState.REPEAT)
+                .execution_options(synchronize_session=False)
+            )
+            self._expire_cached(ids)
+
     def carry_over(self, since: datetime) -> Sequence[Article]:
         """Articles first seen at or after `since` that no digest has shown yet."""
         query = (

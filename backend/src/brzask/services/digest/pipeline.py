@@ -1,5 +1,6 @@
 """The digest pipeline: pool → ranking → extraction → deduplication → selection."""
 
+from collections.abc import Sequence
 from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import tzinfo
@@ -17,9 +18,9 @@ from brzask.log import get_logger
 from brzask.prompts import Language
 from brzask.repositories import ArticleRepository
 from brzask.repositories.articles import DigestEntry
-from brzask.services.digest.dedup import deduplicate_candidates
+from brzask.services.digest.dedup import Deduplicated, deduplicate_candidates
 from brzask.services.digest.extraction import DocumentEmbedder, TextExtractor, extract_and_embed
-from brzask.services.digest.pool import FeedReader, gather_candidates
+from brzask.services.digest.pool import Candidate, FeedReader, gather_candidates
 from brzask.services.digest.ranking import ChatModel, rank_candidates
 from brzask.services.digest.selection import Pick, select_digest
 from brzask.services.embeddings import active_model
@@ -63,10 +64,10 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
         raise SkipRunError("no candidates")
     top = rank_candidates(context, pool, clients.llm, judge=clients.judge)
     extracted = extract_and_embed(context, top, clients.extractor, clients.embedder)
-    survivors = deduplicate_candidates(
+    deduplicated = deduplicate_candidates(
         context, extracted, clients.embedder.model, judge=clients.dedup_judge
     )
-    picks = select_digest(context, survivors, clients.llm, clients.language)
+    picks = select_digest(context, deduplicated.survivors, clients.llm, clients.language)
 
     if not context.dry_run:
         with context.sessions.begin() as session:
@@ -74,6 +75,7 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
             # Read again inside the writing transaction: a forced run appends.
             offset = articles.last_digest_position(day) or 0
             articles.mark_shown(day, [_entry(pick, offset) for pick in picks], shown_at=now)
+            articles.mark_repeats(_repeats(extracted, deduplicated))
 
 
 def run_digest(context: RunContext) -> None:
@@ -115,6 +117,16 @@ def run_digest(context: RunContext) -> None:
                 dedup_judge=judge if digest.deduplication == "judge" else None,
             ),
         )
+
+
+def _repeats(candidates: Sequence[Candidate], deduplicated: Deduplicated) -> list[int]:
+    """Article IDs of the candidates dropped as repeats of shown articles.
+
+    Without the mark they stay in the pool for the carry-over week, and a
+    repeat that ranks high takes a top slot again every day.
+    """
+    links = {drop.link for drop in deduplicated.drops if drop.reason == "cross_day"}
+    return [c.article_id for c in candidates if c.link in links and c.article_id is not None]
 
 
 def _entry(pick: Pick, offset: int) -> DigestEntry:

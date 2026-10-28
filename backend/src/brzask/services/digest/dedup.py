@@ -337,8 +337,8 @@ def deduplicate_candidates(
     model: str,
     thresholds: Thresholds | None = None,
     judge: Judge | None = None,
-) -> list[Candidate]:
-    """Survivors of both passes, compared with articles shown by vectors of `model`.
+) -> Deduplicated:
+    """Both passes over `candidates`, compared with articles shown by vectors of `model`.
 
     Articles shown in the window before the run's start count, so a replayed
     day compares with what had been shown by then. `thresholds` replaces the
@@ -388,4 +388,4 @@ def deduplicate_candidates(
         "candidates deduplicated",
         **{k: v for k, v in context.stats["deduplication"].items() if k != "drops"},
     )
-    return result.survivors
+    return result

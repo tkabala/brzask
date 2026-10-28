@@ -212,7 +212,7 @@ def test_the_stage_compares_with_recent_articles_of_the_same_model(
     ]
     run = context(sessions)
 
-    survivors = deduplicate_candidates(run, candidates, TEST_MODEL)
+    survivors = deduplicate_candidates(run, candidates, TEST_MODEL).survivors
 
     assert ranks(survivors) == list(range(2, 13))
     stats = run.stats["deduplication"]
@@ -412,7 +412,7 @@ def test_the_stage_uses_the_judge_and_falls_back_when_it_fails(
     candidates = [candidate(1, axis(0)), candidate(2, near(0.85, 0, 2)), *distinct(3, 9)]
 
     run = context(sessions)
-    survivors = deduplicate_candidates(run, candidates, TEST_MODEL, judge=PairJudge())
+    survivors = deduplicate_candidates(run, candidates, TEST_MODEL, judge=PairJudge()).survivors
     assert len(survivors) == 10
     assert run.stats["deduplication"]["same_day_method"] == "judge"
     assert run.stats["deduplication"]["judged_pairs"] == 1
@@ -420,6 +420,8 @@ def test_the_stage_uses_the_judge_and_falls_back_when_it_fails(
     assert run.usage.summary()["by_purpose"]["deduplication"]["calls"] == 1
 
     run = context(sessions)
-    survivors = deduplicate_candidates(run, candidates, TEST_MODEL, judge=PairJudge(fail=True))
+    survivors = deduplicate_candidates(
+        run, candidates, TEST_MODEL, judge=PairJudge(fail=True)
+    ).survivors
     assert len(survivors) == 10  # the 0.80 threshold drops the pair too
     assert run.stats["deduplication"]["same_day_method"] == "threshold (judge failed)"

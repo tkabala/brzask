@@ -23,6 +23,8 @@ An article moves through these steps:
 
 ```
 fetched ──► seen ──► ranked (rank set) ──► shown (in a digest) ──► opened
+              │                  │
+              │                  └─► repeat (dropped as a repeat of a shown article)
               │
               └─► carried over to the next days, until it is too old
 ```
@@ -36,6 +38,9 @@ fetched ──► seen ──► ranked (rank set) ──► shown (in a digest)
   empty, and only shown articles can have them. A row records one appearance,
   so a link is shown at most once: a shown link that turns up in a feed again
   is never a candidate.
+- **`state = repeat`**: dropped by deduplication as a repeat of an article
+  shown in the last days, under another link. Like a shown link, it is never a
+  candidate again, so it cannot take a top slot day after day.
 - **`opened_at`**: the first time you opened the article. Opening is the only
   preference signal brzask uses, so this column drives learning, source review
   and measurement.

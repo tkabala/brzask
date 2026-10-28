@@ -321,7 +321,7 @@ def replay_day(
             clients.embedding_model,
             config.thresholds(),
             clients.judge if config.deduplication.method == "judge" else None,
-        )
+        ).survivors
         picks = select_digest(
             context, survivors, clients.llm, clients.language, config.selection.digest_size
         )

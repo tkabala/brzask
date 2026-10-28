@@ -22,7 +22,7 @@ from brzask.services.digest.selection import DIGEST_SIZE
 from brzask.services.embeddings import switch_model
 from brzask.services.pause import pause
 from brzask.services.runs import RunContext, run_pipeline
-from tests.factories import TEST_MODEL, Factories
+from tests.factories import TEST_MODEL, Factories, unit_vector
 from tests.services.digest.fakes import (
     NOW,
     FakeEmbedder,
@@ -173,6 +173,27 @@ def test_a_paused_digest_is_skipped_unless_forced(
     forced = run(sessions, clients(feeds_for(sources)), force=True)
     assert forced.status is RunStatus.OK
     assert len(shown(session)) == DIGEST_SIZE
+
+
+def test_a_repeat_of_a_shown_article_is_marked_to_stay_out(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    yesterday = NOW - timedelta(days=1)
+    make.article(first_seen_at=yesterday, digest_date=yesterday.date(), embedding=unit_vector(1))
+    repeat = f"https://{sources[0].id}.example/0"
+    embedder = FakeEmbedder()
+    embedder.vectors[f"About {repeat}"] = unit_vector(1)  # the shown article's vector
+    digest = replace(clients(feeds_for(sources)), embedder=embedder)
+
+    finished = run(sessions, digest)
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert finished.stats["deduplication"]["cross_day_dropped"] == 1
+    stored = session.scalars(select(Article).where(Article.link == repeat)).one()
+    assert stored.state is ArticleState.REPEAT
+    others = session.scalars(select(Article).where(Article.state == ArticleState.REPEAT)).all()
+    assert others == [stored]
 
 
 def test_a_dry_run_writes_nothing_but_the_run(

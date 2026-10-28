@@ -220,7 +220,9 @@ def gather_candidates(context: RunContext, fetcher: FeedReader) -> list[Candidat
             for source in SourceRepository(session).find(SourceStatus.ACTIVE)
         }
         articles = ArticleRepository(session)
-        shown_links = articles.shown_links()
+        # A repeat of a shown article is as good as shown: the same link from a
+        # feed must not take a ranking slot only to be dropped again.
+        shown_links = articles.shown_links() | articles.repeat_links()
         carried, source_inactive = carried_candidates(
             articles.carry_over(now - CARRY_OVER), sources
         )

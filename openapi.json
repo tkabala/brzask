@@ -2258,7 +2258,8 @@
         "type": "string",
         "enum": [
           "seen",
-          "shown"
+          "shown",
+          "repeat"
         ],
         "title": "ArticleState"
       },

@@ -131,6 +131,7 @@ class Interest(TimestampMixin, Base):
 class ArticleState(StrEnum):
     SEEN = "seen"  # fetched; may be carried over to later days
     SHOWN = "shown"  # picked for a digest
+    REPEAT = "repeat"  # dropped as a repeat of a shown article; never a candidate again
 
 
 class Article(Base):

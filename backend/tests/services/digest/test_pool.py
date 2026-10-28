@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feeds import FeedEntry, FeedResult, FetchStatus
-from brzask.db.models import Article, SourceKind, SourceStatus
+from brzask.db.models import Article, ArticleState, SourceKind, SourceStatus
 from brzask.services.digest.pool import (
     MAX_AGE,
     SNIPPET_CHARS,
@@ -264,6 +264,28 @@ def test_a_source_whose_feed_moved_for_good_follows_it(
     session.expire_all()
 
     assert (source.url, source.fetched_at) == (new_url, NOW)
+
+
+def test_a_repeat_of_a_shown_article_never_comes_back(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    source = make.source(url="https://ok.example/feed")
+    carried = make.article(source, first_seen_at=NOW - timedelta(days=1), state=ArticleState.REPEAT)
+    fetched = make.article(source, first_seen_at=NOW - timedelta(days=1), state=ArticleState.REPEAT)
+    feeds = FakeFeeds(
+        {
+            source.url: FeedResult(
+                source.url, FetchStatus.OK, [entry("https://ok.example/new"), entry(fetched.link)]
+            )
+        }
+    )
+    run = context(sessions)
+
+    pool = gather_candidates(run, feeds)
+
+    assert [c.link for c in pool] == ["https://ok.example/new"]
+    assert carried.link not in {c.link for c in pool}
+    assert run.stats["pool"]["already_shown"] == 1
 
 
 def test_a_dry_run_writes_nothing(

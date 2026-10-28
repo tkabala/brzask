@@ -80,6 +80,23 @@ def test_shown_links_within_the_window(session: Session, make: Factories) -> Non
     }
 
 
+def test_repeats_are_marked_and_never_carried_over(session: Session, make: Factories) -> None:
+    repeat = make.article(first_seen_at=NOW - timedelta(days=1))
+    shown = make.article(first_seen_at=NOW - timedelta(days=1), digest_date=TODAY)
+    seen = make.article(first_seen_at=NOW - timedelta(days=1))
+    articles = ArticleRepository(session)
+
+    articles.mark_repeats([repeat.id, shown.id])
+
+    assert (repeat.state, shown.state, seen.state) == (
+        ArticleState.REPEAT,
+        ArticleState.SHOWN,
+        ArticleState.SEEN,
+    )
+    assert articles.repeat_links() == {repeat.link}
+    assert articles.carry_over(since=NOW - timedelta(days=7)) == [seen]
+
+
 def test_carry_over_is_unshown_articles_seen_since(session: Session, make: Factories) -> None:
     older = make.article(first_seen_at=NOW - timedelta(days=5))
     newer = make.article(first_seen_at=NOW - timedelta(days=1))

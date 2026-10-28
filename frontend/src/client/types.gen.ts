@@ -104,7 +104,7 @@ export type ArticleOut = {
 /**
  * ArticleState
  */
-export type ArticleState = 'seen' | 'shown';
+export type ArticleState = 'seen' | 'shown' | 'repeat';
 
 /**
  * Credentials

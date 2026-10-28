@@ -14,7 +14,11 @@ export const zArticleCountsOut = z.object({
 /**
  * ArticleState
  */
-export const zArticleState = z.enum(['seen', 'shown']);
+export const zArticleState = z.enum([
+    'seen',
+    'shown',
+    'repeat'
+]);
 
 /**
  * Credentials
