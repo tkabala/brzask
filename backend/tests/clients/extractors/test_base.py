@@ -28,6 +28,9 @@ def test_exactly_the_minimum_is_usable() -> None:
         "Please enable JavaScript and cookies to continue.",
         "Complete the CAPTCHA to proceed.",
         "JavaScript is disabled\nIn order to continue, we need to verify that you're not a robot.",
+        "# towardsdatascience.com\n\n## Performing security verification\n\nThis website uses a"
+        " security service to protect against malicious bots. This page is displayed while the"
+        " website verifies you are not a bot.",
     ],
 )
 def test_block_pages_are_not_usable(page: str) -> None:
@@ -36,6 +39,12 @@ def test_block_pages_are_not_usable(page: str) -> None:
 
 def test_long_articles_mentioning_block_phrases_stay_usable() -> None:
     article = "How CAPTCHA solvers work and why access denied errors confuse users. " * 40
+
+    assert unusable_reason(article) is None
+
+
+def test_a_short_article_about_bottlenecks_is_usable() -> None:
+    article = "The database is not a bottleneck here; the network is. " * 5
 
     assert unusable_reason(article) is None
 

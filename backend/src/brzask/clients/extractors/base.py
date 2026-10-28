@@ -11,10 +11,12 @@ MIN_CHARS = 200
 # for one, answers fetchers with "You've been blocked by network security", the
 # JetBrains blog (after a few dozen requests) with "verify that you're not a robot",
 # VentureBeat's feeds (429) with a "Vercel Security Checkpoint: we're verifying
-# your browser" page.
+# your browser" page, Towards Data Science (to Jina) with Cloudflare's "Performing
+# security verification ... verifies you are not a bot".
 BLOCK_PHRASES = re.compile(
     r"blocked by network security|access denied|are you a human|not a robot|"
-    r"enable javascript and cookies|captcha|verifying your browser",
+    r"enable javascript and cookies|captcha|verifying your browser|"
+    r"security verification|not a bot\b",
     re.IGNORECASE,
 )
 # Block pages are a few hundred characters; an article about CAPTCHAs or access
