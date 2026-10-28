@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.9](https://github.com/tkabala/brzask/compare/v0.1.8...v0.1.9) (2026-10-28)
+
+
+### Features
+
+* **digest:** keep repeats of shown articles out of later pools ([125fa06](https://github.com/tkabala/brzask/commit/125fa06cac443147c7c3599961b8bb646a36ce6e))
+
+
+### Bug Fixes
+
+* **extractors:** recognise Cloudflare's security verification page ([19ea09b](https://github.com/tkabala/brzask/commit/19ea09be034020c9011ad35eab808c706f063175))
+
+
+### Chores
+
+* release 0.1.9 ([192de18](https://github.com/tkabala/brzask/commit/192de181591996ee4531a3b71f1c8a5028d0bf92))
+
 ## [0.1.8](https://github.com/tkabala/brzask/compare/v0.1.7...v0.1.8) (2026-10-26)
 
 
