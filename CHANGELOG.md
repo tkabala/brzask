@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.10](https://github.com/tkabala/brzask/compare/v0.1.9...v0.1.10) (2026-11-02)
+
+
+### Bug Fixes
+
+* **digest:** keep same-day duplicates of a shown article out of later pools ([ca1c5e6](https://github.com/tkabala/brzask/commit/ca1c5e605945ba8eb7f53f4e642dafb3e1a6eaef))
+* **discovery:** do not take a blog for a copy of an aggregator that links to it ([7d8be72](https://github.com/tkabala/brzask/commit/7d8be72d0160b2abefe0696fafe35fc35162c1d7))
+* **discovery:** follow a fork to its original repository only when that has releases ([2f11bf5](https://github.com/tkabala/brzask/commit/2f11bf56f9d77541850627004c4e34553dd464a7))
+* **discovery:** reject copies of known sources instead of enabling them ([b78b403](https://github.com/tkabala/brzask/commit/b78b403fd9d96638c72f15907fbc8230ff5f45ce))
+* **discovery:** stop asking the web search for GitHub repositories ([1559735](https://github.com/tkabala/brzask/commit/155973547e55c86125914c6d63c2ca881fb84f46))
+* **judge:** leave the reasoning effort out for a chat-model judge on another API ([f16dd8c](https://github.com/tkabala/brzask/commit/f16dd8c226f431bdf019fb43798cf8745496d6b8))
+* **llm:** ask for a fixed reasoning effort instead of the provider's default ([72181e4](https://github.com/tkabala/brzask/commit/72181e4faecb5140551d2371e1b5e140e411743f))
+
 ## [0.1.9](https://github.com/tkabala/brzask/compare/v0.1.8...v0.1.9) (2026-10-28)
 
 
