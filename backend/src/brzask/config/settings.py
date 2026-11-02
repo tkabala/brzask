@@ -203,6 +203,9 @@ class DatabaseSettings(SettingsGroup):
         return url.render_as_string(hide_password=False)
 
 
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]
+
+
 class LLMSettings(SettingsGroup):
     """LLM: any OpenAI-compatible chat completions API."""
 
@@ -216,6 +219,13 @@ class LLMSettings(SettingsGroup):
         "deepseek/deepseek-v4-flash", description="Model used for ranking and selection."
     )
     api_key: OptionalSecret = Field(None, description="API key; leave empty for local servers.")
+    reasoning_effort: Annotated[ReasoningEffort | None, BeforeValidator(_empty_to_none)] = Field(
+        "medium",
+        description="How much the model thinks before answering (reasoning_effort). "
+        "Left to them, OpenRouter's providers of one model differ: some answer the "
+        "ranking at once, with a less steady order. Empty leaves it to the provider; "
+        "set it empty for a model without reasoning, whose API may reject the field.",
+    )
     timeout_seconds: float = Field(
         300,
         gt=0,

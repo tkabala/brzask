@@ -180,6 +180,17 @@ def test_json_mode_and_cost_reporting_are_requested() -> None:
     assert [m["role"] for m in request["messages"]] == ["user"]
 
 
+def test_the_reasoning_effort_is_sent_only_when_set() -> None:
+    default = Fake(answer("Hi"))
+    default.llm.complete("Hello", purpose="test")
+    effort = Fake(answer("Hi"))
+    effort.llm.reasoning_effort = "low"
+    effort.llm.complete("Hello", purpose="test")
+
+    assert "reasoning_effort" not in default.requests[0]
+    assert effort.requests[0]["reasoning_effort"] == "low"
+
+
 def test_complete_json_keeps_the_answer_when_it_is_not_json() -> None:
     fake = Fake(answer("I cannot rank these."))
     meter = UsageMeter()
@@ -290,6 +301,11 @@ def test_from_settings_asks_openrouter_for_costs_only() -> None:
     assert str(local.client.base_url) == "http://localhost:11434/v1/"
     assert local.client.api_key == "unused"
     assert local.client.max_retries == 0
+
+
+@pytest.mark.parametrize(("value", "expected"), [("medium", "medium"), ("", None)])
+def test_from_settings_takes_the_reasoning_effort(value: str, expected: str | None) -> None:
+    assert LLMClient.from_settings(settings(reasoning_effort=value)).reasoning_effort == expected
 
 
 def test_from_settings_uses_the_key_and_timeout() -> None:

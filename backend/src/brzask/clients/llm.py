@@ -13,7 +13,7 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
 from brzask.clients.retry import APIError, EmptyResponseError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
-from brzask.config.settings import LLMSettings
+from brzask.config.settings import LLMSettings, ReasoningEffort
 from brzask.log import get_logger
 from brzask.telemetry import api_call_span
 
@@ -68,11 +68,13 @@ class LLMClient:
         model: str,
         *,
         report_cost: bool = False,
+        reasoning_effort: ReasoningEffort | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.client = client
         self.model = model
         self.report_cost = report_cost
+        self.reasoning_effort = reasoning_effort
         self._sleep = sleep
 
     @classmethod
@@ -87,7 +89,12 @@ class LLMClient:
         )
         # OpenRouter reports the cost of a call only when asked; other APIs reject the field.
         is_openrouter = urlsplit(str(settings.base_url)).hostname == "openrouter.ai"
-        return cls(client, settings.model, report_cost=is_openrouter)
+        return cls(
+            client,
+            settings.model,
+            report_cost=is_openrouter,
+            reasoning_effort=settings.reasoning_effort,
+        )
 
     def complete(
         self,
@@ -152,6 +159,7 @@ class LLMClient:
             messages=messages,
             response_format={"type": "json_object"} if json_mode else openai.omit,
             extra_body={"usage": {"include": True}} if self.report_cost else None,
+            reasoning_effort=self.reasoning_effort or openai.omit,
         )
 
 

@@ -33,6 +33,7 @@ Any OpenAI-compatible chat completions API.
 | `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | Base URL of the OpenAI-compatible API (OpenRouter, Ollama, ...). |
 | `LLM_MODEL` | `deepseek/deepseek-v4-flash` | Model used for ranking and selection. |
 | `LLM_API_KEY` | secret | API key; leave empty for local servers. |
+| `LLM_REASONING_EFFORT` | `medium` | How much the model thinks before answering (reasoning_effort). Left to them, OpenRouter's providers of one model differ: some answer the ranking at once, with a less steady order. Empty leaves it to the provider; set it empty for a model without reasoning, whose API may reject the field. |
 | `LLM_TIMEOUT_SECONDS` | `300` | How long one request may take; ranking prompts are long. |
 
 ## Embeddings
