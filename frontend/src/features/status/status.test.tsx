@@ -53,12 +53,16 @@ describe('status', () => {
     const day = await screen.findByLabelText('Pause until')
     // Today's midnight has passed, so the first day offered is tomorrow.
     expect(day).toHaveAttribute('min', nextDay())
-    await user.type(day, '2026-11-02')
+    // A week ahead, so the day stays valid whenever the test runs.
+    const weekAhead = new Date()
+    weekAhead.setDate(weekAhead.getDate() + 7)
+    const chosen = nextDay(weekAhead)
+    await user.type(day, chosen)
     await user.click(screen.getByRole('button', { name: 'Pause' }))
 
     expect(await screen.findByText(/The digest is paused until/)).toBeInTheDocument()
     const body = (await api.sent('PUT /api/v1/pause')[0]?.json()) as { until: string }
-    expect(new Date(body.until).getTime()).toBe(new Date('2026-11-02T00:00').getTime())
+    expect(new Date(body.until).getTime()).toBe(new Date(`${chosen}T00:00`).getTime())
   })
 
   it('resumes a pause', async () => {
