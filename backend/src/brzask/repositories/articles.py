@@ -125,6 +125,13 @@ class ArticleRepository:
             query = query.where(Article.shown_at >= since)
         return set(self.session.scalars(query))
 
+    def links_by_source(self, since: datetime) -> list[tuple[int, str]]:
+        """(source ID, link) of the articles first seen at or after `since`."""
+        query = select(Article.source_id, Article.link).where(
+            Article.source_id.is_not(None), Article.first_seen_at >= since
+        )
+        return [(source_id, link) for source_id, link in self.session.execute(query) if source_id]
+
     def repeat_links(self) -> set[str]:
         """Links of articles dropped as repeats of shown ones."""
         query = select(Article.link).where(Article.state == ArticleState.REPEAT)

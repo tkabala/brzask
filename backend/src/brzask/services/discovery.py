@@ -12,15 +12,20 @@ marketing. Code turns the two scores into a status:
                       posts, for a person to decide.
 
 A missing verdict leaves the feed pending: nothing is enabled or rejected on
-no evidence.
+no evidence. Two kinds of feed are rejected without the judge, as copies of a
+source already known: a GitHub fork is replaced by its parent first, and a feed
+whose recent items are mostly one known source's articles (the same blog on
+another URL, a mirror of release notes) is stored as rejected, naming that source.
 """
 
+import math
 import re
-from collections.abc import Iterable, Sequence
+from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
@@ -34,12 +39,12 @@ from brzask.clients.web_search import WebSearch, WebSearchError, build_web_searc
 from brzask.config import get_settings
 from brzask.db.models import SourceOrigin, SourceStatus
 from brzask.log import get_logger
-from brzask.repositories import SourceRepository
+from brzask.repositories import ArticleRepository, SourceRepository
 from brzask.services.digest.ranking import interest_context
 from brzask.services.runs import RunContext, SkipRunError
 from brzask.services.sources import propose_source
 from brzask.services.visited import FindsFeeds, known_hosts
-from brzask.urls import feed_key, host_matches, host_of
+from brzask.urls import feed_key, host_matches, host_of, item_key
 
 log = get_logger(__name__)
 
@@ -89,7 +94,23 @@ QUESTIONS: dict[str, Score] = {
 ENABLE_FIT, ENABLE_SUBSTANCE = 2.0, 1.5
 REJECT_FIT = 1.0
 
+# A feed copies a known source when at least this many of its sampled items, and at
+# least this share of them, are that source's articles. Measured on one instance's
+# 6,235 articles (2026-11-02): no two different sources shared even 2 of one's 10
+# newest items, while the copies shared 3 of 7 (one blog under two feed URLs) and
+# 5 of 5 (a mirror of release notes).
+DUPLICATE_MIN_ITEMS = 3
+DUPLICATE_MIN_SHARE = 1 / 3
+# Known sources' articles compared against, by when they were first seen.
+KNOWN_ITEMS_WINDOW = timedelta(days=365)
+
 _WORD = re.compile(r"\w{4,}")
+
+
+class FindsSourceFeeds(FindsFeeds, Protocol):
+    """Finds feeds and sees through GitHub forks (`FeedFinder`)."""
+
+    def upstream(self, found: FoundFeed) -> FoundFeed: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,6 +200,23 @@ def to_candidate(proposal: Proposal, feed: FoundFeed, now: datetime) -> Candidat
     )
 
 
+def known_items(links: Iterable[tuple[int, str]]) -> dict[int, set[str]]:
+    """Item keys (`item_key`) of known articles, by source ID."""
+    items: defaultdict[int, set[str]] = defaultdict(set)
+    for source_id, link in links:
+        items[source_id].add(item_key(link))
+    return dict(items)
+
+
+def duplicate_of(candidate: Candidate, known: Mapping[int, set[str]]) -> int | None:
+    """The known source whose articles make up most of the candidate's sample, if any."""
+    sample = {item_key(entry.link) for entry in candidate.sample}
+    needed = max(DUPLICATE_MIN_ITEMS, math.ceil(len(sample) * DUPLICATE_MIN_SHARE))
+    shared = {source_id: len(sample & items) for source_id, items in known.items()}
+    best = max(shared, key=lambda source_id: shared[source_id], default=None)
+    return best if best is not None and shared[best] >= needed else None
+
+
 def judge_state(candidate: Candidate, interests: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """What the judge reads about one feed."""
     c = candidate
@@ -236,7 +274,7 @@ def judge_feed(
 def discover_sources(
     context: RunContext,
     search: WebSearch | None,
-    finder: FindsFeeds,
+    finder: FindsSourceFeeds,
     judge: Judge,
 ) -> None:
     """Search, resolve, sample and judge; store verdicts outside a dry run."""
@@ -248,6 +286,8 @@ def discover_sources(
         sources = SourceRepository(session).find()
         known_urls = {feed_key(source.url) for source in sources}
         known_sites = known_hosts([s.url for s in sources] + [s.site_url for s in sources])
+        names = {source.id: source.name for source in sources}
+        known = known_items(ArticleRepository(session).links_by_source(now - KNOWN_ITEMS_WINDOW))
     if not interests:
         raise SkipRunError("no active interests")
 
@@ -267,7 +307,7 @@ def discover_sources(
     proposed = unique_sites(proposed, known_sites)
 
     with context.stage("resolve"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
-        found = list(pool.map(lambda p: finder.find(p.url), proposed))
+        found = list(pool.map(lambda p: _resolve(finder, p.url), proposed))
     candidates: list[Candidate] = []
     feed_urls = set(known_urls)
     for proposal, feed in zip(proposed, found, strict=True):
@@ -275,7 +315,16 @@ def discover_sources(
         if feed is not None and feed_key(feed.url) not in feed_urls:
             feed_urls.add(feed_key(feed.url))
             candidates.append(to_candidate(proposal, feed, now))
-    active = [c for c in candidates if c.recent_count != 0]
+    active: list[Candidate] = []
+    copies: list[Verdict] = []
+    for candidate in (c for c in candidates if c.recent_count != 0):
+        source_id = duplicate_of(candidate, known)
+        if source_id is None:
+            active.append(candidate)
+            continue
+        reason = f"same items as source {source_id} ({names.get(source_id, 'unknown')})"
+        log.info("feed copies a known source", url=candidate.feed.url, source_id=source_id)
+        copies.append(Verdict(candidate, SourceStatus.REJECTED, None, reason))
 
     with context.stage("judge"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
         verdicts = list(pool.map(lambda c: judge_feed(c, judge, interests, context.usage), active))
@@ -287,7 +336,9 @@ def discover_sources(
     if not context.dry_run:
         with context.sessions.begin() as session:
             for verdict in verdicts:
-                _store(session, verdict, search.name)
+                _store(session, verdict, search.name, f"discovery judge: {verdict.reason}")
+            for verdict in copies:
+                _store(session, verdict, search.name, f"discovery: {verdict.reason}")
 
     context.stats.update(
         {
@@ -296,6 +347,7 @@ def discover_sources(
             "proposed": len(proposed),
             "resolved": len(candidates),
             "inactive": [c.feed.url for c in candidates if c.recent_count == 0],
+            "duplicates": [{"url": v.candidate.feed.url, "reason": v.reason} for v in copies],
             "judged": len(verdicts),
             **{
                 status.value: [
@@ -330,7 +382,12 @@ def run_discovery(context: RunContext) -> None:
             search.close()
 
 
-def _store(session: Session, verdict: Verdict, adapter: str) -> None:
+def _resolve(finder: FindsSourceFeeds, url: str) -> FoundFeed | None:
+    found = finder.find(url)
+    return finder.upstream(found) if found is not None else None
+
+
+def _store(session: Session, verdict: Verdict, adapter: str, note: str) -> None:
     candidate = verdict.candidate
     propose_source(
         session,
@@ -340,7 +397,7 @@ def _store(session: Session, verdict: Verdict, adapter: str) -> None:
         actor=ACTOR,
         # Which search found it and for which interest, for source survival stats.
         origin_detail=f"{adapter}: {candidate.proposal.interest}",
-        note=f"discovery judge: {verdict.reason}",
+        note=note,
     )
 
 

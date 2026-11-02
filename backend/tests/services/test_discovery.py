@@ -19,8 +19,10 @@ from brzask.services.discovery import (
     SAMPLE_ITEMS,
     Proposal,
     discover_sources,
+    duplicate_of,
     judge_feed,
     judge_state,
+    known_items,
     name_mismatch,
     run_discovery,
     search_query,
@@ -202,6 +204,85 @@ def test_a_verdict_names_the_scores_and_a_failed_judge_leaves_the_feed_pending()
     assert (unjudged.status, unjudged.scores) == (SourceStatus.PENDING, None)
 
 
+def linked(*links: str) -> tuple[FeedEntry, ...]:
+    return tuple(
+        FeedEntry(link, f"Item {n}", "", None, NOW - (n + 1) * DAY) for n, link in enumerate(links)
+    )
+
+
+def test_known_items_by_source() -> None:
+    items = known_items(
+        [(1, "https://www.a.example/p/"), (1, "https://a.example/q"), (2, "https://b.example/p")]
+    )
+
+    assert items == {1: {"a.example/p", "a.example/q"}, 2: {"b.example/p"}}
+
+
+def test_a_feed_made_of_a_known_sources_items_is_a_duplicate() -> None:
+    # the same blog under another feed URL: 3 of 7 items, as measured
+    known = known_items([(48, f"https://www.latent.space/p/{n}") for n in range(20)])
+    links = [f"https://latent.space/p/{n}/" for n in range(3)]
+    links += [f"https://latent.space/p/new-{n}" for n in range(4)]
+    copy = to_candidate(
+        proposal("https://latent.space"), feed("https://l/f", items=linked(*links)), NOW
+    )
+
+    assert duplicate_of(copy, known) == 48
+
+
+def test_a_mirror_of_release_notes_is_a_duplicate_of_the_original() -> None:
+    known = known_items(
+        [(1, f"https://github.com/anthropics/claude-code/releases/tag/v2.1.{n}") for n in range(9)]
+    )
+    mirror = linked(
+        *(f"https://github.com/someone/claude-code-update/releases/tag/2.1.{n}" for n in range(5))
+    )
+
+    candidate = to_candidate(
+        proposal("https://github.com/someone/claude-code-update"),
+        feed("https://m/f", items=mirror),
+        NOW,
+    )
+
+    assert duplicate_of(candidate, known) == 1
+
+
+@pytest.mark.parametrize(
+    ("shared", "sampled", "expected"),
+    [
+        (2, 2, None),  # fewer than DUPLICATE_MIN_ITEMS, however small the sample
+        (3, 10, None),  # under a third of the sample
+        (4, 10, 7),
+        (3, 9, 7),
+    ],
+)
+def test_a_duplicate_needs_enough_shared_items(
+    shared: int, sampled: int, expected: int | None
+) -> None:
+    known = known_items([(7, f"https://k.example/{n}") for n in range(shared)])
+    links = [f"https://k.example/{n}" for n in range(shared)]
+    links += [f"https://own.example/{n}" for n in range(sampled - shared)]
+    candidate = to_candidate(
+        proposal("https://own.example"), feed("https://own.example/f", items=linked(*links)), NOW
+    )
+
+    assert duplicate_of(candidate, known) == expected
+
+
+def test_the_source_sharing_most_items_is_named() -> None:
+    known = known_items(
+        [(1, f"https://k.example/{n}") for n in range(4)]
+        + [(2, f"https://k.example/{n}") for n in range(6)]
+    )
+    candidate = to_candidate(
+        proposal("https://k.example"),
+        feed("https://k2.example/f", items=linked(*(f"https://k.example/{n}" for n in range(8)))),
+        NOW,
+    )
+
+    assert duplicate_of(candidate, known) == 2
+
+
 # --- The pipeline --------------------------------------------------------------------------
 
 
@@ -231,9 +312,13 @@ class FakeSearch:
 class FakeFinder:
     def __init__(self, feeds: dict[str, FoundFeed]) -> None:
         self.feeds = feeds
+        self.parents: dict[str, FoundFeed] = {}  # a fork's feed URL -> its parent's feed
 
     def find(self, url: str) -> FoundFeed | None:
         return self.feeds.get(url)
+
+    def upstream(self, found: FoundFeed) -> FoundFeed:
+        return self.parents.get(found.url, found)
 
 
 class FakeJudge:
@@ -349,6 +434,51 @@ def test_discovery_stores_each_verdict(
     assert [entry["url"] for entry in run.stats["active"]] == ["https://great.example/feed"]
     assert run.stats["failed_searches"] == []
     assert {"search", "resolve", "judge"} <= run.timings.keys()
+
+
+def test_copies_of_known_sources_are_rejected_without_the_judge(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    search, finder = setup(make)
+    blog = make.source(name="Known Blog", url="https://blog.example/feed")
+    for n in range(5):
+        make.article(blog, link=f"https://blog.example/{n}", first_seen_at=NOW - n * DAY)
+    rust = search.results["Rust"]
+    assert isinstance(rust, list)
+    rust += [
+        result("https://alias.example/", "Known Blog again"),
+        result("https://github.com/someone/fork", "A fork"),
+    ]
+    alias_items = linked(*(f"https://www.blog.example/{n}/" for n in range(5)))
+    finder.feeds["https://alias.example/"] = feed(
+        "https://alias.example/feed", "Alias", alias_items
+    )
+    finder.feeds["https://github.com/someone/fork"] = feed(
+        "https://github.com/someone/fork/releases.atom"
+    )
+    # the fork's parent is a source already, so nothing of it is stored
+    finder.parents["https://github.com/someone/fork/releases.atom"] = feed(
+        "https://known.example/feed"
+    )
+    judge = FakeJudge(SCORES)
+    run = context(sessions)
+
+    discover_sources(run, search, finder, judge)
+
+    alias = stored(session, "https://alias.example/feed")
+    assert alias.status is SourceStatus.REJECTED
+    assert alias.note == f"discovery: same items as source {blog.id} (Known Blog)"
+    assert "https://alias.example/feed" not in [state["feed"]["url"] for state in judge.states]
+    assert session.scalars(select(Source).where(Source.url.like("%someone%"))).all() == []
+    assert run.stats["duplicates"] == [
+        {
+            "url": "https://alias.example/feed",
+            "reason": f"same items as source {blog.id} (Known Blog)",
+        }
+    ]
+    assert run.stats["rejected"] == [
+        {"url": "https://spam.example/feed", "scores": {"interest_fit": 0.2, "substance": 0.1}}
+    ]
 
 
 def test_a_failed_search_skips_only_its_interest(

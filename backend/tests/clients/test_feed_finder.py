@@ -6,6 +6,7 @@ import pytest
 
 from brzask.clients.feed_finder import (
     FeedFinder,
+    FoundFeed,
     alternate_feeds,
     common_feed_urls,
     youtube_channel_id,
@@ -301,6 +302,64 @@ def test_github_subdomains_are_ordinary_sites() -> None:
 
 def test_a_missing_repository() -> None:
     assert Web({}).finder().find("https://github.com/nobody/nothing") is None
+
+
+FORK_FEED = "https://github.com/someone/omarchy/releases.atom"
+FORK_API = "https://api.github.com/repos/someone/omarchy"
+PARENT_FEED = "https://github.com/omacom/omarchy/releases.atom"
+
+
+def fork_feed() -> FoundFeed:
+    return FoundFeed(FORK_FEED, "Release notes", "https://github.com/someone/omarchy")
+
+
+def test_a_fork_is_replaced_by_its_parent() -> None:
+    web = Web(
+        {
+            FORK_API: httpx2.Response(
+                200, json={"fork": True, "parent": {"full_name": "omacom/omarchy"}}
+            ),
+            PARENT_FEED: feed(ATOM),
+        }
+    )
+
+    found = web.finder().upstream(fork_feed())
+
+    assert found.url == PARENT_FEED
+    assert found.site_url == "https://github.com/omacom/omarchy"
+    assert web.headers[FORK_API]["Accept"] == "application/vnd.github+json"
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx2.Response(200, json={"fork": False, "parent": {"full_name": "omacom/omarchy"}}),
+        httpx2.Response(200, json={"fork": True}),
+        httpx2.Response(200, json={"fork": True, "parent": {"full_name": "not a repository"}}),
+        httpx2.Response(200, json=["unexpected"]),
+        httpx2.Response(200, text="not json"),
+        httpx2.Response(403, json={"message": "API rate limit exceeded"}),
+    ],
+)
+def test_a_feed_stays_when_github_names_no_parent(answer: httpx2.Response) -> None:
+    web = Web({FORK_API: answer, PARENT_FEED: feed(ATOM)})
+
+    assert web.finder().upstream(fork_feed()) == fork_feed()
+    assert web.requested == [FORK_API]
+
+
+def test_a_fork_stays_when_its_parent_has_no_release_notes() -> None:
+    web = Web({FORK_API: httpx2.Response(200, json={"fork": True, "parent": {"full_name": "a/b"}})})
+
+    assert web.finder().upstream(fork_feed()) == fork_feed()
+
+
+def test_only_github_release_notes_are_checked_for_forks() -> None:
+    web = Web({})
+    blog = FoundFeed("https://blog.example/feed", "Blog", "https://blog.example")
+
+    assert web.finder().upstream(blog) == blog
+    assert web.requested == []
 
 
 # --- YouTube -------------------------------------------------------------------

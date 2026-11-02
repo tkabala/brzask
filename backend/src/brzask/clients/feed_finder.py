@@ -31,6 +31,9 @@ GITHUB_RESERVED = frozenset(
         "settings", "sponsors", "topics", "trending",
     }
 )  # fmt: skip
+# Tells a fork and its parent; unauthenticated, 60 requests an hour per address.
+GITHUB_API = "https://api.github.com"
+_RELEASE_FEED = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/releases\.atom$")
 _YOUTUBE_CHANNEL_ID = re.compile(r"^UC[A-Za-z0-9_-]{22}$")
 # Most reliable first: on a channel page the first "channelId" can belong to a
 # recommended channel, while the canonical link and externalId name the owner;
@@ -135,6 +138,34 @@ class FeedFinder:
         return self._feed(
             f"https://github.com/{owner}/{repo}/releases.atom", f"https://github.com/{owner}/{repo}"
         )
+
+    def upstream(self, found: FoundFeed) -> FoundFeed:
+        """The parent's release notes when `found` is those of a GitHub fork, else `found`.
+
+        A fork mostly carries its parent's tags as releases of its own, so a
+        search that turns up a fork is really pointing at the parent. When
+        GitHub cannot tell (rate limit, network), `found` stays as it is.
+        """
+        match = _RELEASE_FEED.match(found.url)
+        if match is None:
+            return found
+        owner, repo = match.groups()
+        try:
+            response = self.client.get(
+                f"{GITHUB_API}/repos/{owner}/{repo}",
+                headers={"Accept": "application/vnd.github+json"},
+            )
+            response.raise_for_status()
+            info = response.json()
+        except (*REQUEST_ERRORS, ValueError) as error:
+            log.info("fork check failed", url=found.url, error=str(error))
+            return found
+        parent = info.get("parent") if isinstance(info, dict) and info.get("fork") else None
+        name = parent.get("full_name") if isinstance(parent, dict) else None
+        if not isinstance(name, str) or name.count("/") != 1:
+            return found
+        log.info("fork replaced by its parent", url=found.url, parent=name)
+        return self._github(f"https://github.com/{name}") or found
 
     def _youtube(self, page: str) -> FoundFeed | None:
         """A channel's video feed, from a channel, handle or video URL."""

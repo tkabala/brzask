@@ -80,6 +80,17 @@ def test_shown_links_within_the_window(session: Session, make: Factories) -> Non
     }
 
 
+def test_links_by_source_since(session: Session, make: Factories) -> None:
+    source = make.source()
+    make.article(source, link="https://a.example/new", first_seen_at=NOW - timedelta(days=1))
+    make.article(source, link="https://a.example/old", first_seen_at=NOW - timedelta(days=400))
+    make.article(link="https://a.example/sourceless", first_seen_at=NOW)
+
+    links = ArticleRepository(session).links_by_source(NOW - timedelta(days=365))
+
+    assert links == [(source.id, "https://a.example/new")]
+
+
 def test_repeats_are_marked_and_never_carried_over(session: Session, make: Factories) -> None:
     repeat = make.article(first_seen_at=NOW - timedelta(days=1))
     shown = make.article(first_seen_at=NOW - timedelta(days=1), digest_date=TODAY)

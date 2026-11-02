@@ -4,7 +4,8 @@ Links come from feeds and pages, where malformed ones (`http://[oops`) occur;
 `urlsplit` raises on those, so these helpers treat them as not a URL.
 """
 
-from urllib.parse import urlsplit, urlunsplit
+import re
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 
 def host_of(url: str) -> str:
@@ -51,3 +52,25 @@ def feed_key(url: str) -> str:
     return urlunsplit(
         (parts.scheme.lower(), parts.netloc.lower(), path, parts.query, parts.fragment)
     )
+
+
+_RELEASE_TAG = re.compile(r"^/[^/]+/[^/]+/releases/tag/([^/]+)/?$")
+
+
+def item_key(link: str) -> str:
+    """What two feeds share when they carry the same item under their own links.
+
+    A GitHub release counts by its tag without a leading `v`, since a mirror or a
+    fork links to its own repository (`owner/mirror/releases/tag/2.1.3` is
+    `anthropics/claude-code/releases/tag/v2.1.3`); any other link by host
+    (without `www.`), path without a trailing slash and query.
+    """
+    try:
+        parts = urlsplit(link.strip())
+    except ValueError:
+        return link.strip()
+    host = (parts.hostname or "").removeprefix("www.")
+    if host == "github.com" and (tag := _RELEASE_TAG.match(parts.path)):
+        return "release:" + unquote(tag.group(1)).lower().removeprefix("v")
+    query = f"?{parts.query}" if parts.query else ""
+    return f"{host}{parts.path.rstrip('/')}{query}"

@@ -1,6 +1,6 @@
 import pytest
 
-from brzask.urls import feed_key, host_matches, host_of, is_http_url
+from brzask.urls import feed_key, host_matches, host_of, is_http_url, item_key
 
 
 @pytest.mark.parametrize(
@@ -66,3 +66,42 @@ def test_feed_keys_ignore_case_that_does_not_matter(first: str, second: str) -> 
 )
 def test_feed_keys_keep_case_that_matters(first: str, second: str) -> None:
     assert feed_key(first) != feed_key(second)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        # a mirror of release notes, tagged without the "v"
+        (
+            "https://github.com/anthropics/claude-code/releases/tag/v2.1.316",
+            "https://github.com/someone/claude-code-update/releases/tag/2.1.316",
+        ),
+        # a fork's copy of a tag
+        (
+            "https://github.com/omacom/omarchy/releases/tag/v4.0.4",
+            "https://github.com/someone/omarchy/releases/tag/V4.0.4/",
+        ),
+        # one blog under two feed URLs
+        ("https://www.latent.space/p/claude-mods", "https://latent.space/p/claude-mods/"),
+        ("http://example.com/a?id=1", "https://example.com/a?id=1"),
+    ],
+)
+def test_item_keys_match_one_item_under_two_links(first: str, second: str) -> None:
+    assert item_key(first) == item_key(second)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("https://example.com/a?id=1", "https://example.com/a?id=2"),
+        ("https://example.com/a", "https://other.example/a"),
+        # a tag page that is not a release of one repository
+        ("https://github.com/a/b/releases/tag/v1/notes", "https://github.com/c/d/releases/tag/v1"),
+    ],
+)
+def test_item_keys_tell_items_apart(first: str, second: str) -> None:
+    assert item_key(first) != item_key(second)
+
+
+def test_an_item_key_of_a_malformed_link_is_the_link() -> None:
+    assert item_key(" http://[oops ") == "http://[oops"

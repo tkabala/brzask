@@ -79,6 +79,12 @@ Two URLs are the same feed when they differ only in case that does not matter:
 the scheme and host, and the path on GitHub and Reddit, where owners,
 repositories and subreddits ignore case. Elsewhere a path's case counts.
 
+Discovery also catches copies under another URL. A GitHub fork is replaced by
+its parent repository, and a proposed feed whose recent items are mostly one
+known source's articles (the same blog under a second feed URL, a mirror of
+release notes) is stored as `rejected` with a note naming that source. GitHub
+releases count as the same item when their tags match without a leading `v`.
+
 `kind` is `release` for release-note feeds, which are judged on their content
 instead of being dropped as noise. `origin` (`manual`, `discovery`, `visited`,
 `opml`) and `origin_detail` record where a source came from, so it is possible
