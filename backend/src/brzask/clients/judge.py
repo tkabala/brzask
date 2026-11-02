@@ -340,7 +340,7 @@ class LLMJudge:
     @classmethod
     def from_settings(cls, settings: Settings, model: str | None = None) -> Self:
         judge, llm = settings.judge, settings.llm
-        overrides = {
+        overrides: dict[str, object] = {
             key: value
             for key, value in (
                 ("model", model or judge.model),
@@ -349,6 +349,10 @@ class LLMJudge:
             )
             if value is not None
         }
+        if judge.base_url is not None:
+            # LLM_REASONING_EFFORT is chosen for LLM_BASE_URL's models; another API
+            # (a local server, a model without reasoning) may reject the field.
+            overrides["reasoning_effort"] = None
         return cls(LLMClient.from_settings(llm.model_copy(update=overrides)))
 
     def close(self) -> None:

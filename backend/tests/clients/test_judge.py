@@ -512,6 +512,21 @@ def test_build_judge_llm_backend_uses_the_llm_settings_with_overrides(
     assert str(judge.llm.client.base_url) == "http://ollama:11434/v1/"
 
 
+def test_an_llm_judge_on_another_api_does_not_send_the_llm_reasoning_effort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JUDGE_BACKEND", "llm")
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "medium")
+    same_api = build_judge(Settings())
+    monkeypatch.setenv("JUDGE_BASE_URL", "http://ollama:11434/v1")
+    other_api = build_judge(Settings())
+
+    assert isinstance(same_api, LLMJudge)
+    assert isinstance(other_api, LLMJudge)
+    assert same_api.llm.reasoning_effort == "medium"
+    assert other_api.llm.reasoning_effort is None
+
+
 def test_llm_score_keyed_by_level_text_is_understood() -> None:
     answers = {
         "same_event": {"probability": 0.5},
