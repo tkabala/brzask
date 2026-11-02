@@ -95,10 +95,12 @@ ENABLE_FIT, ENABLE_SUBSTANCE = 2.0, 1.5
 REJECT_FIT = 1.0
 
 # A feed copies a known source when at least this many of its sampled items, and at
-# least this share of them, are that source's articles. Measured on one instance's
-# 6,235 articles (2026-11-02): no two different sources shared even 2 of one's 10
-# newest items, while the copies shared 3 of 7 (one blog under two feed URLs) and
-# 5 of 5 (a mirror of release notes).
+# least this share of them, are that source's articles, and they are at least this
+# share of the source's own newest items too. Measured on one instance's 6,235
+# articles (2026-11-02): no two different sources shared even 2 of one's 10 newest
+# items, while four real copies (a blog under a second feed URL or host, a mirror of
+# release notes, a fork's tags) shared 7-10 of their 10 sampled items, and 7-10 of
+# the original's newest.
 DUPLICATE_MIN_ITEMS = 3
 DUPLICATE_MIN_SHARE = 1 / 3
 # Known sources' articles compared against, by when they were first seen.
@@ -200,21 +202,47 @@ def to_candidate(proposal: Proposal, feed: FoundFeed, now: datetime) -> Candidat
     )
 
 
-def known_items(links: Iterable[tuple[int, str]]) -> dict[int, set[str]]:
-    """Item keys (`item_key`) of known articles, by source ID."""
+@dataclass(frozen=True, slots=True)
+class KnownSource:
+    """Item keys (`item_key`) of a known source's articles."""
+
+    items: set[str]
+    newest: set[str]  # its SAMPLE_ITEMS newest, the counterpart of a candidate's sample
+
+
+def known_items(links: Iterable[tuple[int, str]]) -> dict[int, KnownSource]:
+    """Known sources by ID, from (source ID, link) pairs newest first."""
     items: defaultdict[int, set[str]] = defaultdict(set)
+    newest: defaultdict[int, list[str]] = defaultdict(list)
     for source_id, link in links:
-        items[source_id].add(item_key(link))
-    return dict(items)
+        key = item_key(link)
+        if key not in items[source_id] and len(newest[source_id]) < SAMPLE_ITEMS:
+            newest[source_id].append(key)
+        items[source_id].add(key)
+    return {
+        source_id: KnownSource(keys, set(newest[source_id])) for source_id, keys in items.items()
+    }
 
 
-def duplicate_of(candidate: Candidate, known: Mapping[int, set[str]]) -> int | None:
-    """The known source whose articles make up most of the candidate's sample, if any."""
+def duplicate_of(candidate: Candidate, known: Mapping[int, KnownSource]) -> int | None:
+    """The known source the candidate copies, if any.
+
+    Its articles must make up most of the candidate's sample, and the
+    candidate must carry a good part of that source's own newest items too:
+    an aggregator links to other sites' posts, so without the second test a
+    blog it often links to would pass for a copy of the aggregator.
+    """
     sample = {item_key(entry.link) for entry in candidate.sample}
     needed = max(DUPLICATE_MIN_ITEMS, math.ceil(len(sample) * DUPLICATE_MIN_SHARE))
-    shared = {source_id: len(sample & items) for source_id, items in known.items()}
-    best = max(shared, key=lambda source_id: shared[source_id], default=None)
-    return best if best is not None and shared[best] >= needed else None
+    best, most = None, 0
+    for source_id, source in known.items():
+        shared = len(sample & source.items)
+        if shared < needed or shared <= most:
+            continue
+        if len(sample & source.newest) < math.ceil(len(source.newest) * DUPLICATE_MIN_SHARE):
+            continue
+        best, most = source_id, shared
+    return best
 
 
 def judge_state(candidate: Candidate, interests: Sequence[dict[str, Any]]) -> dict[str, Any]:

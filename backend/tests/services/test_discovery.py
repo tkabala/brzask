@@ -17,6 +17,7 @@ from brzask.services.discovery import (
     ACTOR,
     RECENT_WINDOW,
     SAMPLE_ITEMS,
+    KnownSource,
     Proposal,
     discover_sources,
     duplicate_of,
@@ -215,14 +216,26 @@ def test_known_items_by_source() -> None:
         [(1, "https://www.a.example/p/"), (1, "https://a.example/q"), (2, "https://b.example/p")]
     )
 
-    assert items == {1: {"a.example/p", "a.example/q"}, 2: {"b.example/p"}}
+    assert items == {
+        1: KnownSource({"a.example/p", "a.example/q"}, {"a.example/p", "a.example/q"}),
+        2: KnownSource({"b.example/p"}, {"b.example/p"}),
+    }
+
+
+def test_a_known_sources_newest_items_are_its_first_ones() -> None:
+    links = [(1, f"https://a.example/{n}") for n in range(SAMPLE_ITEMS + 5)]
+
+    [source] = known_items(links).values()
+
+    assert len(source.items) == SAMPLE_ITEMS + 5
+    assert source.newest == {f"a.example/{n}" for n in range(SAMPLE_ITEMS)}
 
 
 def test_a_feed_made_of_a_known_sources_items_is_a_duplicate() -> None:
-    # the same blog under another feed URL: 3 of 7 items, as measured
+    # the same blog under another feed URL: 7 of 10 items both ways, as measured
     known = known_items([(48, f"https://www.latent.space/p/{n}") for n in range(20)])
-    links = [f"https://latent.space/p/{n}/" for n in range(3)]
-    links += [f"https://latent.space/p/new-{n}" for n in range(4)]
+    links = [f"https://latent.space/p/{n}/" for n in range(7)]
+    links += [f"https://latent.space/p/new-{n}" for n in range(3)]
     copy = to_candidate(
         proposal("https://latent.space"), feed("https://l/f", items=linked(*links)), NOW
     )
@@ -267,6 +280,19 @@ def test_a_duplicate_needs_enough_shared_items(
     )
 
     assert duplicate_of(candidate, known) == expected
+
+
+def test_a_blog_is_not_a_copy_of_an_aggregator_linking_to_it() -> None:
+    # The aggregator's newest items are mostly other sites' posts: it carries
+    # the blog's posts, the blog carries little of it.
+    aggregator = [(5, f"https://site{n}.example/post") for n in range(10)]
+    aggregator += [(5, f"https://blog.example/{n}") for n in range(6)]
+    blog = linked(*(f"https://blog.example/{n}" for n in range(8)))
+    candidate = to_candidate(
+        proposal("https://blog.example"), feed("https://blog.example/f", items=blog), NOW
+    )
+
+    assert duplicate_of(candidate, known_items(aggregator)) is None
 
 
 def test_the_source_sharing_most_items_is_named() -> None:

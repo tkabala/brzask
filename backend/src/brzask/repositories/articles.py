@@ -126,9 +126,13 @@ class ArticleRepository:
         return set(self.session.scalars(query))
 
     def links_by_source(self, since: datetime) -> list[tuple[int, str]]:
-        """(source ID, link) of the articles first seen at or after `since`."""
-        query = select(Article.source_id, Article.link).where(
-            Article.source_id.is_not(None), Article.first_seen_at >= since
+        """(source ID, link) of the articles first seen at or after `since`, newest first."""
+        query = (
+            select(Article.source_id, Article.link)
+            .where(Article.source_id.is_not(None), Article.first_seen_at >= since)
+            .order_by(
+                func.coalesce(Article.published_at, Article.first_seen_at).desc(), Article.id.desc()
+            )
         )
         return [(source_id, link) for source_id, link in self.session.execute(query) if source_id]
 

@@ -91,6 +91,22 @@ def test_links_by_source_since(session: Session, make: Factories) -> None:
     assert links == [(source.id, "https://a.example/new")]
 
 
+def test_links_by_source_come_newest_first(session: Session, make: Factories) -> None:
+    source = make.source()
+    seen = NOW - timedelta(days=1)
+    make.article(source, link="https://a.example/older", published_at=NOW - timedelta(days=3))
+    make.article(source, link="https://a.example/undated", first_seen_at=seen)
+    make.article(source, link="https://a.example/newer", published_at=NOW - timedelta(days=2))
+
+    links = ArticleRepository(session).links_by_source(NOW - timedelta(days=365))
+
+    assert [link for _, link in links] == [
+        "https://a.example/undated",  # dated by when it was first seen
+        "https://a.example/newer",
+        "https://a.example/older",
+    ]
+
+
 def test_repeats_are_marked_and_never_carried_over(session: Session, make: Factories) -> None:
     repeat = make.article(first_seen_at=NOW - timedelta(days=1))
     shown = make.article(first_seen_at=NOW - timedelta(days=1), digest_date=TODAY)

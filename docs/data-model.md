@@ -82,8 +82,10 @@ repositories and subreddits ignore case. Elsewhere a path's case counts.
 
 Discovery also catches copies under another URL. A GitHub fork is replaced by
 its parent repository, and a proposed feed whose recent items are mostly one
-known source's articles (the same blog under a second feed URL, a mirror of
-release notes) is stored as `rejected` with a note naming that source. GitHub
+known source's articles, and also a good part of that source's newest ones (the
+same blog under a second feed URL, a mirror of release notes), is stored as
+`rejected` with a note naming that source. The second condition keeps a blog
+from passing for a copy of an aggregator that links to its posts. GitHub
 releases count as the same item when their tags match without a leading `v`.
 
 `kind` is `release` for release-note feeds, which are judged on their content
