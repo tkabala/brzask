@@ -215,6 +215,7 @@ def test_discovery_search_in_plain_language_or_keywords() -> None:
 
     assert request.startswith("Currently active, high-quality blogs")
     assert "staying up to date on Postgres (pgvector, replication), plus" in request
+    assert "GitHub" not in request  # repositories are not asked for
     assert keywords == "Postgres pgvector replication blog\n"
     assert bare == "Postgres blog\n"
 
