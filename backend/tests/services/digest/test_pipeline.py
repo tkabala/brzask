@@ -17,8 +17,10 @@ from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.db.models import Article, ArticleState, RunKind, RunStatus, Source
 from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.services.digest import pipeline
-from brzask.services.digest.pipeline import DigestClients, build_digest, run_digest
-from brzask.services.digest.selection import DIGEST_SIZE
+from brzask.services.digest.dedup import Deduplicated, Drop
+from brzask.services.digest.pipeline import DigestClients, build_digest, repeats, run_digest
+from brzask.services.digest.pool import Candidate
+from brzask.services.digest.selection import DIGEST_SIZE, Pick
 from brzask.services.embeddings import switch_model
 from brzask.services.pause import pause
 from brzask.services.runs import RunContext, run_pipeline
@@ -194,6 +196,31 @@ def test_a_repeat_of_a_shown_article_is_marked_to_stay_out(
     assert stored.state is ArticleState.REPEAT
     others = session.scalars(select(Article).where(Article.state == ArticleState.REPEAT)).all()
     assert others == [stored]
+
+
+def _candidate(n: int) -> Candidate:
+    return Candidate(f"https://x.example/{n}", f"T{n}", n, "S", False, None, None, article_id=n)
+
+
+def test_repeats_are_cross_day_drops_and_same_day_drops_of_a_picked_article() -> None:
+    kept, picked_dup, unpicked_dup, cross, unstored = (_candidate(n) for n in range(1, 6))
+    unstored = replace(unstored, article_id=None)
+    other = _candidate(9)
+    deduplicated = Deduplicated(
+        survivors=[kept, other],
+        drops=[
+            Drop(picked_dup.link, "same_day", 0.9, duplicate_of=kept.link),
+            Drop(unpicked_dup.link, "same_day", 0.9, duplicate_of=other.link),
+            Drop(cross.link, "cross_day", 0.97),
+            Drop(unstored.link, "cross_day", 0.97),
+        ],
+        same_day_threshold=None,
+    )
+    picks = [Pick(kept, 1, "T", "S", "W", "Topic")]  # `other` is not in the digest
+
+    ids = repeats([kept, picked_dup, unpicked_dup, cross, unstored, other], deduplicated, picks)
+
+    assert ids == [picked_dup.article_id, cross.article_id]
 
 
 def test_a_dry_run_writes_nothing_but_the_run(

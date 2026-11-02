@@ -39,7 +39,8 @@ fetched ──► seen ──► ranked (rank set) ──► shown (in a digest)
   so a link is shown at most once: a shown link that turns up in a feed again
   is never a candidate.
 - **`state = repeat`**: dropped by deduplication as a repeat of an article
-  shown in the last days, under another link. Like a shown link, it is never a
+  shown in the last days, under another link, or as a same-day duplicate of an
+  article picked for that day's digest. Like a shown link, it is never a
   candidate again, so it cannot take a top slot day after day.
 - **`opened_at`**: the first time you opened the article. Opening is the only
   preference signal brzask uses, so this column drives learning, source review

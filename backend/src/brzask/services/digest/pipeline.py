@@ -75,7 +75,7 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
             # Read again inside the writing transaction: a forced run appends.
             offset = articles.last_digest_position(day) or 0
             articles.mark_shown(day, [_entry(pick, offset) for pick in picks], shown_at=now)
-            articles.mark_repeats(_repeats(extracted, deduplicated))
+            articles.mark_repeats(repeats(extracted, deduplicated, picks))
 
 
 def run_digest(context: RunContext) -> None:
@@ -119,13 +119,23 @@ def run_digest(context: RunContext) -> None:
         )
 
 
-def _repeats(candidates: Sequence[Candidate], deduplicated: Deduplicated) -> list[int]:
-    """Article IDs of the candidates dropped as repeats of shown articles.
+def repeats(
+    candidates: Sequence[Candidate], deduplicated: Deduplicated, picks: Sequence[Pick]
+) -> list[int]:
+    """Article IDs of the candidates dropped as repeats of articles shown by now.
 
-    Without the mark they stay in the pool for the carry-over week, and a
-    repeat that ranks high takes a top slot again every day.
+    That is every cross-day drop, and a same-day drop whose kept duplicate is
+    in today's digest; when the kept one is not picked, the drop stays a
+    candidate for later days. Without the mark they stay in the pool for the
+    carry-over week, and a repeat that ranks high takes a top slot again every
+    day (a daily roundup was dropped as a same-day duplicate two days running).
     """
-    links = {drop.link for drop in deduplicated.drops if drop.reason == "cross_day"}
+    picked = {pick.candidate.link for pick in picks}
+    links = {
+        drop.link
+        for drop in deduplicated.drops
+        if drop.reason == "cross_day" or drop.duplicate_of in picked
+    }
     return [c.article_id for c in candidates if c.link in links and c.article_id is not None]
 
 
