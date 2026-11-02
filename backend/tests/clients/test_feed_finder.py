@@ -348,10 +348,39 @@ def test_a_feed_stays_when_github_names_no_parent(answer: httpx2.Response) -> No
     assert web.requested == [FORK_API]
 
 
+def test_a_fork_of_a_fork_is_replaced_by_the_original() -> None:
+    middle = {"full_name": "middle/omarchy"}
+    answer = {"fork": True, "parent": middle, "source": {"full_name": "omacom/omarchy"}}
+    web = Web({FORK_API: httpx2.Response(200, json=answer), PARENT_FEED: feed(ATOM)})
+
+    assert web.finder().upstream(fork_feed()).url == PARENT_FEED
+
+
 def test_a_fork_stays_when_its_parent_has_no_release_notes() -> None:
     web = Web({FORK_API: httpx2.Response(200, json={"fork": True, "parent": {"full_name": "a/b"}})})
 
     assert web.finder().upstream(fork_feed()) == fork_feed()
+
+
+def test_a_fork_stays_when_its_parent_publishes_no_releases() -> None:
+    # GitHub answers a repository without releases with a valid, empty feed.
+    empty = (
+        b'<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>x</title></feed>'
+    )
+    answer = {"fork": True, "parent": {"full_name": "omacom/omarchy"}}
+    web = Web({FORK_API: httpx2.Response(200, json=answer), PARENT_FEED: feed(empty)})
+
+    assert web.finder().upstream(fork_feed()) == fork_feed()
+
+
+def test_a_fork_is_checked_whatever_the_scheme_of_its_feed() -> None:
+    answer = {"fork": True, "parent": {"full_name": "omacom/omarchy"}}
+    web = Web({FORK_API: httpx2.Response(200, json=answer), PARENT_FEED: feed(ATOM)})
+    fork = FoundFeed(
+        "http://www.github.com/someone/omarchy/releases.atom", None, "https://github.com/x"
+    )
+
+    assert web.finder().upstream(fork).url == PARENT_FEED
 
 
 def test_only_github_release_notes_are_checked_for_forks() -> None:
