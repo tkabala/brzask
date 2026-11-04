@@ -6,6 +6,8 @@ import httpx2
 import openai
 import pytest
 import sentry_sdk
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from opentelemetry import metrics, trace
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
@@ -218,3 +220,20 @@ def test_sql_queries_produce_spans(
         dict(span.attributes or {}).get("db.statement") for span in spans.get_finished_spans()
     ]
     assert "SELECT 1" in statements
+
+
+def test_spans_hide_feed_tokens(spans: InMemorySpanExporter) -> None:
+    app = FastAPI()
+
+    @app.get("/feed")
+    def feed() -> dict[str, str]:
+        return {}
+
+    telemetry.instrument_app(app)
+    TestClient(app).get("/feed", params={"token": "brz_secret", "x": "1"})
+
+    finished = spans.get_finished_spans()
+    assert finished
+    values = [str(v) for span in finished for v in (span.attributes or {}).values()]
+    assert any("token=REDACTED" in v for v in values)
+    assert not any("brz_secret" in v for v in values)

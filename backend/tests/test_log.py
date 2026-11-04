@@ -17,6 +17,7 @@ from brzask.log import (
     configure_logging,
     get_logger,
     logged_run,
+    redact_tokens,
 )
 
 
@@ -219,3 +220,30 @@ def test_http_client_request_lines_are_quiet(output: io.StringIO) -> None:
     logging.getLogger("httpcore2.http11").info("receive_response_headers")
 
     assert lines(output) == []
+
+
+def test_redact_tokens() -> None:
+    assert (
+        redact_tokens("GET /feed?token=brz_abc&x=1 HTTP/1.1")
+        == "GET /feed?token=REDACTED&x=1 HTTP/1.1"
+    )
+    assert redact_tokens("/feed?x=1&token=brz_abc") == "/feed?x=1&token=REDACTED"
+    assert redact_tokens("/open?id=3&sig=ff") == "/open?id=3&sig=ff"
+    assert redact_tokens("token=brz_abc&x=1") == "token=REDACTED&x=1"  # a bare query
+    assert redact_tokens("/feed?mytoken=a") == "/feed?mytoken=a"
+
+
+def test_access_log_hides_feed_tokens(output: io.StringIO) -> None:
+    logging.getLogger("uvicorn.access").info(
+        '%s - "%s %s HTTP/%s" %d', "1.2.3.4:5", "GET", "/feed?token=brz_secret", "1.1", 200
+    )
+
+    [line] = lines(output)
+    assert "/feed?token=REDACTED" in line["event"]
+    assert "brz_secret" not in output.getvalue()
+
+
+def test_redaction_is_installed_once(output: io.StringIO) -> None:
+    configure_logging("INFO", "json", output)
+
+    assert len(logging.getLogger("uvicorn.access").filters) == 1

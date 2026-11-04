@@ -24,6 +24,28 @@ LogFormat = Literal["auto", "json", "console"]
 # Libraries that log every request at INFO; their warnings still come through.
 _QUIET_LOGGERS = ("httpx2", "httpcore2", "apscheduler.executors.default")
 
+# A token in a query string (the feed's URL carries one): every poll would
+# write it into the access log.
+_QUERY_TOKEN = re.compile(r"((?:^|[?&])token=)[^&#\s\"]+")
+
+
+def redact_tokens(text: str) -> str:
+    """`text` (a URL, a query or a log line) with every `token=` value replaced."""
+    return _QUERY_TOKEN.sub(r"\1REDACTED", text)
+
+
+class _RedactTokens(logging.Filter):
+    """Redacts tokens in request URLs that uvicorn logs, one per request."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = redact_tokens(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                redact_tokens(arg) if isinstance(arg, str) else arg for arg in record.args
+            )
+        return True
+
 
 def configure_logging(
     level: str = "INFO", log_format: LogFormat = "auto", stream: TextIO | None = None
@@ -69,6 +91,9 @@ def configure_logging(
     root.setLevel(level.upper())
     for name in _QUIET_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _RedactTokens) for f in access.filters):
+        access.addFilter(_RedactTokens())
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:

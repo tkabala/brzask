@@ -10,6 +10,7 @@ OpenTelemetry API calls in the code are no-ops.
 import os
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from typing import Any
 
 import sentry_sdk
 from fastapi import FastAPI
@@ -30,7 +31,7 @@ from opentelemetry.trace import Span
 from brzask import __version__
 from brzask.clients.usage import CallUsage
 from brzask.config.settings import TelemetrySettings
-from brzask.log import get_logger
+from brzask.log import get_logger, redact_tokens
 
 log = get_logger(__name__)
 
@@ -96,8 +97,21 @@ def instrument_app(app: FastAPI, meter_provider: MeterProviderAPI | None = None)
     Uses the global tracer and meter providers unless `meter_provider` is given.
     """
     FastAPIInstrumentor.instrument_app(
-        app, meter_provider=meter_provider, excluded_urls="/healthz,/readyz,/metrics"
+        app,
+        meter_provider=meter_provider,
+        excluded_urls="/healthz,/readyz,/metrics",
+        server_request_hook=_redact_span_tokens,
     )
+
+
+def _redact_span_tokens(span: Span, scope: dict[str, Any]) -> None:
+    """Keep a token in the request's query (the feed's URL) out of the span."""
+    if not span.is_recording():
+        return
+    attributes = getattr(span, "attributes", None) or {}
+    for key, value in attributes.items():
+        if isinstance(value, str) and "token=" in value:
+            span.set_attribute(key, redact_tokens(value))
 
 
 def instrument_sqlalchemy() -> None:
