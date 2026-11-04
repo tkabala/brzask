@@ -135,24 +135,52 @@ def select_digest(
     language: Language,
     size: int = DIGEST_SIZE,
 ) -> list[Pick]:
-    """The day's picks; raises `SelectionError` when the answer names no candidate."""
+    """The day's picks; raises `SelectionError` when the answer names no candidate.
+
+    An answer with fewer than `size` usable picks while candidates are left
+    is topped up once: the model is asked for the missing number from the
+    candidates it did not pick. Over 23 daily runs on two instances, one
+    answer named 3 of 9 candidates and another 6 of 13, although the prompt
+    asks for exactly `size`.
+    """
     with context.sessions.begin() as session:
         interests = interest_context(session)
+    topics = [interest["topic"] for interest in interests]
     prompt = selection_prompt(candidates, interests, language, size)
     with context.stage("selection"):
         answer, _ = llm.complete_json(prompt, purpose="selection", meter=context.usage)
-    topics = [interest["topic"] for interest in interests]
-    picks = parse_selection(answer, candidates, language, size, topics)
+        items = _items(answer)
+        picks = parse_selection({"articles": items}, candidates, language, size, topics)
+        first = len(picks)
+        if (missing := min(size, len(candidates)) - first) > 0:
+            picked = {pick.candidate.link for pick in picks}
+            rest = [candidate for candidate in candidates if candidate.link not in picked]
+            log.info("selection is short; asking for the rest", picked=len(picks), missing=missing)
+            more, _ = llm.complete_json(
+                selection_prompt(rest, interests, language, missing),
+                purpose="selection",
+                meter=context.usage,
+            )
+            # Parsed together, so topics group across both answers and repeats are skipped.
+            picks = parse_selection(
+                {"articles": [*items, *_items(more)]}, candidates, language, size, topics
+            )
     if not picks:
         raise SelectionError("the selection answer named none of the candidates")
     context.stats["selection"] = {
         "prompt_chars": len(prompt),
         "candidates": len(candidates),
         "picked": len(picks),
+        "topped_up": len(picks) - first,
         "topics": list(dict.fromkeys(pick.topic for pick in picks)),
     }
     log.info("digest selected", **context.stats["selection"])
     return picks
+
+
+def _items(answer: Any) -> list[Any]:
+    items = answer.get("articles") if isinstance(answer, dict) else None
+    return items if isinstance(items, list) else []
 
 
 def _interest_topic(topic: str, topics: Sequence[str]) -> str:

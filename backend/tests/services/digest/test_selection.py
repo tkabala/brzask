@@ -172,15 +172,18 @@ def test_prompt_marks_release_notes() -> None:
 
 
 class FakeModel:
-    def __init__(self, answer: Any) -> None:
-        self.answer = answer
+    """Gives `answers` in turn, the last one again once they run out."""
+
+    def __init__(self, *answers: Any) -> None:
+        self.answers = answers
         self.prompts: list[str] = []
 
     def complete_json(
         self, prompt: str, *, purpose: str, meter: UsageMeter | None = None
     ) -> tuple[Any, Completion]:
         self.prompts.append(prompt)
-        return self.answer, Completion("{}", CallUsage("test/model", purpose, 1, 1, None, 1))
+        answer = self.answers[min(len(self.prompts), len(self.answers)) - 1]
+        return answer, Completion("{}", CallUsage("test/model", purpose, 1, 1, None, 1))
 
 
 def test_select_digest_uses_the_active_interests_and_records_stats(
@@ -200,9 +203,57 @@ def test_select_digest_uses_the_active_interests_and_records_stats(
         "prompt_chars": len(model.prompts[0]),
         "candidates": 10,
         "picked": 2,
+        "topped_up": 0,
         "topics": ["Rust", "General"],
     }
     assert "selection" in run.timings
+
+
+def test_a_short_answer_is_topped_up_from_the_candidates_left(
+    sessions: sessionmaker[Session],
+) -> None:
+    first = {"articles": [item(1, "Rust"), item(2, "Postgres"), item(99), item(3, "Rust")]}
+    more = {"articles": [item(2), item(4, "Postgres"), item(5, "Rust"), item(6), item(7)]}
+    model = FakeModel(first, more)
+    run = context(sessions)
+
+    picks = select_digest(run, CANDIDATES, model, ENGLISH)
+
+    assert [p.candidate.link.rsplit("/", 1)[-1] for p in picks] == [
+        "1",
+        "3",
+        "5",
+        "6",
+        "7",
+        "2",
+        "4",
+    ]
+    assert len(model.prompts) == 2
+    assert "select exactly 4 articles" in model.prompts[1]
+    assert "https://news.example/1)" not in model.prompts[1]
+    assert "https://news.example/4)" in model.prompts[1]
+    assert run.stats["selection"]["picked"] == 7
+    assert run.stats["selection"]["topped_up"] == 4
+
+
+def test_a_digest_stays_short_when_the_top_up_adds_nothing(
+    sessions: sessionmaker[Session],
+) -> None:
+    model = FakeModel({"articles": [item(1), item(2)]}, {"articles": []})
+
+    picks = select_digest(context(sessions), CANDIDATES, model, ENGLISH)
+
+    assert len(picks) == 2
+    assert len(model.prompts) == 2
+
+
+def test_no_top_up_when_every_candidate_is_picked(sessions: sessionmaker[Session]) -> None:
+    model = FakeModel({"articles": [item(1), item(2)]})
+
+    picks = select_digest(context(sessions), CANDIDATES[:2], model, ENGLISH)
+
+    assert len(picks) == 2
+    assert len(model.prompts) == 1
 
 
 def test_an_answer_naming_no_candidate_fails(sessions: sessionmaker[Session]) -> None:

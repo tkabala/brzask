@@ -105,7 +105,7 @@ flowchart LR
 | Ranking | The LLM orders the pool; top 15, at most 2 per source | [ADR 0010](decisions/0010-rank-candidates-and-show-a-fixed-seven.md), [ADR 0006](decisions/0006-llm-ranking-stays-the-default-over-composite-scores.md) |
 | Text and embeddings | Extractors in turn, the first 4,000 characters embedded | [ADR 0002](decisions/0002-trafilatura-as-the-default-page-extractor.md), [ADR 0022](decisions/0022-one-embedding-model-at-a-time-with-thresholds-per-model.md) |
 | Deduplication | Against 7 days of shown articles, then within the day | [ADR 0012](decisions/0012-embedding-deduplication-across-days-and-within-the-day.md), [ADR 0007](decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md) |
-| Selection | The LLM picks 7 and writes title, summary and why it matters | [ADR 0010](decisions/0010-rank-candidates-and-show-a-fixed-seven.md) |
+| Selection | The LLM picks 7 and writes title, summary and why it matters; a short answer is topped up once from the candidates it left | [ADR 0010](decisions/0010-rank-candidates-and-show-a-fixed-seven.md) |
 
 If the selection fails, nothing is marked as shown and the candidates stay
 in the pool for the next run. The data each stage reads and writes is

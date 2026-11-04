@@ -95,7 +95,7 @@ Over 28 days of daily use (2026-09-21 to 2026-10-20, `deepseek/deepseek-v4-flash
 
 One opened article (2026-09-30) is in no rebuilt pool: it was published two months before it was shown, and the 10-day age limit drops it.
 
-Each day costs two model calls (ranking and selection). `--workers` (default 4) replays several days at once.
+Each day costs two model calls (ranking and selection), three when the selection answer is short and is topped up. `--workers` (default 4) replays several days at once.
 
 ## Embedding models: reembed and replay
 
