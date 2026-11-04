@@ -44,6 +44,7 @@ nav:
       - Configuration: configuration.md
       - Providers: providers.md
       - Reverse proxy: reverse-proxy.md
+      - Feed: feed.md
       - Backup and restore: backup.md
   - How it works:
       - Architecture: architecture.md

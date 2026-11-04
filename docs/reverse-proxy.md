@@ -51,6 +51,43 @@ such as `172.20.0.0/16`. Without `TRUSTED_PROXIES`, everything still works
 over plain HTTP; behind an HTTPS proxy set `AUTH_COOKIE_SECURE=true` instead
 if you prefer not to trust any header.
 
+## Feed readers and open links
+
+`/feed` and `/open` are reached by feed readers and mail clients, which cannot
+log in to a proxy. Both carry their own credential, a feed token or a
+signature, so a proxy that asks for a login (basic auth, single sign-on) must
+let these two paths through:
+
+```nginx
+location = /feed {
+    auth_basic off;
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+# The same block again for location = /open.
+```
+
+```caddyfile
+news.example.com {
+    @public path /feed /open
+    handle @public {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle {
+        # forward_auth or basicauth here
+        reverse_proxy 127.0.0.1:8000
+    }
+}
+```
+
+The feed's links are absolute: their host is the `Host` header the proxy
+passes on, and their scheme `https` when a trusted proxy sends
+`X-Forwarded-Proto: https`. Proxies log query strings by default, so the
+feed token ends up in their access log; brzask's own log shows
+`token=REDACTED`.
+
 ## Single sign-on
 
 With `AUTH_MODE=header`, brzask has no login of its own: an authenticating

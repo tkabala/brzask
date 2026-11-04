@@ -12,6 +12,7 @@ listens on 0.0.0.0.
 | `/api/v1/openapi.json` | Its OpenAPI 3.1 document |
 | `/api/v1/docs` | Interactive documentation |
 | `/open?id=` | Redirects to an article and records that it was opened |
+| `/feed?token=` | The digest of the last seven days as Atom, for feed readers ([Feed](feed.md)) |
 | `/healthz` | Liveness: the process answers |
 | `/readyz` | Readiness: the database answers and is fully migrated |
 | `/metrics` | Prometheus metrics |
@@ -66,7 +67,8 @@ $ curl -H "Authorization: Bearer brz_..." https://brzask.example/api/v1/status
 ```
 
 - **`read`** (the default) may only read (`GET`, `HEAD`); anything else
-  answers 403. **`write`** may also change things.
+  answers 403. **`write`** may also change things. **`feed`** opens only
+  [the feed](feed.md), carried in its URL; the API answers it 401.
 - The token is printed once. Only its SHA-256 is stored, with its first 12
   characters, which `brzask tokens list` shows next to its scope, when it was
   created, last used (to the hour) and revoked.
@@ -100,7 +102,8 @@ Behind trusted proxies the login throttle and the logs use the client's
 address from `X-Forwarded-For`: the last entry that is not one of the proxies.
 
 Without a login: `/healthz`, `/readyz`, `/metrics`, the OpenAPI document and the
-interactive documentation, and `/open` links carrying their signature (below).
+interactive documentation, `/open` links carrying their signature (below), and
+`/feed` with a feed token in its URL.
 
 ## Endpoints
 

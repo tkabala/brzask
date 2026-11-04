@@ -13,6 +13,7 @@ Running brzask:
 - [Configuration](configuration.md): every setting with its default.
 - [Providers](providers.md): OpenRouter, Ollama, Gemini and other OpenAI-compatible APIs.
 - [Reverse proxy](reverse-proxy.md): TLS in front, trusted proxies and single sign-on.
+- [Feed](feed.md): the digest in any feed reader.
 - [Backup and restore](backup.md): `pg_dump`, restore and moving to another machine.
 
 How it works:
