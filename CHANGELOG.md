@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.11](https://github.com/tkabala/brzask/compare/v0.1.10...v0.1.11) (2026-11-04)
+
+
+### Features
+
+* **auth:** add a feed token scope that only opens the digest feed ([2c44cc2](https://github.com/tkabala/brzask/commit/2c44cc20be249e132cbef9896f05f6f99938d297))
+* **feed:** render digest entries as Atom ([726c983](https://github.com/tkabala/brzask/commit/726c983d8d7b2e78cf0f1a4cc9a3e7d23fdc54dd))
+* **feed:** serve the digest of the last seven days as an Atom feed ([9c00114](https://github.com/tkabala/brzask/commit/9c0011420ec3e4b5c894f92fd194d0fb7d751aed))
+
+
+### Bug Fixes
+
+* **feed:** keep the token out of Sentry and give the feed an author ([7fe3a26](https://github.com/tkabala/brzask/commit/7fe3a26bd02e1d21e903a0300ddc1ac593c9e1f2))
+* **log:** redact tokens in request URLs from the access log and spans ([499bce0](https://github.com/tkabala/brzask/commit/499bce0556d8e351be1e97c93c0fbe79fff593be))
+
+
+### Documentation
+
+* describe the digest feed and letting it past proxy auth ([d414135](https://github.com/tkabala/brzask/commit/d41413552164d1b3489705f66c9e4ea0177df6d8))
+
+
+### Chores
+
+* release 0.1.11 ([4845b0e](https://github.com/tkabala/brzask/commit/4845b0e64306f10b98b7eaa486a55bb37702c587))
+
 ## [0.1.10](https://github.com/tkabala/brzask/compare/v0.1.9...v0.1.10) (2026-11-02)
 
 
