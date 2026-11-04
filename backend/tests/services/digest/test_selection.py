@@ -210,3 +210,26 @@ def test_an_answer_naming_no_candidate_fails(sessions: sessionmaker[Session]) ->
 
     with pytest.raises(SelectionError):
         select_digest(context(sessions), CANDIDATES, model, ENGLISH)
+
+
+def test_a_topic_copied_with_its_keywords_or_note_is_the_interest_topic() -> None:
+    topics = ["Formula 1", "Formula 1 history", "Rust"]
+    answer = {
+        "articles": [
+            item(1, "Formula 1: F1, motorsport, Grand Prix"),
+            item(2, "formula 1 history [reader note: no rumours]"),
+            item(3, "Rust"),
+            item(4, "Rustaceans"),  # a longer word, not the interest
+            item(5, "Other"),
+        ]
+    }
+
+    picks = parse_selection(answer, CANDIDATES, ENGLISH, topics=topics)
+
+    assert [p.topic for p in picks] == [
+        "Formula 1",
+        "Formula 1 history",
+        "Rust",
+        "Rustaceans",
+        "Other",
+    ]

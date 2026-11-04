@@ -68,11 +68,17 @@ def selection_prompt(
 
 
 def parse_selection(
-    answer: Any, candidates: Sequence[Candidate], language: Language, size: int = DIGEST_SIZE
+    answer: Any,
+    candidates: Sequence[Candidate],
+    language: Language,
+    size: int = DIGEST_SIZE,
+    topics: Sequence[str] = (),
 ) -> list[Pick]:
     """Picks from `{"articles": [...]}`, grouped by topic and numbered from 1.
 
-    Topics keep the order in which they first appear; links are matched to the
+    Topics keep the order in which they first appear, each read back as one of
+    the interest `topics` when it is that topic with more after it (see
+    `_interest_topic`); links are matched to the
     candidates (ignoring a trailing slash, and the query when the model dropped
     it and only one candidate fits), unknown and repeated ones skipped, and at
     most `size` kept. A missing title falls back to the original one.
@@ -106,7 +112,7 @@ def parse_selection(
 
     groups: dict[str, list[tuple[Candidate, dict[str, Any]]]] = {}
     for candidate, item in chosen:
-        topic = _text(item.get("topic")) or language.fallback_topic
+        topic = _interest_topic(_text(item.get("topic")), topics) or language.fallback_topic
         groups.setdefault(topic, []).append((candidate, item))
     ordered = [(topic, pair) for topic, pairs in groups.items() for pair in pairs]
     return [
@@ -135,7 +141,8 @@ def select_digest(
     prompt = selection_prompt(candidates, interests, language, size)
     with context.stage("selection"):
         answer, _ = llm.complete_json(prompt, purpose="selection", meter=context.usage)
-    picks = parse_selection(answer, candidates, language, size)
+    topics = [interest["topic"] for interest in interests]
+    picks = parse_selection(answer, candidates, language, size, topics)
     if not picks:
         raise SelectionError("the selection answer named none of the candidates")
     context.stats["selection"] = {
@@ -146,6 +153,25 @@ def select_digest(
     }
     log.info("digest selected", **context.stats["selection"])
     return picks
+
+
+def _interest_topic(topic: str, topics: Sequence[str]) -> str:
+    """The interest topic `topic` names, else `topic` itself.
+
+    The prompt lists each interest as `topic: keywords [reader note: ...]`, and
+    the model sometimes copies the whole line as the topic (one digest in 11
+    days of daily runs had all five topics written that way), which names the
+    groups wrongly and splits them from other days' groups. The longest
+    interest topic that `topic` starts with, ignoring case and followed by
+    nothing or by a character that is not a letter or digit, is taken;
+    "Rustaceans" is not "Rust".
+    """
+    folded = topic.casefold()
+    for interest in sorted(topics, key=len, reverse=True):
+        name = interest.casefold()
+        if folded.startswith(name) and not folded[len(name) : len(name) + 1].isalnum():
+            return interest
+    return topic
 
 
 def _text(value: Any) -> str:
