@@ -1758,6 +1758,50 @@ export type OpenLinkErrors = {
 
 export type OpenLinkError = OpenLinkErrors[keyof OpenLinkErrors];
 
+export type GetFeedData = {
+    body?: never;
+    headers?: {
+        /**
+         * If-None-Match
+         */
+        'if-none-match'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Token
+         *
+         * A feed token from `brzask tokens create --scope feed`.
+         */
+        token?: string | null;
+    };
+    url: '/feed';
+};
+
+export type GetFeedErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type GetFeedError = GetFeedErrors[keyof GetFeedErrors];
+
+export type GetFeedResponses = {
+    /**
+     * Atom feed of the last days' digests, newest first.
+     */
+    200: unknown;
+};
+
 export type HealthzData = {
     body?: never;
     path?: never;

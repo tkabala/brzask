@@ -2,13 +2,16 @@
 
 from datetime import date
 
+import feedparser
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from brzask.config.settings import AuthSettings
+from brzask.db.models import TokenScope
 from brzask.services.auth import header_csrf_token, link_signature
+from brzask.services.tokens import create_token
 from tests.api.conftest import SECRET
 from tests.factories import Factories
 
@@ -122,3 +125,20 @@ def test_a_wrong_brzask_token_is_not_saved_by_the_proxy_user(app: FastAPI) -> No
     response = proxy.get("/api/v1/status", headers={**USER, "Authorization": "Bearer brz_wrong"})
 
     assert response.status_code == 401
+
+
+def test_feed_links_use_the_public_origin_behind_a_trusted_proxy(
+    app: FastAPI, session: Session, make: Factories
+) -> None:
+    make.article(digest_date=date(2026, 11, 4))
+    _, value = create_token(session, "reader", TokenScope.FEED, actor="user")
+    session.commit()
+    headers = {"Host": "news.example", "X-Forwarded-Proto": "https"}
+
+    behind = from_(app, PROXY).get("/feed", params={"token": value}, headers=headers)
+    forged = from_(app, STRANGER).get("/feed", params={"token": value}, headers=headers)
+
+    [entry] = feedparser.parse(behind.content).entries
+    assert entry.link.startswith("https://news.example/open?id=")
+    [entry] = feedparser.parse(forged.content).entries
+    assert entry.link.startswith("http://news.example/open?id=")

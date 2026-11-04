@@ -23,6 +23,17 @@ def digest_days(session: Session, limit: int, before: date | None = None) -> lis
     return ArticleRepository(session).digest_days(limit, before)
 
 
+@dataclass(frozen=True, slots=True)
+class DigestOfDay:
+    day: date
+    articles: Sequence[Article]  # in digest order, sources loaded
+
+
+def recent_digests(session: Session, days: int) -> list[DigestOfDay]:
+    """The newest `days` days with a digest, newest first."""
+    return [DigestOfDay(d.day, digest_for(session, d.day)) for d in digest_days(session, days)]
+
+
 def get_article(session: Session, article_id: int) -> Article:
     article = ArticleRepository(session).get(article_id)
     if article is None:

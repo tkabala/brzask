@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addInterest, addSource, changeInterest, changeSource, deletePause, getArticle, getArticleRanking, getDigest, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, search, setPause } from '../sdk.gen';
-import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
+import { addInterest, addSource, changeInterest, changeSource, deletePause, getArticle, getArticleRanking, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, search, setPause } from '../sdk.gen';
+import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -629,6 +629,26 @@ export const openLinkOptions = (options: Options<OpenLinkData>) => queryOptions<
         return data;
     },
     queryKey: openLinkQueryKey(options)
+});
+
+export const getFeedQueryKey = (options?: Options<GetFeedData>) => createQueryKey('getFeed', options);
+
+/**
+ * The digest as an Atom feed
+ *
+ * The last seven days with a digest, each article linking through `/open`.
+ */
+export const getFeedOptions = (options?: Options<GetFeedData>) => queryOptions<unknown, GetFeedError, unknown, ReturnType<typeof getFeedQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getFeed({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getFeedQueryKey(options)
 });
 
 export const healthzQueryKey = (options?: Options<HealthzData>) => createQueryKey('healthz', options);

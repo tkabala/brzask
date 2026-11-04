@@ -558,6 +558,14 @@ export const zOpenLinkQuery = z.object({
     sig: z.string().max(64).regex(/^[^\x00]*$/).nullish()
 });
 
+export const zGetFeedHeaders = z.object({
+    'if-none-match': z.string().max(1000).nullish()
+});
+
+export const zGetFeedQuery = z.object({
+    token: z.string().max(200).regex(/^[^\x00]*$/).nullish()
+});
+
 /**
  * Successful Response
  */

@@ -2,8 +2,9 @@
 
 The JSON API lives under `/api/v1`; its OpenAPI document (`/api/v1/openapi.json`)
 is the contract the frontend client is generated from. `/open` (links that
-record an open), probes (`/healthz`, `/readyz`) and `/metrics` sit at the
-root: the first ends up in feed readers and mail, the others where
+record an open), `/feed` (the digest as Atom), probes (`/healthz`, `/readyz`)
+and `/metrics` sit at the root: the first two end up in feed readers and
+mail, the others where
 orchestrators and scrapers expect them. The built web app, when given, takes
 every other path.
 """
@@ -23,6 +24,7 @@ from brzask.api import (
     articles,
     auth,
     digests,
+    feed,
     health,
     interests,
     metrics,
@@ -94,6 +96,7 @@ def create_app(
     app.include_router(api)
     app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(opens.router)
+    app.include_router(feed.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
     if web_dir is not None:

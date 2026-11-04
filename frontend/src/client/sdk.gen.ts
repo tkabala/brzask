@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
+import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -383,6 +383,13 @@ export const openLink = <ThrowOnError extends boolean = false>(options: Options<
     url: '/open',
     ...options
 });
+
+/**
+ * The digest as an Atom feed
+ *
+ * The last seven days with a digest, each article linking through `/open`.
+ */
+export const getFeed = <ThrowOnError extends boolean = false>(options?: Options<GetFeedData, ThrowOnError>): RequestResult<GetFeedResponses, GetFeedErrors, ThrowOnError> => (options?.client ?? client).get<GetFeedResponses, GetFeedErrors, ThrowOnError>({ url: '/feed', ...options });
 
 /**
  * The process is up

@@ -242,6 +242,17 @@ def _over_https(request: Request, config: Auth) -> bool:
     return forwarded.lower() == "https"
 
 
+def public_origin(request: Request, config: Auth) -> str:
+    """Scheme and host the browser or reader used, e.g. `https://news.example`.
+
+    For absolute links, as in a feed; the scheme follows a trusted proxy's
+    X-Forwarded-Proto, the host is the Host header the proxy passed on.
+    """
+    scheme = "https" if _over_https(request, config) else request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    return f"{scheme}://{host}"
+
+
 def _set_cookie(request: Request, response: Response, config: Auth, token: str) -> None:
     max_age = int(auth.SESSION_LIFETIME.total_seconds())
     setting = config.settings.cookie_secure
