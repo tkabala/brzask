@@ -51,8 +51,9 @@ def replay_command(
 ) -> None:
     """Choose past digests again and compare the picks with what was opened.
 
-    Calls the LLM twice per day (with `method = "judge"`: the judge once per
-    pool article and the LLM once); writes nothing to the database.
+    Calls the LLM twice per day, once more when the selection is topped up
+    (with `method = "judge"`: the judge once per pool article and the LLM for
+    the selection); writes nothing to the database.
     """
     try:
         config = ReplayConfig.load(config_file) if config_file else ReplayConfig()

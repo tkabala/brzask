@@ -30,6 +30,7 @@ SAMPLES: dict[str, dict[str, Any]] = {
                 "title": "Async I/O",
                 "snippet": "Deep dive. " * 60,
                 "release": False,
+                "age": "3 days old",
             },
             {
                 "id": 12,
@@ -37,6 +38,7 @@ SAMPLES: dict[str, dict[str, Any]] = {
                 "title": "v2.0.0",
                 "snippet": "",
                 "release": True,
+                "age": None,
             },
         ],
         "rank_limit": 40,
@@ -143,7 +145,7 @@ def test_no_interests() -> None:
 def test_ranking_lists_candidates_and_the_schema() -> None:
     text = prompts.render("ranking", **SAMPLES["ranking"])
 
-    assert "11. [PG Weekly] Async I/O\n" in text
+    assert "11. [PG Weekly] Async I/O (3 days old)\n" in text
     assert "12. [RELEASE] [github.com/a/b] v2.0.0\n" in text
     assert "Return the ids of the best 40 candidates" in text
     assert '{"ranking": [id, id, ...]}' in text

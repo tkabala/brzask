@@ -80,7 +80,7 @@ def test_other_limits_can_be_tried() -> None:
     top = select_top(pool, list(range(30)), limits)
 
     assert titles(top) == ["Article 1", "Article 2", "Article 3", "Article 4"]
-    assert "best 20 candidates" in ranking_prompt(pool, [], [], limits.rank_limit)
+    assert "best 20 candidates" in ranking_prompt(pool, [], [], limits.rank_limit, now=NOW)
 
 
 def test_top_follows_the_ranking_and_numbers_the_ranks() -> None:
@@ -153,10 +153,10 @@ def test_prompt_numbers_candidates_by_pool_position_and_summarises_opens() -> No
         for n in range(OPENED_TITLES + 5)
     ]
 
-    text = ranking_prompt(pool, [{"topic": "Rust", "keywords": [], "notes": ""}], opens)
+    text = ranking_prompt(pool, [{"topic": "Rust", "keywords": [], "notes": ""}], opens, now=NOW)
 
-    assert "1. [RELEASE] [Source 1] Article 1\n   Notes\n" in text
-    assert "2. [Source 2] Article 2\n" in text
+    assert "1. [RELEASE] [Source 1] Article 1 (under a day old)\n   Notes\n" in text
+    assert "2. [Source 2] Article 2 (under a day old)\n" in text
     assert "77." not in text
     assert f"- Opened {OPENED_TITLES - 1}\n" in text
     assert f"- Opened {OPENED_TITLES}\n" not in text
@@ -168,7 +168,24 @@ def test_prompt_numbers_candidates_by_pool_position_and_summarises_opens() -> No
 def test_prompt_asks_for_at_most_the_rank_limit() -> None:
     pool = [candidate(n) for n in range(RANK_LIMIT + 10)]
 
-    assert f"best {RANK_LIMIT} candidates" in ranking_prompt(pool, [], [])
+    assert f"best {RANK_LIMIT} candidates" in ranking_prompt(pool, [], [], now=NOW)
+
+
+def test_prompt_gives_each_candidate_its_age_at_the_run_start() -> None:
+    pool = [
+        candidate(1, published_at=NOW - timedelta(days=8)),
+        candidate(2, published_at=NOW - timedelta(hours=30)),
+        candidate(3, published_at=None),
+        candidate(4, published_at=NOW + timedelta(hours=20)),  # a feed's clock ahead
+    ]
+
+    text = ranking_prompt(pool, [], [], now=NOW)
+
+    assert "1. [Source 1] Article 1 (8 days old)\n" in text
+    assert "2. [Source 2] Article 2 (1 day old)\n" in text
+    assert "3. [Source 3] Article 3\n" in text
+    assert "4. [Source 4] Article 4 (under a day old)\n" in text
+    assert "lose most of their value" in text
 
 
 # --- The stage ---------------------------------------------------------------------------
@@ -236,6 +253,17 @@ def test_rank_candidates_stores_the_ranks_of_the_top(
         "sources": MIN_CANDIDATES,
     }
     assert "ranking" in run.timings
+
+
+def test_ages_are_taken_at_the_run_start(sessions: sessionmaker[Session]) -> None:
+    pool = [candidate(1, published_at=NOW - timedelta(days=2))]
+    model = FakeModel({"ranking": [1]})
+
+    rank_candidates(
+        context(sessions, dry_run=True, started_at=NOW + timedelta(days=3)), pool, model
+    )
+
+    assert "1. [Source 1] Article 1 (5 days old)\n" in model.prompts[0]
 
 
 def test_a_dry_run_stores_no_ranks(

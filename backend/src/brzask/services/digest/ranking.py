@@ -10,7 +10,7 @@ order follows the weighted sum (`scoring`).
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from sqlalchemy.orm import Session
@@ -70,8 +70,14 @@ def ranking_prompt(
     interests: Sequence[dict[str, Any]],
     opens: Sequence[OpenedArticle],
     rank_limit: int = RANK_LIMIT,
+    *,
+    now: datetime,
 ) -> str:
-    """The ranking prompt; candidate `i` in the pool is listed with ID `i + 1`."""
+    """The ranking prompt; candidate `i` in the pool is listed with ID `i + 1`.
+
+    Each candidate shows its age at `now`, the run's start, so news tied to a
+    date can rank lower once it is old.
+    """
     return prompts.render(
         "ranking",
         interests=interests,
@@ -85,6 +91,7 @@ def ranking_prompt(
                 "title": candidate.title,
                 "snippet": candidate.snippet or "",
                 "release": candidate.release,
+                "age": _age(candidate, now),
             }
             for number, candidate in enumerate(candidates, start=1)
         ],
@@ -196,7 +203,9 @@ def rank_candidates(
                 ranking = scoring.composite_ranking(scored, weights)
                 stats = {"method": "judge", "judge_model": judge.model, "judged": len(scored)}
         if ranking is None:
-            prompt = ranking_prompt(candidates, interests, opens, limits.rank_limit)
+            prompt = ranking_prompt(
+                candidates, interests, opens, limits.rank_limit, now=context.started_at
+            )
             try:
                 answer, _ = llm.complete_json(prompt, purpose="ranking", meter=context.usage)
             except InvalidJSONError as error:
@@ -232,6 +241,16 @@ def interest_context(session: Session) -> list[dict[str, Any]]:
         {"topic": interest.topic, "keywords": interest.keywords, "notes": interest.notes}
         for interest in InterestRepository(session).find(active_only=True)
     ]
+
+
+def _age(candidate: Candidate, now: datetime) -> str | None:
+    """How old the candidate was at `now`, in whole days; None without a date."""
+    if candidate.published_at is None:
+        return None
+    days = (now - candidate.published_at) // timedelta(days=1)
+    if days < 1:  # also an entry dated ahead of `now`
+        return "under a day old"
+    return f"{days} day old" if days == 1 else f"{days} days old"
 
 
 def _tally(names: Iterable[str | None]) -> list[dict[str, Any]]:
