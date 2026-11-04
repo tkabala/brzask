@@ -65,6 +65,8 @@ location = /feed {
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    # No login ran here: drop a user name the client may have sent itself.
+    proxy_set_header Remote-User "";
 }
 # The same block again for location = /open.
 ```
@@ -73,7 +75,10 @@ location = /feed {
 news.example.com {
     @public path /feed /open
     handle @public {
-        reverse_proxy 127.0.0.1:8000
+        # No login ran here: drop a user name the client may have sent itself.
+        reverse_proxy 127.0.0.1:8000 {
+            header_up -Remote-User
+        }
     }
     handle {
         # forward_auth or basicauth here
@@ -87,6 +92,11 @@ passes on, and their scheme `https` when a trusted proxy sends
 `X-Forwarded-Proto: https`. Proxies log query strings by default, so the
 feed token ends up in their access log; brzask's own log shows
 `token=REDACTED`.
+
+With `AUTH_MODE=header`, the paths that skip the login must also remove the
+user header (`AUTH_HEADER`), as above: brzask believes it from the proxy, and
+a client could otherwise send its own and open any article without a
+signature.
 
 ## Single sign-on
 

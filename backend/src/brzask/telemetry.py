@@ -58,6 +58,9 @@ def setup_telemetry(
             release=f"brzask@{__version__}",
             send_default_pii=False,
             traces_sample_rate=0,  # traces go to OpenTelemetry
+            # Sentry copies the request's query string as it is, the feed's token included.
+            before_send=_redact_event_tokens,
+            before_send_transaction=_redact_event_tokens,
         )
         sentry_sdk.set_tag("component", component)
         log.info("sentry enabled", environment=settings.sentry_environment)
@@ -102,6 +105,21 @@ def instrument_app(app: FastAPI, meter_provider: MeterProviderAPI | None = None)
         excluded_urls="/healthz,/readyz,/metrics",
         server_request_hook=_redact_span_tokens,
     )
+
+
+def _redact_event_tokens(event: Any, _hint: Any) -> Any:
+    """The Sentry event with every `token=` value in its strings replaced."""
+    return _redacted(event)
+
+
+def _redacted(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact_tokens(value)
+    if isinstance(value, dict):
+        return {key: _redacted(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redacted(item) for item in value]
+    return value
 
 
 def _redact_span_tokens(span: Span, scope: dict[str, Any]) -> None:

@@ -87,3 +87,10 @@ def test_entries_keep_their_order() -> None:
     parsed = parse(*(entry(id=i) for i in ids))
 
     assert [e.id for e in parsed.entries] == ids
+
+
+def test_the_feed_names_an_author_for_entries_without_a_source() -> None:
+    # RFC 4287: a feed needs an author unless every entry has one.
+    parsed = parse(entry(source=None))
+
+    assert parsed.feed.author == "brzask"

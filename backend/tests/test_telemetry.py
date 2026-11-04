@@ -237,3 +237,27 @@ def test_spans_hide_feed_tokens(spans: InMemorySpanExporter) -> None:
     values = [str(v) for span in finished for v in (span.attributes or {}).values()]
     assert any("token=REDACTED" in v for v in values)
     assert not any("brz_secret" in v for v in values)
+
+
+def test_sentry_events_hide_feed_tokens(calls: dict[str, list[Any]]) -> None:
+    telemetry.setup_telemetry(
+        TelemetrySettings.model_validate({"SENTRY_DSN": "https://key@sentry.example/1"}),
+        component="api",
+    )
+    [options] = calls["sentry"]
+    event: dict[str, Any] = {
+        "request": {
+            "url": "https://news.example/feed?token=brz_secret",
+            "query_string": "token=brz_secret",
+        },
+        "breadcrumbs": {
+            "values": [
+                {"message": "GET /feed?token=brz_secret", "data": {"url": "/feed?token=brz_secret"}}
+            ]
+        },
+    }
+
+    for hook in ("before_send", "before_send_transaction"):
+        scrubbed = options[hook](json.loads(json.dumps(event)), {})
+        assert "brz_secret" not in json.dumps(scrubbed), hook
+        assert scrubbed["request"]["query_string"] == "token=REDACTED"

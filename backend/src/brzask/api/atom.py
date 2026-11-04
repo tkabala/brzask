@@ -46,6 +46,10 @@ def atom_feed(
     _link(feed, f"{origin}/feed", rel="self", type="application/atom+xml")
     _link(feed, f"{origin}/", rel="alternate", type="text/html")
     _text(feed, "generator", TITLE)
+    # RFC 4287 wants a feed author unless every entry has one; an article
+    # whose source was removed has none.
+    author = ET.SubElement(feed, _tag("author"))
+    _text(author, "name", TITLE)
     for item in entries:
         feed.append(_entry(item))
     document: bytes = ET.tostring(feed, encoding="utf-8", xml_declaration=True)
