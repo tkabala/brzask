@@ -24,6 +24,14 @@ def test_create_stores_only_a_hash(session: Session) -> None:
     assert (change.action, change.after) == ("token.create", {"name": "ci", "scope": "write"})
 
 
+def test_feed_tokens_are_stored(session: Session) -> None:
+    token, value = tokens.create_token(session, "reader", TokenScope.FEED, actor="user")
+    session.flush()
+
+    assert token.scope is TokenScope.FEED
+    assert tokens.authenticate_token(session, value, NOW) == token
+
+
 def test_names_are_unique_and_not_blank(session: Session) -> None:
     tokens.create_token(session, "ci", TokenScope.READ, actor="user")
 

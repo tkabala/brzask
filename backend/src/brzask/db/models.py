@@ -293,6 +293,7 @@ class Change(Base):
 class TokenScope(StrEnum):
     READ = "read"
     WRITE = "write"
+    FEED = "feed"  # only the digest feed, carried in its URL
 
 
 class ApiToken(Base):

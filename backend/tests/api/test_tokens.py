@@ -49,6 +49,14 @@ def test_read_token_reads_but_cannot_change(
         assert response.json()["detail"] == "This token may only read."
 
 
+def test_feed_token_does_not_open_the_api(client: TestClient, session: Session) -> None:
+    headers = bearer(session, TokenScope.FEED)
+
+    response = client.get("/api/v1/status", headers=headers)
+
+    assert response.status_code == 401
+
+
 def test_write_token_changes_without_csrf_and_is_the_actor(
     client: TestClient, session: Session, make: Factories
 ) -> None:

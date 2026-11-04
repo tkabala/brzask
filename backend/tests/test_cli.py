@@ -487,6 +487,14 @@ def test_tokens_default_to_read(cli: Invoke) -> None:
     assert cli("tokens", "create", "reader").exit_code == 1
 
 
+def test_feed_token_says_where_to_subscribe(cli: Invoke) -> None:
+    created = cli("tokens", "create", "reader", "--scope", "feed")
+
+    assert created.exit_code == 0, created.output
+    assert created.stdout.strip().startswith("brz_")
+    assert "/feed?token=" in created.stderr
+
+
 def test_seed_demo(cli: Invoke) -> None:
     result = cli("seed-demo")
 

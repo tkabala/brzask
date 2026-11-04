@@ -9,7 +9,9 @@ In the first two, requests that change something also send a CSRF token in
 `X-CSRF-Token`: the browser sends the cookies on its own, even for a page on
 another site, but that page cannot learn the token. Scripts and agents send an
 API token instead (`Authorization: Bearer brz_...`), which no browser sends on
-its own, so it needs no CSRF token; a `read` token may only read.
+its own, so it needs no CSRF token; a `read` token may only read. A `feed`
+token opens nothing here: it travels in the feed's URL, where readers and
+logs keep it, so it opens only `/feed`.
 """
 
 import threading
@@ -157,7 +159,7 @@ def _brzask_token(authorization: str) -> str | None:
 
 def _token_identity(session: DbSession, value: str) -> Identity | None:
     token = tokens.authenticate_token(session, value, datetime.now(UTC))
-    if token is None:
+    if token is None or token.scope is TokenScope.FEED:
         return None
     return Identity(f"token:{token.name}", read_only=token.scope is not TokenScope.WRITE)
 

@@ -2,7 +2,8 @@
 
 A token is shown once, when it is created; only its SHA-256 is stored, with
 its first characters to tell tokens apart. A `read` token may only read; a
-`write` token may also change things.
+`write` token may also change things; a `feed` token only opens the digest
+feed, in its URL.
 """
 
 import secrets

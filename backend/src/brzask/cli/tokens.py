@@ -19,7 +19,11 @@ def create(
     name: TokenName,
     scope: Annotated[
         TokenScope,
-        typer.Option("--scope", "-s", help="read: only reading; write: also changes."),
+        typer.Option(
+            "--scope",
+            "-s",
+            help="read: only reading; write: also changes; feed: only the digest feed, in its URL.",
+        ),
     ] = TokenScope.READ,
 ) -> None:
     """Create a token; it is shown once, here."""
@@ -27,11 +31,12 @@ def create(
         token, value = tokens.create_token(session, name, scope, actor=ACTOR)
         scope_name = token.scope.value
     typer.echo(value)
-    typer.echo(
-        f"Token {name!r} ({scope_name}). Send it as 'Authorization: Bearer <token>'; "
-        "it cannot be shown again.",
-        err=True,
+    use = (
+        "Subscribe to <your server>/feed?token=<token>"
+        if scope is TokenScope.FEED
+        else "Send it as 'Authorization: Bearer <token>'"
     )
+    typer.echo(f"Token {name!r} ({scope_name}). {use}; it cannot be shown again.", err=True)
 
 
 @app.command("list")
