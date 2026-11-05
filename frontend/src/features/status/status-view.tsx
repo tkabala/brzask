@@ -5,7 +5,7 @@ import type { RunKind, RunOut, StatusOut } from '@/client/types.gen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { formatDay, formatMoment, nextDay, runCost, seconds } from '@/lib/format'
+import { formatDay, formatMoment, nextDay, runBudget, runCost, seconds } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const KINDS: RunKind[] = ['digest', 'review', 'visited', 'discovery']
@@ -26,6 +26,7 @@ function RunLine({ run }: { run: RunOut }) {
   const language = i18n.resolvedLanguage ?? 'en'
   const took = seconds(run.started_at, run.finished_at)
   const cost = runCost(run.stats)
+  const budget = runBudget(run.stats)
   return (
     <div className="grid gap-0.5 text-sm">
       <div className="flex flex-wrap gap-x-2">
@@ -45,6 +46,16 @@ function RunLine({ run }: { run: RunOut }) {
           </span>
         ) : null}
       </div>
+      {budget?.over ? (
+        <p className="text-muted-foreground">
+          {budget.skipped.includes('discovery')
+            ? t('status.budgetSkipped')
+            : t('status.budgetDegraded')}
+        </p>
+      ) : null}
+      {budget && budget.unpriced > 0 ? (
+        <p className="text-muted-foreground">{t('status.budgetUnpriced')}</p>
+      ) : null}
       {run.error ? <p className="text-destructive">{run.error}</p> : null}
     </div>
   )

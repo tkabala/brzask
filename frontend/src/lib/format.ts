@@ -29,6 +29,25 @@ export function seconds(start: string, end: string | null): number | null {
 }
 
 /** The run's LLM cost, when its stats recorded one. */
+export interface RunBudget {
+  over: boolean
+  skipped: string[]
+  unpriced: number
+}
+
+/** The spending limit a run checked, from its stats; null when none was set. */
+export function runBudget(stats: Record<string, unknown>): RunBudget | null {
+  const budget = stats.budget
+  if (typeof budget !== 'object' || budget === null) return null
+  const { over, skipped, unpriced_runs } = budget as Record<string, unknown>
+  if (!Array.isArray(skipped)) return null
+  return {
+    over: over === true,
+    skipped: skipped.filter((step): step is string => typeof step === 'string'),
+    unpriced: typeof unpriced_runs === 'number' ? unpriced_runs : 0,
+  }
+}
+
 export function runCost(stats: Record<string, unknown>): number | null {
   const usage = stats.usage
   if (typeof usage !== 'object' || usage === null) return null

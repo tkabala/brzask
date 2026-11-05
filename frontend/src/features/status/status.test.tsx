@@ -37,6 +37,42 @@ describe('status', () => {
     ).toBeInTheDocument()
   })
 
+  it('says when a run hit the spending limit', async () => {
+    const budget = { over: true, unpriced_runs: 0 }
+    const limited = [
+      {
+        ...runs[0],
+        kind: 'digest',
+        stats: { budget: { ...budget, skipped: ['ranking', 'deduplication_judge'] } },
+      },
+      {
+        ...runs[0],
+        id: 'discovery',
+        kind: 'discovery',
+        status: 'skipped',
+        stats: { budget: { ...budget, skipped: ['discovery'], unpriced_runs: 2 } },
+      },
+    ]
+    loggedInApi({
+      'GET /api/v1/status': () => json(status),
+      'GET /api/v1/runs': () => json({ items: limited, next_cursor: null }),
+    })
+    renderApp('/status')
+
+    const recent = await screen.findByRole('region', { name: 'Recent runs' })
+    expect(
+      await within(recent).findByText(
+        'Spending limit reached: ranked without the LLM, duplicates without the judge',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(recent).getByText('Spending limit reached: discovery skipped'),
+    ).toBeInTheDocument()
+    expect(
+      within(recent).getByText('Some calls report no cost; the limit counts only reported costs.'),
+    ).toBeInTheDocument()
+  })
+
   it('pauses until the start of a chosen day', async () => {
     let paused: string | null = null
     const api = loggedInApi({

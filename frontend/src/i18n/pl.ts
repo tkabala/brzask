@@ -164,6 +164,9 @@ export const pl: Resources = {
     dryRun: 'próba',
     duration: '{{seconds}} s',
     cost: '{{cost}} USD',
+    budgetDegraded: 'Osiągnięto limit wydatków: ranking bez LLM, duplikaty bez sędziego',
+    budgetSkipped: 'Osiągnięto limit wydatków: wyszukiwanie źródeł pominięte',
+    budgetUnpriced: 'Część wywołań nie podaje kosztu; limit liczy tylko podane koszty.',
   },
   problem: {
     title: 'Coś poszło nie tak',

@@ -159,6 +159,9 @@ export const en = {
     dryRun: 'dry run',
     duration: '{{seconds}} s',
     cost: '${{cost}}',
+    budgetDegraded: 'Spending limit reached: ranked without the LLM, duplicates without the judge',
+    budgetSkipped: 'Spending limit reached: discovery skipped',
+    budgetUnpriced: 'Some calls report no cost; the limit counts only reported costs.',
   },
   problem: {
     title: 'Something went wrong',

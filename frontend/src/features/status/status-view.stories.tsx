@@ -31,3 +31,18 @@ export const NewInstance: Story = {
     hasMore: false,
   },
 }
+export const SpendingLimitReached: Story = {
+  args: {
+    runs: runs.map((run, index) =>
+      index === 0
+        ? {
+            ...run,
+            stats: {
+              ...run.stats,
+              budget: { over: true, skipped: ['ranking', 'deduplication_judge'], unpriced_runs: 0 },
+            },
+          }
+        : run,
+    ),
+  },
+}
