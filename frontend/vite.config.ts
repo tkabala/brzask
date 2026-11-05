@@ -7,6 +7,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
+import { NOT_THE_APP } from './src/lib/sw-routes.ts'
+
 const { version } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ) as {
@@ -55,10 +57,7 @@ export default defineConfig({
         // Only the app itself; its data is saved by the app (src/lib/offline-cache.ts).
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: 'index.html',
-        // Served by the API, never by the app: an article link offline fails as
-        // a page, instead of opening the app where the article should be.
-        // Workbox matches these against the path and the query string.
-        navigateFallbackDenylist: [/^\/(api|open|feed|healthz|readyz)([/?]|$)/],
+        navigateFallbackDenylist: NOT_THE_APP,
       },
       devOptions: { enabled: false },
     }),

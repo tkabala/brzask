@@ -14,19 +14,24 @@ interface Props {
   renderWhy?: (article: ArticleOut) => ReactNode
   /** When the shown copy was saved (ms since the epoch), if it is not live. */
   savedAt?: number
+  /** Shown next to the saved time, e.g. a way to sign in again. */
+  savedNote?: ReactNode
 }
 
 /** A day's digest as cards, in order, or what to show when there is none. */
-export function DigestView({ digest, title, empty, onOpen, renderWhy, savedAt }: Props) {
+export function DigestView({ digest, title, empty, onOpen, renderWhy, savedAt, savedNote }: Props) {
   const { t, i18n } = useTranslation()
   return (
     <section>
       <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       {savedAt !== undefined ? (
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('offline.savedAt', {
-            time: formatMoment(new Date(savedAt).toISOString(), i18n.resolvedLanguage ?? 'en'),
-          })}
+        <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+          <span>
+            {t('offline.savedAt', {
+              time: formatMoment(new Date(savedAt).toISOString(), i18n.resolvedLanguage ?? 'en'),
+            })}
+          </span>
+          {savedNote}
         </p>
       ) : null}
       {digest.articles.length === 0 ? (

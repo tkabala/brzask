@@ -15,6 +15,12 @@ if (!rootElement) {
 }
 
 configureApi()
+// Back from signing in again at a proxy: the marker has done its work.
+const url = new URL(window.location.href)
+if (url.searchParams.has('signin')) {
+  url.searchParams.delete('signin')
+  window.history.replaceState(null, '', url)
+}
 followBrowserOnline()
 
 createRoot(rootElement).render(

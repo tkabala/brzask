@@ -33,6 +33,7 @@ export const en = {
     banner: "You're offline. Today's digest is the saved copy; other pages need a connection.",
     savedAt: 'Saved at {{time}}',
     page: 'This page needs a connection.',
+    signIn: 'Sign in again',
   },
   today: {
     title: 'Today',

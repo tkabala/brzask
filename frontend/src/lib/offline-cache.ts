@@ -113,3 +113,31 @@ export function forgetSaved(
     // Nothing saved where nothing can be stored.
   }
 }
+
+function readerOf(data: unknown): string | null | undefined {
+  const session = data as { authenticated?: boolean; user?: string | null } | undefined
+  return session?.authenticated ? (session.user ?? null) : undefined
+}
+
+/**
+ * Forgets the saved copy the moment the session names another reader (a
+ * proxy in front of brzask now sends someone else), before anything of the
+ * previous reader is shown to them. Returns the function that stops it.
+ */
+export function watchReader(
+  queryClient: QueryClient,
+  storage: Storage | undefined = browserStorage(),
+): () => void {
+  const cache = queryClient.getQueryCache()
+  const [session] = cache.findAll({ predicate: (query) => operationId(query.queryKey) === SESSION })
+  let reader = readerOf(session?.state.data)
+  return cache.subscribe((event) => {
+    if (event.type !== 'updated') return
+    const query = event.query as Query
+    if (operationId(query.queryKey) !== SESSION) return
+    const now = readerOf(query.state.data)
+    if (now === undefined) return
+    if (reader !== undefined && now !== reader) forgetSaved(queryClient, storage)
+    reader = now
+  })
+}

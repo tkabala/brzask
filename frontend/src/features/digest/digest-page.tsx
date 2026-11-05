@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type { DigestOut } from '@/client/types.gen'
 import { Pending } from '@/components/pending'
 import { ProblemMessage } from '@/components/problem-message'
+import { SignInAgain } from '@/components/sign-in-again'
 import { useOnline } from '@/lib/online'
 
 import { DigestView } from './digest-view'
@@ -35,6 +36,8 @@ export function DigestPage({
     <DigestView
       digest={digest.data}
       {...(saved ? { savedAt: digest.dataUpdatedAt } : {})}
+      // Online yet no answer from brzask: perhaps a proxy's login ran out.
+      {...(saved && online ? { savedNote: <SignInAgain /> } : {})}
       title={title}
       empty={empty}
       onOpen={markOpened}

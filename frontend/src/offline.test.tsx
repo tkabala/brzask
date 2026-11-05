@@ -59,8 +59,9 @@ describe('saved for offline', () => {
 
     renderApp('/', { persister: createPersister(localStorage) })
 
-    expect(await screen.findByText(firstTitle)).toBeInTheDocument()
-  })
+    // Shown once the session's retries have failed.
+    expect(await screen.findByText(firstTitle, {}, { timeout: 8000 })).toBeInTheDocument()
+  }, 10_000)
 
   it('forgets it on logout', async () => {
     await readTodayOnline()
@@ -128,6 +129,7 @@ describe('offline, the app says so', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent(BANNER)
     expect(screen.getByText(/^Saved at /)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Sign in again' })).not.toBeInTheDocument()
   })
 
   it('tells when the copy was saved if the server is out of reach', async () => {
@@ -140,6 +142,7 @@ describe('offline, the app says so', () => {
     renderApp('/', { persister: createPersister(localStorage) })
 
     expect(await screen.findByText(/^Saved at /, {}, { timeout: 8000 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in again' })).toBeInTheDocument()
   }, 10_000)
 
   it('says a page without a saved copy needs a connection', async () => {
@@ -151,4 +154,89 @@ describe('offline, the app says so', () => {
 
     expect(await screen.findByText('This page needs a connection.')).toBeInTheDocument()
   })
+})
+
+describe('the saved copy and who reads it', () => {
+  it('is forgotten by logging out offline', async () => {
+    await readTodayOnline()
+    onlineManager.setOnline(false)
+    fakeApi({})
+    const user = userEvent.setup()
+    renderApp('/', { persister: createPersister(localStorage) })
+
+    await user.click(await screen.findByRole('button', { name: 'Log out' }))
+
+    await waitFor(() => {
+      expect(saved()).not.toContain(firstTitle)
+    })
+    expect(screen.queryByText(firstTitle)).not.toBeInTheDocument()
+  })
+
+  it('is not shown online before the server confirms the session', async () => {
+    await readTodayOnline()
+    let answer: () => void = () => undefined
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve
+    })
+    fakeApi({
+      'GET /api/v1/auth/session': async () => {
+        await answered
+        return json(loggedOut)
+      },
+    })
+
+    renderApp('/', { persister: createPersister(localStorage) })
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(screen.queryByText(firstTitle)).not.toBeInTheDocument()
+    answer()
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument()
+  })
+
+  it('is forgotten when the proxy names another reader', async () => {
+    const alice: SessionOut = {
+      mode: 'header',
+      authenticated: true,
+      user: 'alice',
+      csrf_token: 'a',
+    }
+    fakeApi({ 'GET /api/v1/auth/session': () => json(alice) })
+    const first = renderApp('/', { persister: createPersister(localStorage) })
+    expect(await screen.findByText(firstTitle)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(saved()).toContain(firstTitle)
+    })
+    first.unmount()
+
+    let answer: () => void = () => undefined
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve
+    })
+    fakeApi({
+      'GET /api/v1/auth/session': () => json({ ...alice, user: 'bob', csrf_token: 'b' }),
+      'GET /api/v1/digests/today': async () => {
+        await answered
+        return json({ date: digest.date, articles: [] })
+      },
+    })
+    renderApp('/', { persister: createPersister(localStorage) })
+
+    // Bob is in, and alice's digest is not shown while his own loads.
+    expect(await screen.findByRole('link', { name: 'Archive' })).toBeInTheDocument()
+    expect(screen.queryByText(firstTitle)).not.toBeInTheDocument()
+    answer()
+    expect(await screen.findByText('No digest yet today.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(saved()).not.toContain(firstTitle)
+    })
+  })
+
+  it('offers to sign in again when the server answers with something else', async () => {
+    fakeApi({ 'GET /api/v1/auth/session': () => Response.error() })
+
+    renderApp('/')
+
+    const link = await screen.findByRole('link', { name: 'Sign in again' }, { timeout: 8000 })
+    expect(link).toHaveAttribute('href', '/?signin')
+  }, 10_000)
 })

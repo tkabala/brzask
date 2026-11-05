@@ -1,20 +1,24 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { getSessionStateOptions } from '@/client/@tanstack/react-query.gen'
 import type { SessionOut } from '@/client/types.gen'
 import { LoginForm } from '@/components/login-form'
+import { Pending } from '@/components/pending'
 import { ProblemMessage } from '@/components/problem-message'
+import { SignInAgain } from '@/components/sign-in-again'
 import { setCsrfToken } from '@/lib/api'
 import { forgetSaved } from '@/lib/offline-cache'
-import { Pending } from '@/components/pending'
+import { useOnline } from '@/lib/online'
 
 /** Shows `children` once the API may be used, else the way to log in. */
 export function SessionGate({ children }: { children: (session: SessionOut) => ReactNode }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const online = useOnline()
   const session = useQuery(getSessionStateOptions())
+  const [startedAt] = useState(() => Date.now())
   const loggedOut = session.data?.authenticated === false
 
   useEffect(() => {
@@ -29,14 +33,20 @@ export function SessionGate({ children }: { children: (session: SessionOut) => R
       </div>
     )
   }
-  // A saved session (offline, or the server out of reach) still opens the
-  // saved digest; without one there is nothing to show but the problem.
+  // A saved session is shown only once the server cannot confirm it (offline,
+  // or out of reach); online, the live answer comes first.
+  const saved = session.dataUpdatedAt < startedAt
+  if (saved && session.isFetching) return null
   if (session.isError && session.data === undefined) {
-    return <ProblemMessage error={session.error} onRetry={() => void session.refetch()} />
+    return (
+      <div className="grid gap-3">
+        <ProblemMessage error={session.error} onRetry={() => void session.refetch()} />
+        {online ? <SignInAgain /> : null}
+      </div>
+    )
   }
   const state = session.data
-  // A saved session has no CSRF token: changes wait for the live session,
-  // which arrives within a moment of an online start.
+  // A saved session has no CSRF token: changes need the live session.
   setCsrfToken(state.csrf_token ?? null)
   if (state.authenticated) return children(state)
   if (state.mode === 'header') {

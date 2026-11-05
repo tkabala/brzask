@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { I18nextProvider } from 'react-i18next'
 
 import { initI18n } from '@/i18n'
-import { persistOptions } from '@/lib/offline-cache'
+import { persistOptions, watchReader } from '@/lib/offline-cache'
 import { createAppRouter } from '@/router'
 
 /** The whole app; tests render it with their own query client and history.
@@ -32,6 +32,9 @@ export function App({
       i18n.off('languageChanged', setLang)
     }
   }, [i18n])
+
+  // Only a saved copy can outlive a change of reader.
+  useEffect(() => (persister ? watchReader(queryClient) : undefined), [persister, queryClient])
 
   const app = <RouterProvider router={router} />
   return (

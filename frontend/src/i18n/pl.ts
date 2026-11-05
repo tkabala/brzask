@@ -36,6 +36,7 @@ export const pl: Resources = {
       'Jesteś offline. Dzisiejszy przegląd to zapisana kopia; inne strony wymagają połączenia.',
     savedAt: 'Zapisano {{time}}',
     page: 'Ta strona wymaga połączenia.',
+    signIn: 'Zaloguj się ponownie',
   },
   today: {
     title: 'Dziś',

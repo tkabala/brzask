@@ -113,6 +113,18 @@ AUTH_HEADER=Remote-User
 TRUSTED_PROXIES=172.20.0.1
 ```
 
+### The installed app and an expired proxy login
+
+The installed app opens from its own saved files, so opening it no longer
+passes the proxy's login page. When the proxy's session has run out, the
+app's requests get the login page or a redirect instead of an answer from
+brzask; the app then shows today's saved digest, or a problem, with a
+*Sign in again* link. That link goes to `/?signin`, which the app's service
+worker always leaves to the server, so the proxy sees the visit, asks for its
+login and sends the browser back to brzask. Nothing has to be configured for
+it. When another user signs in at the proxy, the saved digest of the previous
+one is removed before anything is shown.
+
 Scripts and agents use API tokens in either mode (`brzask tokens create`,
 then `Authorization: Bearer brz_...`).
 

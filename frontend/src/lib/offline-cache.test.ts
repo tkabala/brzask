@@ -18,6 +18,7 @@ import {
   forgetSaved,
   MAX_AGE_MS,
   persistOptions,
+  watchReader,
 } from './offline-cache'
 
 const digest: DigestOut = { date: '2026-11-05', articles: [] }
@@ -102,5 +103,35 @@ describe('the saved copy', () => {
 
     expect(localStorage.getItem(CACHE_KEY)).toBeNull()
     expect(client.getQueryData(getTodayDigestQueryKey())).toBeUndefined()
+  })
+})
+
+describe('another reader', () => {
+  const as = (user: string) => ({ ...loggedIn, mode: 'header' as const, user })
+
+  it('forgets the copy when the session names someone else', async () => {
+    const client = filledClient()
+    client.setQueryData(getSessionStateQueryKey(), as('alice'))
+    await save(client)
+    const stop = watchReader(client, localStorage)
+
+    client.setQueryData(getSessionStateQueryKey(), as('bob'))
+
+    expect(localStorage.getItem(CACHE_KEY)).toBeNull()
+    expect(client.getQueryData(getTodayDigestQueryKey())).toBeUndefined()
+    stop()
+  })
+
+  it('keeps it for the same reader', async () => {
+    const client = filledClient()
+    client.setQueryData(getSessionStateQueryKey(), as('alice'))
+    await save(client)
+    const stop = watchReader(client, localStorage)
+
+    client.setQueryData(getSessionStateQueryKey(), as('alice'))
+
+    expect(localStorage.getItem(CACHE_KEY)).not.toBeNull()
+    expect(client.getQueryData(getTodayDigestQueryKey())).toEqual(digest)
+    stop()
   })
 })

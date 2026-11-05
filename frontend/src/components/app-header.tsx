@@ -23,6 +23,12 @@ export function AppHeader({ session }: { session: SessionOut }) {
   const queryClient = useQueryClient()
   const logout = useMutation({
     ...logoutMutation(),
+    // Offline the request fails at once instead of waiting: the saved copy
+    // must go now, not whenever the connection returns.
+    networkMode: 'always',
+    onMutate: () => {
+      forgetSaved(queryClient)
+    },
     onSettled: () => {
       setCsrfToken(null)
       forgetSaved(queryClient)
