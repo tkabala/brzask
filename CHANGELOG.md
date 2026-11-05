@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.13](https://github.com/tkabala/brzask/compare/v0.1.12...v0.1.13) (2026-11-05)
+
+
+### Features
+
+* **budget:** sum spending per day and month and decide when a limit is reached ([e24f65a](https://github.com/tkabala/brzask/commit/e24f65a3a7a262d9e2c31feb5d538f4f370445e5))
+* **config:** add daily and monthly spending limits ([398f0bd](https://github.com/tkabala/brzask/commit/398f0bdfa459d6a65be3b88d1759c910a75f50fc))
+* **digest:** rank by pool order and skip the dedup judge over budget ([d6471c0](https://github.com/tkabala/brzask/commit/d6471c08f4a7bf4f53d6dd38281b036f62a64a53))
+* **discovery:** skip discovery when the spending limit is reached ([0988509](https://github.com/tkabala/brzask/commit/09885099c3cc16de950857aed107d7b546f5e87d))
+* **status:** show when a run hit the spending limit ([3830fa6](https://github.com/tkabala/brzask/commit/3830fa6cc9c01e83cd4a364698b054466d419bb7))
+* **usage:** report the known part of a run's cost ([9767cd1](https://github.com/tkabala/brzask/commit/9767cd168a09c14acbbf60d74e8ce7489f94017a))
+
+
+### Bug Fixes
+
+* **budget:** count only JSON numbers when summing spending ([cc93ba2](https://github.com/tkabala/brzask/commit/cc93ba2e3fd817680da6297b6abbcdd2eb41e902))
+
+
+### Documentation
+
+* describe the spending limits ([0a9c1c2](https://github.com/tkabala/brzask/commit/0a9c1c274c0c52e6d4431dae643df9fb0fa94920))
+* state the measured saving of a degraded digest ([33ada2e](https://github.com/tkabala/brzask/commit/33ada2e31bee17544d1ef9e306450c2cada47719))
+
+
+### Chores
+
+* release 0.1.13 ([08f19a5](https://github.com/tkabala/brzask/commit/08f19a57b6dd3ddaaa64e8e22dfd53ad39ddb432))
+
 ## [0.1.12](https://github.com/tkabala/brzask/compare/v0.1.11...v0.1.12) (2026-11-05)
 
 
