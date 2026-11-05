@@ -18,6 +18,8 @@ LLM_API_KEY = "llm_api_key"
 # For the optional crawler and search services of the compose file.
 CRAWL4AI_API_TOKEN = "crawl4ai_api_token"  # noqa: S105
 SEARXNG_SECRET = "searxng_secret"  # noqa: S105
+# For the optional observability services.
+GRAFANA_ADMIN_PASSWORD = "grafana_admin_password"  # noqa: S105
 
 
 def setup_command(
@@ -37,6 +39,7 @@ def setup_command(
         _write(directory, LLM_API_KEY, _llm_api_key)
         _write(directory, CRAWL4AI_API_TOKEN, lambda: secrets.token_urlsafe(32))
         _write(directory, SEARXNG_SECRET, lambda: secrets.token_urlsafe(32))
+        _write(directory, GRAFANA_ADMIN_PASSWORD, lambda: secrets.token_urlsafe(24))
     finally:
         # Also after an interrupted prompt, so the host user is never locked
         # out of a half-written directory.

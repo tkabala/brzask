@@ -11,7 +11,13 @@
 #            COMPOSE_PROFILES=crawler and EXTRACTORS=feed,trafilatura,crawl4ai
 #   search   SearXNG for source discovery. In .env:
 #            COMPOSE_PROFILES=search and WEB_SEARCH=searxng
-# Both at once: COMPOSE_PROFILES=crawler,search.
+#   observability
+#            Traces and metrics in Grafana at http://localhost:3000 (user
+#            admin, password in ./secrets/grafana_admin_password). Needs the
+#            observability folder next to this file (docs/observability.md).
+#            In .env: COMPOSE_PROFILES=observability and
+#            OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+# Several at once: COMPOSE_PROFILES=crawler,search.
 name: brzask
 
 x-logging: &logging
@@ -151,8 +157,83 @@ services:
       - source: searxng_settings
         target: /etc/searxng/settings.yml
 
+  # --- observability profile ---------------------------------------------------
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.164.0
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ./observability/collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - prometheus
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      # A point or so a day per pipeline: a year of history takes little space.
+      - --storage.tsdb.retention.time=400d
+      - --web.enable-otlp-receiver
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+
+  tempo:
+    image: grafana/tempo:3.1.1
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command: [-target=all, -config.file=/etc/tempo.yaml]
+    # The image runs as this user; the volume starts out owned by root.
+    user: "10001"
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      # Loopback only, like the API; GRAFANA_PUBLISH=3000 opens it to other machines.
+      - ${GRAFANA_PUBLISH:-127.0.0.1:3000}:3000
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/brzask.json
+      # No requests to grafana.com or elsewhere: no usage reports, update
+      # checks, news, avatars or plugin downloads.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+
 volumes:
   db-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:
 
 configs:
   # Reachable only inside this network, where it answers brzask's JSON queries.
@@ -178,3 +259,5 @@ secrets:
     file: ${BRZASK_SECRETS:-./secrets}/crawl4ai_api_token
   searxng_secret:
     file: ${BRZASK_SECRETS:-./secrets}/searxng_secret
+  grafana_admin_password:
+    file: ${BRZASK_SECRETS:-./secrets}/grafana_admin_password

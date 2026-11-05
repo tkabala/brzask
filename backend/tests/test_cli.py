@@ -574,9 +574,12 @@ def test_setup_writes_the_secret_files(tmp_path: Path) -> None:
     files = {path.name: path.read_text().strip() for path in directory.iterdir()}
     assert set(files) == {
         "db_password", "auth_session_secret", "auth_password_hash", "llm_api_key",
-        "crawl4ai_api_token", "searxng_secret",
+        "crawl4ai_api_token", "searxng_secret", "grafana_admin_password",
     }  # fmt: skip
-    for generated in ("db_password", "auth_session_secret", "crawl4ai_api_token", "searxng_secret"):
+    for generated in (
+        "db_password", "auth_session_secret", "crawl4ai_api_token", "searxng_secret",
+        "grafana_admin_password",
+    ):  # fmt: skip
         assert len(files[generated]) >= 32
     assert auth.verify_password(files["auth_password_hash"], "pw")
     assert files["llm_api_key"] == "sk-key"

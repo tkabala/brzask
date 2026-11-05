@@ -1,0 +1,12 @@
+# Metrics arrive over OTLP from the collector; nothing is scraped.
+# Retention is set on the command line (compose.yaml).
+otlp:
+  # Kept as labels, so panels can tell the API from the worker.
+  promote_resource_attributes:
+    - service.name
+    - service.version
+    - brzask.component
+storage:
+  tsdb:
+    # The collector batches, and the API and the worker export on their own clocks.
+    out_of_order_time_window: 30m
