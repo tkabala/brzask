@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 from opentelemetry import metrics, trace
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -26,6 +28,7 @@ from brzask.clients.llm import LLMClient, LLMError
 from brzask.config.settings import TelemetrySettings
 from brzask.db.models import EMBEDDING_DIMENSIONS, RunKind
 from brzask.db.session import create_db_engine
+from brzask.services.open_rate import register_open_rate
 from brzask.services.runs import RunContext, SkipRunError, run_pipeline
 
 # The global tracer provider can be set once per process; every test shares it.
@@ -323,3 +326,27 @@ def test_skipped_run_span_is_not_an_error(
     root = named(spans, "pipeline visited")
     assert (root.attributes or {})["brzask.run.status"] == "skipped"
     assert root.status.status_code is not StatusCode.ERROR
+
+
+def test_open_rate_collection_is_not_traced(
+    spans: InMemorySpanExporter, postgres: PostgresContainer
+) -> None:
+    instrumentor = SQLAlchemyInstrumentor()
+    telemetry.instrument_sqlalchemy()
+    engine = create_db_engine(postgres.get_connection_url())
+    try:
+        reader = InMemoryMetricReader()
+        register_open_rate(
+            sessionmaker(engine), MeterProvider(metric_readers=[reader]).get_meter("t")
+        )
+        with engine.connect() as connection:  # this one is traced, as before
+            connection.execute(text("SELECT 1"))
+        traced = len(spans.get_finished_spans())
+
+        reader.get_metrics_data()
+
+        # Every scrape and export reads the database; none of it becomes a trace.
+        assert len(spans.get_finished_spans()) == traced
+    finally:
+        engine.dispose()
+        instrumentor.uninstrument()

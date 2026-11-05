@@ -148,3 +148,19 @@ def test_daily_counts_are_exact(compose: dict[str, Any]) -> None:
     for target in _targets(dashboard):
         for call in re.findall(r"increase\([^\[]*\[[^\]]+\]\s*\w*", target.get("expr", "")):
             assert call.endswith("anchored"), call
+
+
+def test_gauges_are_read_back_over_the_day() -> None:
+    # Instant queries are evaluated at the end of the range, the end of today:
+    # a bare gauge has no sample there (Prometheus looks back 5 minutes).
+    dashboard = json.loads(DASHBOARD.read_text())
+    for target in _targets(dashboard):
+        for gauge in re.findall(r"\w*\(?brzask_digest_(?:shown|opened)", target.get("expr", "")):
+            assert gauge.startswith("last_over_time("), target["expr"]
+
+
+def test_titles_name_the_window_they_show() -> None:
+    dashboard = json.loads(DASHBOARD.read_text())
+    titles = [panel["title"] for panel in dashboard["panels"]]
+    # Instant [1d] windows end at the end of today, so they cover today.
+    assert not [title for title in titles if "24 hours" in title]

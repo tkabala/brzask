@@ -222,7 +222,7 @@
     {
       "id": 6,
       "type": "bargauge",
-      "title": "Digest funnel, last 24 hours",
+      "title": "Digest funnel, today",
       "description": "Articles at each step: fresh from the feeds, candidates, ranked, top, extracted, duplicates dropped, kept and picked.",
       "datasource": {
         "type": "prometheus",
@@ -681,7 +681,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(brzask_digest_opened) / max(brzask_digest_shown)",
+          "expr": "max(last_over_time(brzask_digest_opened[1d])) / max(last_over_time(brzask_digest_shown[1d]))",
           "legendFormat": "__auto",
           "range": false,
           "instant": true
@@ -732,7 +732,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(brzask_digest_opened)",
+          "expr": "max(last_over_time(brzask_digest_opened[1d]))",
           "legendFormat": "opened",
           "range": false,
           "instant": true
@@ -743,7 +743,7 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "max(brzask_digest_shown)",
+          "expr": "max(last_over_time(brzask_digest_shown[1d]))",
           "legendFormat": "shown",
           "range": false,
           "instant": true
@@ -787,7 +787,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(brzask_digest_opened) / max(brzask_digest_shown)",
+          "expr": "max(last_over_time(brzask_digest_opened[1d])) / max(last_over_time(brzask_digest_shown[1d]))",
           "legendFormat": "open rate",
           "range": true,
           "instant": false

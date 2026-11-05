@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable, Iterable
 
 from opentelemetry import metrics
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 from opentelemetry.metrics import CallbackOptions, Observation
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
@@ -47,7 +48,8 @@ def register_open_rate(sessions: sessionmaker[Session], meter: metrics.Meter | N
         if cached and now - cached[0][0] < 1:
             return cached[0][1]
         try:
-            with sessions() as session:
+            # Collected every scrape and export: tracing it would bury the runs.
+            with suppress_instrumentation(), sessions() as session:
                 value: tuple[int, int] | None = recent_opens(session)
         except SQLAlchemyError as error:
             log.debug("open rate not read", error=str(error))

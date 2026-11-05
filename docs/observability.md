@@ -63,7 +63,7 @@ runs* switch at the top shows runs started with `--dry-run` instead.
 - **Runs:** runs per day by pipeline and outcome, the digest's duration and
   the time spent in each of its stages.
 - **Articles:** the digest funnel (fresh entries, candidates, ranked, top,
-  extracted, duplicates dropped, kept, picked) for the last day and per day.
+  extracted, duplicates dropped, kept, picked) for today and per day.
 - **LLM cost:** cost per day by purpose, totals for the selected range and
   the last 30 days, tokens, and calls whose provider reported no cost (their
   cost is missing from the totals).
