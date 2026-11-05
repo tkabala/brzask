@@ -87,6 +87,28 @@ data in components, not in route loaders, because loaders would run before
 the session is known. A 401 from any request asks for the session again, so
 an expired session leads back to the login.
 
+## Install and offline
+
+The built app is installable: a web app manifest, icons and a service worker
+(`vite-plugin-pwa`). Browsers offer to install it only over HTTPS or on
+`localhost`. The service worker keeps the app's own files, so it opens without
+a connection; it never answers `/api`, `/open`, `/feed` or the health checks,
+so an article link opened offline fails as a page instead of opening the app.
+A new version installs quietly and takes over the next time the app opens.
+Development (`just dev`) and Storybook run without it.
+
+The app saves two answers in the browser's `localStorage` (`brzask-cache`):
+the session, without its CSRF token, and today's digest. On the next start
+they show at once and are fetched again right away. Offline, a banner says so,
+today's digest shows when its copy was saved, and other pages say they need a
+connection; the same copy shows, with its time, when the server cannot be
+reached. The copy lasts seven days, starts afresh with every release, and is
+removed on logout, on any 401 and whenever the server answers that nobody is
+logged in. Opening an article still needs the network.
+
+The icons are drawn from `public/icon.svg`; after changing it, `pnpm icons`
+writes the PNG and ICO files next to it (`pwa-assets.config.mjs`).
+
 ## Errors
 
 `ProblemMessage` shows a problem's `title` and `detail` as the API wrote them,
