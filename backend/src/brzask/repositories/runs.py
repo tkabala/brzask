@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Integer, Numeric, and_, cast, func, or_, select, tuple_
+from sqlalchemy import ColumnElement, Numeric, and_, case, cast, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Run, RunKind, RunStatus
@@ -87,17 +87,19 @@ class RunRepository:
         had `cost_usd_known` count their `cost_usd`, unpriced when it is null.
         """
         usage = Run.stats["usage"]
-        cost = func.coalesce(
-            cast(usage["cost_usd_known"].astext, Numeric),
-            cast(usage["cost_usd"].astext, Numeric),
-            0,
-        )
+
+        def number(key: str) -> ColumnElement[Decimal]:
+            # Only JSON numbers are cast: one odd value must not fail every run's check.
+            value = usage[key]
+            return case((func.jsonb_typeof(value) == "number", cast(value.astext, Numeric)))
+
+        cost = func.coalesce(number("cost_usd_known"), number("cost_usd"), 0)
         unpriced = or_(
-            cast(usage["unpriced_calls"].astext, Integer) > 0,
+            number("unpriced_calls") > 0,
             and_(
                 ~usage.has_key("cost_usd_known"),
-                cast(usage["calls"].astext, Integer) > 0,
-                usage["cost_usd"].astext.is_(None),
+                number("calls") > 0,
+                func.jsonb_typeof(usage["cost_usd"]) == "null",
             ),
         )
         query = select(

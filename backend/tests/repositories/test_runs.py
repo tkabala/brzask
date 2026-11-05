@@ -87,3 +87,14 @@ def test_spending_counts_legacy_and_unpriced_runs(session: Session, make: Factor
     today, month, unpriced = RunRepository(session).spending(NOW, NOW)
 
     assert (today, month, unpriced) == (Decimal("0.012"), Decimal("0.012"), 2)
+
+
+def test_spending_ignores_values_that_are_not_numbers(session: Session, make: Factories) -> None:
+    make.run(NOW, stats={"usage": {"calls": 1, "cost_usd": "n/a"}})
+    make.run(NOW, stats={"usage": {"cost_usd_known": "0.5", "unpriced_calls": "1.5"}})
+    make.run(NOW, stats={"usage": [1, 2]})
+    make.run(NOW, cost=0.01)
+
+    today, month, unpriced = RunRepository(session).spending(NOW, NOW)
+
+    assert (today, month, unpriced) == (Decimal("0.01"), Decimal("0.01"), 0)
