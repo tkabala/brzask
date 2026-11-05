@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.14](https://github.com/tkabala/brzask/compare/v0.1.13...v0.1.14) (2026-11-05)
+
+
+### Features
+
+* **pwa:** keep today's digest for offline reading ([199418f](https://github.com/tkabala/brzask/commit/199418f8fe7f92ccb403dadb9c777636f53df8ba))
+* **pwa:** make the web app installable ([7bc29b9](https://github.com/tkabala/brzask/commit/7bc29b9a82f670d973eef4cf3b76e62b5f165b5c))
+* **pwa:** say when the app is offline ([e5b1d54](https://github.com/tkabala/brzask/commit/e5b1d541257e5497f559ef9f3fb9ca42b4e446e9))
+
+
+### Bug Fixes
+
+* **pwa:** keep the saved copy to its own reader ([6f03176](https://github.com/tkabala/brzask/commit/6f03176dac19ec7032addb56dae363028b8b90f6))
+* **pwa:** start offline when the browser already is ([65279c5](https://github.com/tkabala/brzask/commit/65279c5638dc8254fbc91855209b7637ceb041b7))
+
+
+### Documentation
+
+* **pwa:** describe installing the app and reading offline ([878e8da](https://github.com/tkabala/brzask/commit/878e8da2cbc0efc433860dd42a4045ed9bc92a2f))
+
+
+### Chores
+
+* release 0.1.14 ([d2d57a4](https://github.com/tkabala/brzask/commit/d2d57a431761308d79a0ec94ee622f056c200d43))
+
 ## [0.1.13](https://github.com/tkabala/brzask/compare/v0.1.12...v0.1.13) (2026-11-05)
 
 
