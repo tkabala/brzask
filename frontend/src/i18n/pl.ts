@@ -31,6 +31,12 @@ export const pl: Resources = {
     title: 'Zaloguj się przez proxy',
     body: 'Ten serwer bierze użytkownika z reverse proxy przed nim. Otwórz brzask przez to proxy i zaloguj się tam.',
   },
+  offline: {
+    banner:
+      'Jesteś offline. Dzisiejszy przegląd to zapisana kopia; inne strony wymagają połączenia.',
+    savedAt: 'Zapisano {{time}}',
+    page: 'Ta strona wymaga połączenia.',
+  },
   today: {
     title: 'Dziś',
     empty: 'Dzisiejszego przeglądu jeszcze nie ma.',

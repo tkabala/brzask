@@ -10,6 +10,7 @@ import {
 import { ProblemMessage } from '@/components/problem-message'
 import { StatusView } from '@/features/status/status-view'
 import { FIRST_PAGE, nextCursor } from '@/lib/pages'
+import { Pending } from '@/components/pending'
 
 // Enough to see the last week of daily and weekly runs at a glance.
 const RUNS_PER_PAGE = 20
@@ -30,7 +31,7 @@ function StatusPage() {
   const pause = useMutation({ ...setPauseMutation(), onSuccess: refresh })
   const resume = useMutation({ ...deletePauseMutation(), onSuccess: refresh })
 
-  if (status.isPending) return null
+  if (status.isPending) return <Pending query={status} />
   if (status.isError || runs.isError) {
     return (
       <ProblemMessage

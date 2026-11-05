@@ -22,3 +22,6 @@ type Story = StoryObj<typeof meta>
 export const Digest: Story = {}
 
 export const Empty: Story = { args: { digest: emptyDigest } }
+
+/** The saved copy, read offline. */
+export const Saved: Story = { args: { savedAt: Date.parse('2026-10-21T06:12:00Z') } }

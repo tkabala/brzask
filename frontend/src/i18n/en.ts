@@ -29,6 +29,11 @@ export const en = {
     title: 'Sign in through your proxy',
     body: 'This server takes the user from the reverse proxy in front of it. Open brzask through that proxy and sign in there.',
   },
+  offline: {
+    banner: "You're offline. Today's digest is the saved copy; other pages need a connection.",
+    savedAt: 'Saved at {{time}}',
+    page: 'This page needs a connection.',
+  },
   today: {
     title: 'Today',
     empty: 'No digest yet today.',

@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 
 import { AppHeader } from '@/components/app-header'
+import { OfflineBanner } from '@/components/offline-banner'
 import { ProblemMessage } from '@/components/problem-message'
 import { SessionGate } from '@/components/session-gate'
 
@@ -21,6 +22,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootLayout() {
   return (
     <div className="min-h-svh bg-background text-foreground">
+      <OfflineBanner />
       <SessionGate>
         {(session) => (
           <>

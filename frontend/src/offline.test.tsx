@@ -107,3 +107,48 @@ describe('saved for offline', () => {
     })
   })
 })
+
+const BANNER = "You're offline. Today's digest is the saved copy; other pages need a connection."
+
+describe('offline, the app says so', () => {
+  it('shows no banner online', async () => {
+    fakeApi({ 'GET /api/v1/auth/session': () => json(loggedIn) })
+    renderApp()
+
+    expect(await screen.findByText(firstTitle)).toBeInTheDocument()
+    expect(screen.queryByText(BANNER)).not.toBeInTheDocument()
+  })
+
+  it('shows the banner and when today’s copy was saved', async () => {
+    await readTodayOnline()
+    onlineManager.setOnline(false)
+    fakeApi({})
+
+    renderApp('/', { persister: createPersister(localStorage) })
+
+    expect(await screen.findByRole('status')).toHaveTextContent(BANNER)
+    expect(screen.getByText(/^Saved at /)).toBeInTheDocument()
+  })
+
+  it('tells when the copy was saved if the server is out of reach', async () => {
+    await readTodayOnline()
+    fakeApi({
+      'GET /api/v1/auth/session': () => Response.error(),
+      'GET /api/v1/digests/today': () => Response.error(),
+    })
+
+    renderApp('/', { persister: createPersister(localStorage) })
+
+    expect(await screen.findByText(/^Saved at /, {}, { timeout: 8000 })).toBeInTheDocument()
+  }, 10_000)
+
+  it('says a page without a saved copy needs a connection', async () => {
+    await readTodayOnline()
+    onlineManager.setOnline(false)
+    fakeApi({})
+
+    renderApp('/archive', { persister: createPersister(localStorage) })
+
+    expect(await screen.findByText('This page needs a connection.')).toBeInTheDocument()
+  })
+})

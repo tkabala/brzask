@@ -5,6 +5,7 @@ import { listDigestsInfiniteOptions } from '@/client/@tanstack/react-query.gen'
 import { ProblemMessage } from '@/components/problem-message'
 import { ArchiveView } from '@/features/archive/archive-view'
 import { FIRST_PAGE, nextCursor } from '@/lib/pages'
+import { Pending } from '@/components/pending'
 
 export const Route = createFileRoute('/archive/')({
   component: ArchivePage,
@@ -16,7 +17,7 @@ function ArchivePage() {
     initialPageParam: FIRST_PAGE,
     getNextPageParam: nextCursor,
   })
-  if (days.isPending) return null
+  if (days.isPending) return <Pending query={days} />
   if (days.isError) return <ProblemMessage error={days.error} onRetry={() => void days.refetch()} />
   return (
     <ArchiveView

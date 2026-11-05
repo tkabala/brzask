@@ -8,6 +8,7 @@ import { LoginForm } from '@/components/login-form'
 import { ProblemMessage } from '@/components/problem-message'
 import { setCsrfToken } from '@/lib/api'
 import { forgetSaved } from '@/lib/offline-cache'
+import { Pending } from '@/components/pending'
 
 /** Shows `children` once the API may be used, else the way to log in. */
 export function SessionGate({ children }: { children: (session: SessionOut) => ReactNode }) {
@@ -21,7 +22,13 @@ export function SessionGate({ children }: { children: (session: SessionOut) => R
     if (loggedOut) forgetSaved(queryClient)
   }, [loggedOut, queryClient])
 
-  if (session.isPending) return null
+  if (session.isPending) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8">
+        <Pending query={session} />
+      </div>
+    )
+  }
   // A saved session (offline, or the server out of reach) still opens the
   // saved digest; without one there is nothing to show but the problem.
   if (session.isError && session.data === undefined) {

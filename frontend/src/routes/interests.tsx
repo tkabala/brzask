@@ -9,6 +9,7 @@ import {
 } from '@/client/@tanstack/react-query.gen'
 import { ProblemMessage } from '@/components/problem-message'
 import { InterestsView } from '@/features/interests/interests-view'
+import { Pending } from '@/components/pending'
 
 export const Route = createFileRoute('/interests')({
   component: InterestsPage,
@@ -28,7 +29,7 @@ function InterestsPage() {
   })
   const add = useMutation({ ...addInterestMutation(), onSuccess: refresh })
 
-  if (interests.isPending) return null
+  if (interests.isPending) return <Pending query={interests} />
   if (interests.isError) {
     return <ProblemMessage error={interests.error} onRetry={() => void interests.refetch()} />
   }
