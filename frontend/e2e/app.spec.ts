@@ -108,3 +108,23 @@ test('logging out leads back to the login', async ({ page }) => {
   await page.goto('/status')
   await expect(page.getByLabel('Password')).toBeVisible()
 })
+
+test('the app can be installed', async ({ page, request }) => {
+  const manifest = (await (await request.get('/manifest.webmanifest')).json()) as {
+    name: string
+    display: string
+    start_url: string
+    icons: { sizes: string; purpose?: string }[]
+  }
+  expect(manifest).toMatchObject({ name: 'brzask', display: 'standalone', start_url: '/' })
+  const sizes = manifest.icons.map((icon) => icon.sizes)
+  expect(sizes).toEqual(expect.arrayContaining(['192x192', '512x512']))
+  expect(manifest.icons.some((icon) => icon.purpose === 'maskable')).toBe(true)
+
+  await logIn(page)
+  const state = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready
+    return registration.active?.state
+  })
+  expect(state).toBe('activated')
+})

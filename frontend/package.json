@@ -16,13 +16,16 @@
     "generate": "openapi-ts && node scripts/mark-client-runtime.mjs",
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build --quiet",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "icons": "pnpm dlx @vite-pwa/assets-generator@1 --config pwa-assets.config.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "@hookform/resolvers": "^6.0.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/query-sync-storage-persister": "^5.105.3",
     "@tanstack/react-query": "^5.104.5",
+    "@tanstack/react-query-persist-client": "^5.105.3",
     "@tanstack/react-router": "^1.170.44",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",
@@ -68,6 +71,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.0",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@12.14.0",

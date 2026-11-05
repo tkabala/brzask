@@ -16,6 +16,8 @@ INDEX = "<!doctype html><title>brzask</title>"
 def web_dir(tmp_path: Path) -> Path:
     (tmp_path / "index.html").write_text(INDEX)
     (tmp_path / "favicon.svg").write_text("<svg/>")
+    (tmp_path / "sw.js").write_text("self.skipWaiting()")
+    (tmp_path / "manifest.webmanifest").write_text('{"name": "brzask"}')
     (tmp_path / "assets").mkdir()
     (tmp_path / "assets" / "index-a1b2c3.js").write_text("console.log(1)")
     return tmp_path
@@ -50,6 +52,25 @@ def test_app_routes_serve_the_app(client: TestClient, path: str) -> None:
 
     assert response.status_code == 200
     assert response.text == INDEX
+
+
+@pytest.mark.parametrize(
+    ("path", "content_type"),
+    [
+        ("/sw.js", "text/javascript"),
+        ("/manifest.webmanifest", "application/manifest+json"),
+    ],
+)
+def test_installable_app_files_are_revalidated(
+    client: TestClient, path: str, content_type: str
+) -> None:
+    # A new service worker or manifest must reach installed apps on their next open.
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.text != INDEX
+    assert response.headers["content-type"].startswith(content_type)
+    assert response.headers["cache-control"] == "no-cache"
 
 
 def test_hashed_assets_are_cached_for_good(client: TestClient) -> None:

@@ -7,6 +7,15 @@ const config: StorybookConfig = {
   // The mock service worker lives here, not in public/, so the app never ships it.
   staticDirs: ['./public'],
   core: { disableTelemetry: true },
+  // Stories are no installable app: leave out the service worker and manifest.
+  viteFinal: (viteConfig) => ({
+    ...viteConfig,
+    plugins: (viteConfig.plugins ?? [])
+      .flat()
+      .filter(
+        (plugin) => !(plugin && 'name' in plugin && plugin.name.startsWith('vite-plugin-pwa')),
+      ),
+  }),
 }
 
 export default config
