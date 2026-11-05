@@ -128,3 +128,35 @@ test('the app can be installed', async ({ page, request }) => {
   })
   expect(state).toBe('activated')
 })
+
+test('today’s digest is readable offline, until logging out', async ({ page, context }) => {
+  await logIn(page)
+  const cards = page.locator('[data-slot="card"]')
+  await expect(cards).toHaveCount(7)
+  const openUrl = await cards.first().getByRole('link').first().getAttribute('href')
+  // The service worker takes over this page, and the copy is written.
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+  await page.waitForFunction(() => localStorage.getItem('brzask-cache')?.includes('"articles"'))
+
+  await context.setOffline(true)
+  await page.reload()
+  await expect(cards).toHaveCount(7)
+  await expect(page.getByRole('status')).toContainText("You're offline")
+  await expect(page.getByText(/^Saved at /)).toBeVisible()
+  await expectAccessible(page)
+
+  // Any other page opens in the app, and says it needs a connection.
+  await page.goto('/archive/2026-10-01')
+  await expect(page.getByText('This page needs a connection.')).toBeVisible()
+  // An article link is the API's, never the app's.
+  await expect(page.goto(openUrl ?? '/open')).rejects.toThrow()
+
+  await context.setOffline(false)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Log out' }).click()
+  await expect(page.getByLabel('Password')).toBeVisible()
+  await context.setOffline(true)
+  await page.reload()
+  await expect(page.getByRole('status')).toBeVisible()
+  await expect(cards).toHaveCount(0)
+})

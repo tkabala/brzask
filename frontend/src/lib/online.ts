@@ -8,3 +8,9 @@ export function useOnline(): boolean {
     () => onlineManager.isOnline(),
   )
 }
+
+/** The query client assumes it starts online and only hears changes; an app
+ * opened without a connection must say so from the start. */
+export function followBrowserOnline(): void {
+  onlineManager.setOnline(navigator.onLine)
+}

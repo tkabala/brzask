@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from '@/app'
 import { configureApi } from '@/lib/api'
 import { createPersister } from '@/lib/offline-cache'
+import { followBrowserOnline } from '@/lib/online'
 import { createQueryClient } from '@/lib/query'
 
 const rootElement = document.getElementById('root')
@@ -14,6 +15,7 @@ if (!rootElement) {
 }
 
 configureApi()
+followBrowserOnline()
 
 createRoot(rootElement).render(
   <StrictMode>
