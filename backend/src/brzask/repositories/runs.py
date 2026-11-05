@@ -3,9 +3,10 @@
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import Integer, Numeric, and_, cast, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Run, RunKind, RunStatus
@@ -77,3 +78,32 @@ class RunRepository:
 
     def latest(self, kind: RunKind) -> Run | None:
         return next(iter(self.recent(1, kind)), None)
+
+    def spending(self, day_start: datetime, month_start: datetime) -> tuple[Decimal, Decimal, int]:
+        """Reported cost of the runs since `day_start` and since `month_start`.
+
+        Also the number of runs since `month_start` with calls that reported no
+        cost, which make the sums a lower bound. Runs recorded before usage
+        had `cost_usd_known` count their `cost_usd`, unpriced when it is null.
+        """
+        usage = Run.stats["usage"]
+        cost = func.coalesce(
+            cast(usage["cost_usd_known"].astext, Numeric),
+            cast(usage["cost_usd"].astext, Numeric),
+            0,
+        )
+        unpriced = or_(
+            cast(usage["unpriced_calls"].astext, Integer) > 0,
+            and_(
+                ~usage.has_key("cost_usd_known"),
+                cast(usage["calls"].astext, Integer) > 0,
+                usage["cost_usd"].astext.is_(None),
+            ),
+        )
+        query = select(
+            func.coalesce(func.sum(cost).filter(Run.started_at >= day_start), 0),
+            func.coalesce(func.sum(cost), 0),
+            func.count().filter(unpriced),
+        ).where(Run.started_at >= month_start)
+        today, month, unpriced_runs = self.session.execute(query).one()
+        return Decimal(today), Decimal(month), int(unpriced_runs)

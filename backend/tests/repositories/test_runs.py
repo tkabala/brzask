@@ -1,10 +1,12 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from brzask.db.models import RunKind, RunStatus
 from brzask.repositories import RunRepository
+from tests.factories import Factories
 
 NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
 
@@ -55,3 +57,33 @@ def test_recent_and_latest(session: Session) -> None:
     assert list(runs.recent(10, RunKind.DIGEST)) == [digest, old_digest]
     assert runs.latest(RunKind.REVIEW) is review
     assert runs.latest(RunKind.DISCOVERY) is None
+
+
+def test_spending_sums_runs_by_window(session: Session, make: Factories) -> None:
+    day_start = datetime(2026, 10, 17, 22, tzinfo=UTC)
+    month_start = datetime(2026, 9, 30, 22, tzinfo=UTC)
+    make.run(month_start - timedelta(minutes=1), cost=1.0)  # last month
+    make.run(month_start, cost=0.1)
+    make.run(day_start - timedelta(minutes=1), cost=0.02)
+    make.run(day_start, cost=0.003)
+    make.run(NOW, cost=0.05, kind=RunKind.DISCOVERY)
+    make.run(NOW, stats={})  # no paid calls
+
+    today, month, unpriced = RunRepository(session).spending(day_start, month_start)
+
+    assert (today, month, unpriced) == (Decimal("0.053"), Decimal("0.173"), 0)
+
+
+def test_spending_counts_legacy_and_unpriced_runs(session: Session, make: Factories) -> None:
+    make.run(NOW, stats={"usage": {"calls": 2, "cost_usd": 0.01}})  # before cost_usd_known
+    make.run(NOW, stats={"usage": {"calls": 1, "cost_usd": None}})
+    make.run(
+        NOW,
+        stats={
+            "usage": {"calls": 3, "cost_usd": None, "cost_usd_known": 0.002, "unpriced_calls": 1}
+        },
+    )
+
+    today, month, unpriced = RunRepository(session).spending(NOW, NOW)
+
+    assert (today, month, unpriced) == (Decimal("0.012"), Decimal("0.012"), 2)

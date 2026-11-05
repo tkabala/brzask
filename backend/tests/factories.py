@@ -2,6 +2,7 @@
 
 import itertools
 import math
+import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import Any
@@ -14,6 +15,9 @@ from brzask.db.models import (
     ArticleEmbedding,
     ArticleState,
     Interest,
+    Run,
+    RunKind,
+    RunStatus,
     Source,
     SourceKind,
     SourceOrigin,
@@ -117,4 +121,37 @@ class Factories:
     ) -> ArticleEmbedding:
         return self._add(
             ArticleEmbedding(article_id=article.id, model=model, embedding=list(vector))
+        )
+
+    def run(
+        self,
+        started_at: datetime,
+        *,
+        cost: float | None = None,
+        stats: dict[str, Any] | None = None,
+        kind: RunKind = RunKind.DIGEST,
+    ) -> Run:
+        """A finished run; `cost` fills its usage as a fully priced run reports it."""
+        if stats is None:
+            stats = (
+                {}
+                if cost is None
+                else {
+                    "usage": {
+                        "calls": 1,
+                        "cost_usd": cost,
+                        "cost_usd_known": cost,
+                        "unpriced_calls": 0,
+                    }
+                }
+            )
+        return self._add(
+            Run(
+                id=uuid.uuid4(),
+                kind=kind,
+                started_at=started_at,
+                finished_at=started_at,
+                status=RunStatus.OK,
+                stats=stats,
+            )
         )
