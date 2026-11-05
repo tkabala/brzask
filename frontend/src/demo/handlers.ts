@@ -14,6 +14,8 @@ import type {
   NewInterest,
   NewPause,
   NewSource,
+  OpmlImport,
+  OpmlReport,
   Problem,
   SessionOut,
   SourceChange,
@@ -176,6 +178,57 @@ export const handlers = [
     }
     db.sources.push(added)
     return HttpResponse.json(added, { status: 201 })
+  }),
+  // Before `sources/:id`, which would take `opml` for an ID.
+  http.get(`${API}/sources/opml`, () => {
+    const opml = document.implementation.createDocument(null, 'opml')
+    opml.documentElement.setAttribute('version', '2.0')
+    const body = opml.documentElement.appendChild(opml.createElement('body'))
+    for (const source of db.sources.filter((s) => s.status === 'active')) {
+      const outline = body.appendChild(opml.createElement('outline'))
+      outline.setAttribute('type', 'rss')
+      outline.setAttribute('text', source.name)
+      outline.setAttribute('xmlUrl', source.url)
+    }
+    return new HttpResponse(new XMLSerializer().serializeToString(opml), {
+      headers: { 'Content-Type': 'text/x-opml' },
+    })
+  }),
+  http.post(`${API}/sources/opml`, async ({ request }) => {
+    const body = (await request.json()) as OpmlImport
+    const parsed = new DOMParser().parseFromString(body.opml, 'application/xml')
+    if (parsed.documentElement.nodeName !== 'opml') {
+      return problem(400, 'Bad Request', 'not an OPML file')
+    }
+    const report: OpmlReport = { added: [], known: [], failed: [], unchecked: [] }
+    for (const outline of parsed.querySelectorAll('outline[xmlUrl]')) {
+      const url = outline.getAttribute('xmlUrl') ?? ''
+      const known = db.sources.find((s) => s.url === url)
+      if (known) {
+        report.known.push({ url, name: known.name, status: known.status })
+        continue
+      }
+      if (!/^https?:\/\/[^/]+\./.test(url)) {
+        report.failed.push({ url, reason: 'no RSS or Atom feed found' })
+        continue
+      }
+      const added: SourceOut = {
+        ...structuredClone(demo.healthySource),
+        id: Math.max(...db.sources.map((s) => s.id)) + 1,
+        name:
+          outline.getAttribute('title') ?? outline.getAttribute('text') ?? new URL(url).hostname,
+        url,
+        site_url: null,
+        status: body.active ? 'active' : 'pending',
+        origin: 'opml',
+        note: body.active ? null : 'In an imported OPML file.',
+        health: { ...demo.healthySource.health, fetched_at: null },
+        activity: { articles: 0, ranked: 0, shown: 0, opened: 0 },
+      }
+      db.sources.push(added)
+      report.added.push({ id: added.id, name: added.name, url, status: added.status })
+    }
+    return HttpResponse.json(report)
   }),
   http.get(`${API}/sources/:id`, ({ params }) => {
     const source = db.sources.find((s) => String(s.id) === params.id)

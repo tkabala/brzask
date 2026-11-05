@@ -15,6 +15,7 @@ from brzask.config.settings import LLMSettings, Settings
 from brzask.db.models import RunKind, RunStatus, SourceOrigin, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services import auth, pipelines
+from brzask.services.opml import NO_FEED
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
 from tests.factories import Factories
@@ -96,7 +97,7 @@ def test_help_lists_the_commands() -> None:
     for command in top_level:
         assert command in result.stdout
     for group, commands in {
-        "sources": ("list", "add", "mute", "enable", "stats"),
+        "sources": ("list", "add", "mute", "enable", "import", "export", "stats"),
         "interests": ("list", "add", "edit"),
         "tokens": ("create", "list", "revoke"),
     }.items():
@@ -122,6 +123,62 @@ def test_sources_add_list_mute_enable(cli: Invoke) -> None:
     assert "Lobsters" in cli("sources", "list", "-s", "muted").stdout
 
     assert cli("sources", "enable", "https://lobste.rs/rss").stdout.startswith("Enabled")
+
+
+def test_sources_import_checks_each_feed_and_leaves_them_pending(
+    cli: Invoke, finder: FakeFinder, make: Factories, tmp_path: Path
+) -> None:
+    make.source("Known", url="https://known.example/feed")
+    finder.feeds["https://gone.example/feed"] = None
+    file = tmp_path / "feeds.opml"
+    file.write_text(
+        '<opml version="2.0"><body>'
+        '<outline text="New" xmlUrl="https://new.example/feed"/>'
+        '<outline text="K" xmlUrl="https://known.example/feed"/>'
+        '<outline text="Gone" xmlUrl="https://gone.example/feed"/>'
+        "</body></opml>"
+    )
+
+    result = cli("sources", "import", str(file))
+
+    assert result.exit_code == 0, result.output
+    lines = result.stdout.splitlines()
+    assert lines[0] == "Checking 3 feeds..."
+    assert lines[1].startswith("Added New (#")
+    assert lines[1].endswith(", pending): https://new.example/feed")
+    assert "Known https://known.example/feed: Known (active)" in lines
+    assert f"Failed https://gone.example/feed: {NO_FEED}" in lines
+    assert "1 added, 1 already sources, 1 without a feed." in lines
+    assert "New" in cli("sources", "list", "-s", "pending").stdout
+
+
+def test_sources_import_active_and_a_file_that_is_not_opml(cli: Invoke, tmp_path: Path) -> None:
+    file = tmp_path / "feeds.opml"
+    file.write_text('<opml><body><outline xmlUrl="https://new.example/feed"/></body></opml>')
+    broken = tmp_path / "broken.opml"
+    broken.write_text("<html></html>")
+
+    assert (
+        "active): https://new.example/feed"
+        in cli("sources", "import", str(file), "--active").stdout
+    )
+    failed = cli("sources", "import", str(broken))
+    assert failed.exit_code == 1
+    assert "not an OPML file" in failed.stderr
+
+
+def test_sources_export(cli: Invoke, make: Factories, tmp_path: Path) -> None:
+    make.source("Followed", url="https://a.example/feed", site_url="https://a.example/")
+    make.source("Off", url="https://b.example/feed", status=SourceStatus.MUTED)
+
+    printed = cli("sources", "export").stdout
+    output = tmp_path / "out.opml"
+    cli("sources", "export", "-s", "active", "-s", "muted", "-o", str(output))
+
+    assert 'xmlUrl="https://a.example/feed"' in printed
+    assert 'htmlUrl="https://a.example/"' in printed
+    assert "b.example" not in printed
+    assert 'text="Off"' in output.read_text()
 
 
 def test_sources_add_finds_the_feed_of_a_page(cli: Invoke, finder: FakeFinder) -> None:

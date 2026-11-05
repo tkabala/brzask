@@ -17,6 +17,7 @@ interface Props {
   onDecide?: (source: SourceOut, status: Decision) => void
   busyId?: number | null
   addForm?: ReactNode
+  opmlForm?: ReactNode
 }
 
 export function SourcesView({
@@ -29,6 +30,7 @@ export function SourcesView({
   onDecide,
   busyId = null,
   addForm,
+  opmlForm,
 }: Props) {
   const { t } = useTranslation()
   const item = (source: SourceOut) => (
@@ -50,6 +52,7 @@ export function SourcesView({
         </section>
       ) : null}
       {addForm ? <section>{addForm}</section> : null}
+      {opmlForm ? <section>{opmlForm}</section> : null}
       <section aria-labelledby="all-title">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="all-title" className="text-lg font-semibold">

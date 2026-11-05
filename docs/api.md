@@ -120,6 +120,8 @@ The interactive documentation lists every field; in short:
 | `GET /sources` | Sources by name, with fetch health and what each published in the last 30 days; `?status=pending` lists the ones waiting for a decision |
 | `POST /sources` | Add a source from its feed or any page of the site |
 | `GET`, `PATCH /sources/{id}` | Read, rename, or change the status of a source |
+| `GET /sources/opml` | Sources as an OPML file, active ones unless `?status=` says otherwise |
+| `POST /sources/opml` | Import the feeds of an OPML file (`{"opml": "...", "active": false}`): each is checked, new ones become pending (or active), known ones are left alone; checking stops after 45 seconds and the rest come back as `unchecked` |
 | `GET`, `POST /interests`, `GET`, `PATCH /interests/{id}` | Interests, their keywords and reader notes |
 | `GET /runs`, `GET /runs/{id}` | Pipeline runs with their stats and timings |
 | `GET /status` | Counts, the pause and the last run of each pipeline |

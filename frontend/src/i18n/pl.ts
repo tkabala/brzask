@@ -99,6 +99,19 @@ export const pl: Resources = {
     failing: 'Błędy od {{since}}: {{error}}',
     neverFetched: 'Jeszcze nie pobrane',
     lastFetched: 'Pobrane {{when}}',
+    opml: {
+      title: 'Import i eksport',
+      hint: 'OPML to lista subskrypcji, którą eksportuje każdy czytnik kanałów. Każdy kanał jest sprawdzany przed dodaniem; te, które już są źródłami, zostają bez zmian.',
+      file: 'Plik OPML',
+      active: 'Czytaj je od razu, bez czekania na decyzję',
+      import: 'Importuj',
+      importing: 'Sprawdzanie kanałów…',
+      export: 'Eksportuj aktywne źródła (OPML)',
+      result: 'Dodane: {{added}}. Już były źródłami: {{known}}. Bez kanału: {{failed}}.',
+      unchecked:
+        'Niesprawdzone na czas: {{number}}. Zaimportuj ten sam plik ponownie, aby dokończyć.',
+      failedList: 'Nieznalezione kanały',
+    },
     status: {
       active: 'aktywne',
       pending: 'czeka',

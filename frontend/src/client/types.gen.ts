@@ -151,6 +151,20 @@ export type DigestOut = {
 };
 
 /**
+ * FailedOutline
+ */
+export type FailedOutline = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
  * FieldError
  */
 export type FieldError = {
@@ -180,6 +194,27 @@ export type Health = {
      * Status
      */
     status?: 'ok';
+};
+
+/**
+ * ImportedSource
+ */
+export type ImportedSource = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Url
+     *
+     * Feed URL, as found when it was checked.
+     */
+    url: string;
+    status: SourceStatus;
 };
 
 /**
@@ -243,6 +278,25 @@ export type InterestOut = {
 };
 
 /**
+ * KnownSource
+ */
+export type KnownSource = {
+    /**
+     * Url
+     *
+     * As in the file.
+     */
+    url: string;
+    /**
+     * Name
+     *
+     * The source that already has this feed.
+     */
+    name: string;
+    status: SourceStatus;
+};
+
+/**
  * NewInterest
  */
 export type NewInterest = {
@@ -292,6 +346,52 @@ export type NewSource = {
      * Display name; defaults to the feed's title.
      */
     name?: string | null;
+};
+
+/**
+ * OpmlImport
+ */
+export type OpmlImport = {
+    /**
+     * Opml
+     *
+     * The OPML file's content, as exported by a feed reader.
+     */
+    opml: string;
+    /**
+     * Active
+     *
+     * Follow the new feeds now instead of leaving them pending.
+     */
+    active?: boolean;
+};
+
+/**
+ * OpmlReport
+ */
+export type OpmlReport = {
+    /**
+     * Added
+     */
+    added: Array<ImportedSource>;
+    /**
+     * Known
+     *
+     * Already sources, whatever their status.
+     */
+    known: Array<KnownSource>;
+    /**
+     * Failed
+     *
+     * No working feed found.
+     */
+    failed: Array<FailedOutline>;
+    /**
+     * Unchecked
+     *
+     * Not checked in time; import the same file again to continue.
+     */
+    unchecked: Array<string>;
 };
 
 /**
@@ -1153,6 +1253,81 @@ export type AddSourceResponses = {
 };
 
 export type AddSourceResponse = AddSourceResponses[keyof AddSourceResponses];
+
+export type ExportSourcesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Status
+         *
+         * Sources with one of these statuses; active ones by default.
+         */
+        status?: Array<SourceStatus> | null;
+    };
+    url: '/api/v1/sources/opml';
+};
+
+export type ExportSourcesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ExportSourcesError = ExportSourcesErrors[keyof ExportSourcesErrors];
+
+export type ExportSourcesResponses = {
+    /**
+     * OPML 2.0 file, one outline per source, by name.
+     */
+    200: unknown;
+};
+
+export type ImportSourcesData = {
+    body: OpmlImport;
+    path?: never;
+    query?: never;
+    url: '/api/v1/sources/opml';
+};
+
+export type ImportSourcesErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ImportSourcesError = ImportSourcesErrors[keyof ImportSourcesErrors];
+
+export type ImportSourcesResponses = {
+    /**
+     * Successful Response
+     */
+    200: OpmlReport;
+};
+
+export type ImportSourcesResponse = ImportSourcesResponses[keyof ImportSourcesResponses];
 
 export type GetSourceData = {
     body?: never;

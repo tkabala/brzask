@@ -50,6 +50,14 @@ def test_wrong_method_lists_every_method_of_the_path(client: TestClient) -> None
     assert client.post("/metrics").headers["allow"] == "GET"
 
 
+def test_a_fixed_path_is_not_taken_for_a_parameter(client: TestClient) -> None:
+    response = client.patch("/api/v1/sources/opml", json={})
+
+    # Not PATCH /sources/{source_id} with "opml" as the ID.
+    assert response.status_code == 405
+    assert response.headers["allow"] == "GET, POST"
+
+
 def test_validation_errors_list_each_field() -> None:
     response = app_raising(ValueError()).get("/limit", params={"value": "many"})
 

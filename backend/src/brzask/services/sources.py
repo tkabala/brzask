@@ -87,16 +87,20 @@ def propose_source(
     actor: str,
     origin_detail: str | None = None,
     note: str | None = None,
+    name: str | None = None,
 ) -> Source | None:
     """Add a source found by a pipeline, under a free name; None when its URL is known.
 
-    A known URL counts whatever its status, so a rejected feed is never
-    proposed again.
+    `name` is one a person chose (in an imported file) and wins over the one
+    the feed gives; a number would read as an ID, so it is not used. A known
+    URL counts whatever its status, so a rejected feed is never proposed again.
     """
     sources = SourceRepository(session)
     if sources.get_by_url(found.url) is not None:
         return None
-    name = unique_name(session, name_from_feed(found.url, found.title), found.url)
+    chosen = (name or "").strip()
+    base = chosen if chosen and as_id(chosen) is None else name_from_feed(found.url, found.title)
+    name = unique_name(session, base, found.url)
     source = sources.add(
         name=name,
         url=found.url,

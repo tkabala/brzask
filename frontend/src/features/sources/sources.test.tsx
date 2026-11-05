@@ -106,4 +106,61 @@ describe('sources', () => {
     expect(url).toHaveValue('')
     expect(await api.sent('POST /api/v1/sources')[1]?.json()).toEqual({ url: 'blog.example/post' })
   })
+
+  it('imports an OPML file and says what came of it', async () => {
+    const api = loggedInApi({
+      'GET /api/v1/sources': listSources,
+      'POST /api/v1/sources/opml': () =>
+        json({
+          added: [{ id: 9, name: 'A Blog', url: 'https://a.example/feed', status: 'pending' }],
+          known: [],
+          failed: [{ url: 'https://gone.example/feed', reason: 'no RSS or Atom feed found' }],
+          unchecked: ['https://slow.example/feed'],
+        }),
+    })
+    const user = userEvent.setup()
+    renderApp('/sources')
+
+    const opml = '<opml><body><outline xmlUrl="https://a.example/feed"/></body></opml>'
+    await user.upload(
+      await screen.findByLabelText('OPML file'),
+      new File([opml], 'feeds.opml', { type: 'text/x-opml' }),
+    )
+    await user.click(screen.getByLabelText(/Read them right away/))
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+
+    expect(
+      await screen.findByText('Added: 1. Already sources: 0. No feed found: 1.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Not checked in time: 1. Import the same file again to continue.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/gone\.example\/feed: no RSS or Atom feed found/)).toBeInTheDocument()
+    const request = nth(api.sent('POST /api/v1/sources/opml'), 0)
+    expect(await request.json()).toEqual({ opml, active: true })
+    expect(request.headers.get('X-CSRF-Token')).toBe('csrf-1')
+  })
+
+  it('exports the active sources as a file', async () => {
+    const api = loggedInApi({
+      'GET /api/v1/sources': listSources,
+      'GET /api/v1/sources/opml': () =>
+        new Response('<opml version="2.0"/>', { headers: { 'Content-Type': 'text/x-opml' } }),
+    })
+    const createObjectURL = vi.fn(() => 'blob:opml')
+    // jsdom has no object URLs; this file runs in its own environment.
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockReturnValue(undefined)
+    const user = userEvent.setup()
+    renderApp('/sources')
+
+    await user.click(await screen.findByRole('button', { name: 'Export active sources (OPML)' }))
+
+    await vi.waitFor(() => {
+      expect(click).toHaveBeenCalledOnce()
+    })
+    expect(api.sent('GET /api/v1/sources/opml')).toHaveLength(1)
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    click.mockRestore()
+  })
 })

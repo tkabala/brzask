@@ -37,6 +37,14 @@ export const zDigestDayOut = z.object({
 });
 
 /**
+ * FailedOutline
+ */
+export const zFailedOutline = z.object({
+    url: z.string(),
+    reason: z.string()
+});
+
+/**
  * FieldError
  */
 export const zFieldError = z.object({
@@ -99,6 +107,14 @@ export const zNewPause = z.object({
 export const zNewSource = z.object({
     url: z.string().min(1).max(2000).regex(/^[^\x00]*$/),
     name: z.string().max(200).regex(/^[^\x00]*$/).nullish()
+});
+
+/**
+ * OpmlImport
+ */
+export const zOpmlImport = z.object({
+    opml: z.string().min(1).max(5000000).regex(/^[^\x00]*$/),
+    active: z.boolean().optional().default(false)
 });
 
 /**
@@ -328,6 +344,35 @@ export const zSourceStatus = z.enum([
 ]);
 
 /**
+ * ImportedSource
+ */
+export const zImportedSource = z.object({
+    id: z.int(),
+    name: z.string(),
+    url: z.string(),
+    status: zSourceStatus
+});
+
+/**
+ * KnownSource
+ */
+export const zKnownSource = z.object({
+    url: z.string(),
+    name: z.string(),
+    status: zSourceStatus
+});
+
+/**
+ * OpmlReport
+ */
+export const zOpmlReport = z.object({
+    added: z.array(zImportedSource),
+    known: z.array(zKnownSource),
+    failed: z.array(zFailedOutline),
+    unchecked: z.array(z.string())
+});
+
+/**
  * SourceOut
  */
 export const zSourceOut = z.object({
@@ -435,6 +480,17 @@ export const zAddSourceBody = zNewSource;
  * Successful Response
  */
 export const zAddSourceResponse = zSourceOut;
+
+export const zExportSourcesQuery = z.object({
+    status: z.array(zSourceStatus).nullish()
+});
+
+export const zImportSourcesBody = zOpmlImport;
+
+/**
+ * Successful Response
+ */
+export const zImportSourcesResponse = zOpmlReport;
 
 export const zGetSourcePath = z.object({
     source_id: z.int().gte(1).lte(9007199254740991)

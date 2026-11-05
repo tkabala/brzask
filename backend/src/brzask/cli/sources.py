@@ -1,6 +1,7 @@
 """`brzask sources ...`"""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -9,10 +10,10 @@ from brzask.cli import common
 from brzask.cli.common import ACTOR, errors_as_messages, local, table, unit_of_work
 from brzask.clients.feed_finder import with_scheme
 from brzask.db.models import SourceStatus
-from brzask.services import sources
+from brzask.services import opml, sources
 from brzask.services.source_stats import source_survival
 
-app = typer.Typer(no_args_is_help=True, help="List, add, mute and enable sources.")
+app = typer.Typer(no_args_is_help=True, help="List, add, mute, enable, import and export sources.")
 
 SourceRef = Annotated[str, typer.Argument(help="Source ID, feed URL or name.")]
 
@@ -83,6 +84,69 @@ def enable(source: SourceRef) -> None:
     with unit_of_work() as session:
         changed = sources.enable_source(session, source, actor=ACTOR)
     typer.echo(f"Enabled {source}." if changed else f"{source} is already active.")
+
+
+@app.command("import")
+def import_command(
+    file: Annotated[
+        Path,
+        typer.Argument(
+            exists=True, dir_okay=False, readable=True, help="OPML file from a feed reader."
+        ),
+    ],
+    active: Annotated[
+        bool,
+        typer.Option("--active", help="Follow the new feeds now instead of leaving them pending."),
+    ] = False,
+) -> None:
+    """Add the feeds of an OPML file; each is checked first, known ones are left alone."""
+    with common.errors_as_messages():
+        outlines = opml.parse_opml(file.read_bytes())
+    typer.echo(f"Checking {len(outlines)} feeds...")
+    finder = common.get_feed_finder()
+    try:
+        with common.errors_as_messages():
+            report = opml.import_outlines(
+                common.get_sessions(), finder, outlines, actor=ACTOR, active=active
+            )
+    finally:
+        finder.close()
+    for added in report.added:
+        typer.echo(f"Added {added.name} (#{added.id}, {added.status.value}): {added.url}")
+    for known in report.known:
+        typer.echo(f"Known {known.url}: {known.name} ({known.status.value})")
+    for failed in report.failed:
+        typer.echo(f"Failed {failed.url}: {failed.reason}")
+    typer.echo(
+        f"{len(report.added)} added, {len(report.known)} already sources, "
+        f"{len(report.failed)} without a feed."
+    )
+    if report.added and not active:
+        typer.echo("New feeds are pending: approve them on the Sources page or with `enable`.")
+
+
+@app.command()
+def export(
+    status: Annotated[
+        list[SourceStatus] | None,
+        typer.Option(
+            "--status", "-s", help="Sources with this status; repeatable. Default: active."
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", dir_okay=False, help="Write here instead of stdout."),
+    ] = None,
+) -> None:
+    """Write sources as an OPML file, for a feed reader or another brzask."""
+    with unit_of_work() as session:
+        data = opml.render_opml(
+            sources.list_sources(session, *(status or [SourceStatus.ACTIVE])), datetime.now(UTC)
+        )
+    if output is None:
+        typer.echo(data.decode(), nl=False)
+    else:
+        output.write_bytes(data)
 
 
 @app.command()

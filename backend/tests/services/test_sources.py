@@ -260,6 +260,29 @@ def test_propose_source_records_the_change(session: Session, make: Factories) ->
     )
 
 
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("  My Blog ", "My Blog"), ("Taken", "Taken (blog.other)"), ("7", "Feed"), (None, "Feed")],
+)
+def test_propose_source_prefers_a_chosen_name(
+    session: Session, make: Factories, name: str | None, expected: str
+) -> None:
+    make.source("Taken")
+    found = FoundFeed("https://blog.other/feed", "Feed", "https://blog.other")
+
+    source = propose_source(
+        session,
+        found,
+        status=SourceStatus.PENDING,
+        origin=SourceOrigin.OPML,
+        actor="cli",
+        name=name,
+    )
+
+    assert source is not None
+    assert source.name == expected
+
+
 def test_propose_source_skips_a_known_url_whatever_its_status(
     session: Session, make: Factories
 ) -> None:

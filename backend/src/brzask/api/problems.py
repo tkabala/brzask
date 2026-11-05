@@ -101,14 +101,17 @@ def allowed_methods(app: FastAPI, path: str) -> list[str]:
     """Methods the OpenAPI document lists for `path`.
 
     FastAPI makes one route per method, and Starlette's own `Allow` names only
-    the methods of the first route that matches the path.
+    the methods of the first route that matches the path. When several
+    templates match, the one with the fewest parameters is the path's own:
+    `/sources/opml`, not `/sources/{source_id}`.
     """
-    methods: set[str] = set()
+    matches: dict[int, set[str]] = {}
     for template, operations in app.openapi().get("paths", {}).items():
         pattern = re.sub(r"\\\{[^/]+?\\\}", "[^/]+", re.escape(template))
         if re.fullmatch(pattern, path):
+            methods = matches.setdefault(template.count("{"), set())
             methods.update(method.upper() for method in operations)
-    return sorted(methods)
+    return sorted(matches[min(matches)]) if matches else []
 
 
 def install(app: FastAPI) -> None:

@@ -5,6 +5,7 @@ import { ApiProblem } from '@/lib/api'
 import { pendingSources, sources } from '@/demo/data'
 
 import { AddSourceForm } from './add-source-form'
+import { OpmlForm } from './opml-form'
 import { SourcesView } from './sources-view'
 
 const meta = {
@@ -18,6 +19,7 @@ const meta = {
     hasMore: false,
     onDecide: fn(),
     addForm: <AddSourceForm onAdd={fn(async () => Promise.resolve())} />,
+    opmlForm: <OpmlForm onImport={fn(async () => Promise.resolve())} onExport={fn()} />,
   },
 } satisfies Meta<typeof SourcesView>
 
@@ -40,6 +42,23 @@ export const NoFeedFound: Story = {
             detail: 'no RSS or Atom feed found for https://example.com',
           })
         }
+      />
+    ),
+  },
+}
+export const OpmlImported: Story = {
+  args: {
+    pending: [],
+    opmlForm: (
+      <OpmlForm
+        onImport={fn(async () => Promise.resolve())}
+        onExport={fn()}
+        report={{
+          added: [{ id: 9, name: 'A Blog', url: 'https://a.example/feed', status: 'pending' }],
+          known: [{ url: 'https://b.example/feed', name: 'B', status: 'active' }],
+          failed: [{ url: 'https://gone.example/feed', reason: 'no RSS or Atom feed found' }],
+          unchecked: ['https://slow.example/feed'],
+        }}
       />
     ),
   },

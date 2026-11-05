@@ -88,3 +88,31 @@ docker compose exec api brzask status
 docker compose exec api brzask sources add https://example.com/blog
 docker compose run --rm migrate seed-demo   # fill an empty instance with demo data
 ```
+
+## Bringing your feeds
+
+Feed readers export their subscriptions as an OPML file. Import it on the
+Sources page, or from the command line:
+
+```sh
+docker compose exec -T api brzask sources import /dev/stdin < feeds.opml
+docker compose exec -T api brzask sources import --active /dev/stdin < feeds.opml
+```
+
+Every feed is fetched before it is added. When its URL no longer works, the
+site's page is read for the feed it points to now. A feed that cannot be read
+is listed and skipped, including one that is only down for the moment;
+importing the file again later tries it again. New feeds wait on the Sources page for a decision,
+like the ones brzask proposes itself; `--active` (or "Read them right away"
+on the page) follows them from the next digest instead. Feeds that are already
+sources, in any status, are left as they are, so importing a file twice adds
+nothing. On the page, checking stops after 45 seconds so a large file does not
+outlast a proxy's timeout; import the same file again to continue where it
+stopped. The command line has no such limit.
+
+Export goes the other way, for a feed reader or another brzask:
+
+```sh
+docker compose exec -T api brzask sources export > brzask-sources.opml
+docker compose exec -T api brzask sources export -s active -s muted > all.opml
+```

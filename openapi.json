@@ -756,6 +756,168 @@
         }
       }
     },
+    "/api/v1/sources/opml": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Export sources as OPML",
+        "description": "For a feed reader, or to move the sources to another brzask.",
+        "operationId": "export_sources",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceStatus"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sources with one of these statuses; active ones by default.",
+              "title": "Status"
+            },
+            "description": "Sources with one of these statuses; active ones by default."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OPML 2.0 file, one outline per source, by name.",
+            "content": {
+              "text/x-opml": {}
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Import sources from OPML",
+        "description": "Every feed is checked first, its site's page when the feed URL fails.\n\nNew ones are pending (or active with `active`); known ones are left as\nthey are, so importing a file twice adds nothing. Checking stops after\n45 seconds, and what is left is listed in `unchecked`.",
+        "operationId": "import_sources",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpmlImport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpmlReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sources/{source_id}": {
       "get": {
         "tags": [
@@ -2418,6 +2580,24 @@
         ],
         "title": "DigestOut"
       },
+      "FailedOutline": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "reason"
+        ],
+        "title": "FailedOutline"
+      },
       "FieldError": {
         "properties": {
           "location": {
@@ -2464,6 +2644,34 @@
         },
         "type": "object",
         "title": "Health"
+      },
+      "ImportedSource": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Feed URL, as found when it was checked."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SourceStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url",
+          "status"
+        ],
+        "title": "ImportedSource"
       },
       "InterestChange": {
         "properties": {
@@ -2578,6 +2786,30 @@
         ],
         "title": "InterestOut"
       },
+      "KnownSource": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "As in the file."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The source that already has this feed."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SourceStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "name",
+          "status"
+        ],
+        "title": "KnownSource"
+      },
       "NewInterest": {
         "properties": {
           "topic": {
@@ -2659,6 +2891,72 @@
           "url"
         ],
         "title": "NewSource"
+      },
+      "OpmlImport": {
+        "properties": {
+          "opml": {
+            "type": "string",
+            "maxLength": 5000000,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Opml",
+            "description": "The OPML file's content, as exported by a feed reader."
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Follow the new feeds now instead of leaving them pending.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "opml"
+        ],
+        "title": "OpmlImport"
+      },
+      "OpmlReport": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedSource"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "known": {
+            "items": {
+              "$ref": "#/components/schemas/KnownSource"
+            },
+            "type": "array",
+            "title": "Known",
+            "description": "Already sources, whatever their status."
+          },
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/FailedOutline"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "No working feed found."
+          },
+          "unchecked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unchecked",
+            "description": "Not checked in time; import the same file again to continue."
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "known",
+          "failed",
+          "unchecked"
+        ],
+        "title": "OpmlReport"
       },
       "Page_DigestDayOut_": {
         "properties": {

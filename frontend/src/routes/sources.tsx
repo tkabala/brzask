@@ -6,13 +6,16 @@ import { z } from 'zod'
 import {
   addSourceMutation,
   changeSourceMutation,
+  importSourcesMutation,
   listSourcesInfiniteOptions,
   listSourcesOptions,
 } from '@/client/@tanstack/react-query.gen'
+import { exportSources } from '@/client/sdk.gen'
 import type { SourceStatus } from '@/client/types.gen'
 import { ProblemMessage } from '@/components/problem-message'
 import { AddSourceForm } from '@/features/sources/add-source-form'
 import { FILTERS } from '@/features/sources/filters'
+import { OpmlForm } from '@/features/sources/opml-form'
 import { SourcesView } from '@/features/sources/sources-view'
 import { FIRST_PAGE, nextCursor } from '@/lib/pages'
 
@@ -45,6 +48,14 @@ function SourcesPage() {
     },
   })
   const add = useMutation({ ...addSourceMutation(), onSuccess: refresh })
+  const importOpml = useMutation({ ...importSourcesMutation(), onSuccess: refresh })
+  const exportOpml = useMutation({
+    mutationFn: async () => {
+      // Through the API client, so the session and the demo's fake server apply.
+      const { data } = await exportSources({ parseAs: 'blob', throwOnError: true })
+      download(data as Blob, 'brzask-sources.opml')
+    },
+  })
 
   if (pending.isError || sources.isError) {
     const error = pending.error ?? sources.error
@@ -60,9 +71,9 @@ function SourcesPage() {
   }
   return (
     <>
-      {change.isError ? (
+      {change.isError || exportOpml.isError ? (
         <div className="mb-4">
-          <ProblemMessage error={change.error} />
+          <ProblemMessage error={change.error ?? exportOpml.error} />
         </div>
       ) : null}
       <SourcesView
@@ -89,7 +100,26 @@ function SourcesPage() {
             }
           />
         }
+        opmlForm={
+          <OpmlForm
+            importing={importOpml.isPending}
+            exporting={exportOpml.isPending}
+            error={importOpml.error}
+            report={importOpml.data ?? null}
+            onImport={(values) => importOpml.mutateAsync({ body: values })}
+            onExport={() => exportOpml.mutateAsync()}
+          />
+        }
       />
     </>
   )
+}
+
+function download(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  link.click()
+  URL.revokeObjectURL(url)
 }

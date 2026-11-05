@@ -95,6 +95,18 @@ export const en = {
     failing: 'Failing since {{since}}: {{error}}',
     neverFetched: 'Not fetched yet',
     lastFetched: 'Fetched {{when}}',
+    opml: {
+      title: 'Import and export',
+      hint: 'OPML is the subscription list every feed reader can export. Each feed is checked before it is added; feeds that are already sources are left as they are.',
+      file: 'OPML file',
+      active: 'Read them right away instead of waiting for a decision',
+      import: 'Import',
+      importing: 'Checking feeds…',
+      export: 'Export active sources (OPML)',
+      result: 'Added: {{added}}. Already sources: {{known}}. No feed found: {{failed}}.',
+      unchecked: 'Not checked in time: {{number}}. Import the same file again to continue.',
+      failedList: 'Feeds not found',
+    },
     status: {
       active: 'active',
       pending: 'pending',

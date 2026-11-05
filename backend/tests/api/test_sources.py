@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from brzask.clients.feed_finder import FoundFeed
 from brzask.db.models import Change, SourceKind, SourceStatus
+from brzask.services.opml import NO_FEED
 from tests.api.conftest import FakeFeedFinder
 from tests.factories import Factories
 
@@ -148,3 +149,65 @@ def test_rename_conflicts_and_rejects_numbers(client: TestClient, make: Factorie
     assert client.patch(url, json={"name": "taken"}).status_code == 409
     assert client.patch(url, json={"name": "42"}).status_code == 400
     assert client.patch(url, json={"name": "   "}).status_code == 400
+
+
+def test_exports_active_sources_as_opml(client: TestClient, make: Factories) -> None:
+    make.source("Followed", url="https://a.example/feed", site_url="https://a.example/")
+    make.source("Off", url="https://b.example/feed", status=SourceStatus.MUTED)
+
+    response = client.get("/api/v1/sources/opml")
+    muted = client.get("/api/v1/sources/opml", params={"status": "muted"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/x-opml")
+    assert "attachment" in response.headers["content-disposition"]
+    assert 'xmlUrl="https://a.example/feed"' in response.text
+    assert "b.example" not in response.text
+    assert 'text="Off"' in muted.text
+
+
+def test_imports_opml_as_pending_sources(
+    client: TestClient, feed_finder: FakeFeedFinder, make: Factories
+) -> None:
+    make.source("Known", url="https://known.example/feed", status=SourceStatus.REJECTED)
+    feed_finder.feeds["https://new.example/feed"] = FoundFeed(
+        url="https://new.example/feed", title="Feed title", site_url="https://new.example/"
+    )
+    opml = (
+        '<opml version="2.0"><body>'
+        '<outline text="New one" xmlUrl="https://new.example/feed"/>'
+        '<outline text="K" xmlUrl="https://known.example/feed"/>'
+        '<outline text="Gone" xmlUrl="https://gone.example/feed"/>'
+        "</body></opml>"
+    )
+
+    report = client.post("/api/v1/sources/opml", json={"opml": opml}).json()
+
+    assert [(a["name"], a["status"]) for a in report["added"]] == [("New one", "pending")]
+    assert report["known"] == [
+        {"url": "https://known.example/feed", "name": "Known", "status": "rejected"}
+    ]
+    assert report["failed"] == [{"url": "https://gone.example/feed", "reason": NO_FEED}]
+    assert report["unchecked"] == []
+    pending = client.get("/api/v1/sources", params={"status": "pending"}).json()["items"]
+    assert [item["origin"] for item in pending] == ["opml"]
+
+
+def test_imports_opml_as_active_sources_when_asked(
+    client: TestClient, feed_finder: FakeFeedFinder
+) -> None:
+    feed_finder.feeds["https://new.example/feed"] = FoundFeed(
+        url="https://new.example/feed", title=None, site_url="https://new.example/"
+    )
+    opml = '<opml><body><outline xmlUrl="https://new.example/feed"/></body></opml>'
+
+    report = client.post("/api/v1/sources/opml", json={"opml": opml, "active": True}).json()
+
+    assert [a["status"] for a in report["added"]] == ["active"]
+
+
+def test_a_file_that_is_not_opml_is_a_bad_request(client: TestClient) -> None:
+    response = client.post("/api/v1/sources/opml", json={"opml": "<rss/>"})
+
+    assert response.status_code == 400
+    assert "not an OPML file" in response.json()["detail"]

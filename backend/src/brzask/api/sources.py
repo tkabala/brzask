@@ -1,10 +1,11 @@
 """Sources: the feeds read every day, the ones proposed, and their health."""
 
+import time
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
@@ -14,7 +15,7 @@ from brzask.api.pagination import DEFAULT_LIMIT, CursorParam, Limit, Page, decod
 from brzask.clients.feed_finder import with_scheme
 from brzask.db.models import Source, SourceKind, SourceOrigin, SourceStatus
 from brzask.repositories.sources import SourceStats
-from brzask.services import sources
+from brzask.services import opml, sources
 from brzask.services.refs import as_id
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -163,8 +164,117 @@ def list_sources(
     )
 
 
+OPML_TYPE = "text/x-opml"
+# Feed lookups of one import stop after this long, under the 60 s a reverse
+# proxy commonly waits for an answer (nginx's default proxy_read_timeout). The
+# rest are reported as unchecked; importing the same file again continues.
+IMPORT_BUDGET_SECONDS = 45
+
+
 @router.get(
-    "/{source_id}",
+    "/opml",
+    summary="Export sources as OPML",
+    response_class=Response,
+    responses={
+        HTTPStatus.OK.value: {
+            "description": "OPML 2.0 file, one outline per source, by name.",
+            "content": {OPML_TYPE: {}},
+        }
+    },
+)
+def export_sources(
+    session: DbSession,
+    status: Annotated[
+        list[SourceStatus] | None,
+        Query(description="Sources with one of these statuses; active ones by default."),
+    ] = None,
+) -> Response:
+    """For a feed reader, or to move the sources to another brzask."""
+    data = opml.render_opml(
+        sources.list_sources(session, *(status or [SourceStatus.ACTIVE])), datetime.now(UTC)
+    )
+    return Response(
+        data,
+        media_type=OPML_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="brzask-sources.opml"'},
+    )
+
+
+class OpmlImport(BaseModel):
+    opml: str = Field(
+        min_length=1,
+        max_length=5_000_000,
+        pattern=NO_NUL,
+        description="The OPML file's content, as exported by a feed reader.",
+    )
+    active: bool = Field(
+        False, description="Follow the new feeds now instead of leaving them pending."
+    )
+
+
+class ImportedSource(BaseModel):
+    id: int
+    name: str
+    url: str = Field(description="Feed URL, as found when it was checked.")
+    status: SourceStatus
+
+
+class KnownSource(BaseModel):
+    url: str = Field(description="As in the file.")
+    name: str = Field(description="The source that already has this feed.")
+    status: SourceStatus
+
+
+class FailedOutline(BaseModel):
+    url: str
+    reason: str
+
+
+class OpmlReport(BaseModel):
+    added: list[ImportedSource]
+    known: list[KnownSource] = Field(description="Already sources, whatever their status.")
+    failed: list[FailedOutline] = Field(description="No working feed found.")
+    unchecked: list[str] = Field(
+        description="Not checked in time; import the same file again to continue."
+    )
+
+
+@router.post(
+    "/opml",
+    summary="Import sources from OPML",
+    responses=problems.responses(HTTPStatus.BAD_REQUEST),
+)
+def import_sources(
+    sessions: Sessions, clients: Clients, actor: Actor, upload: OpmlImport
+) -> OpmlReport:
+    """Every feed is checked first, its site's page when the feed URL fails.
+
+    New ones are pending (or active with `active`); known ones are left as
+    they are, so importing a file twice adds nothing. Checking stops after
+    45 seconds, and what is left is listed in `unchecked`.
+    """
+    outlines = opml.parse_opml(upload.opml)
+    with clients.feed_finder() as finder:
+        report = opml.import_outlines(
+            sessions,
+            finder,
+            outlines,
+            actor=actor,
+            active=upload.active,
+            deadline=time.monotonic() + IMPORT_BUDGET_SECONDS,
+        )
+    return OpmlReport(
+        added=[
+            ImportedSource(id=a.id, name=a.name, url=a.url, status=a.status) for a in report.added
+        ],
+        known=[KnownSource(url=k.url, name=k.name, status=k.status) for k in report.known],
+        failed=[FailedOutline(url=f.url, reason=f.reason) for f in report.failed],
+        unchecked=report.unchecked,
+    )
+
+
+@router.get(
+    "/{source_id:int}",
     summary="Get a source",
     responses=problems.responses(HTTPStatus.NOT_FOUND),
 )
@@ -203,7 +313,7 @@ def add_source(sessions: Sessions, clients: Clients, actor: Actor, new: NewSourc
 
 
 @router.patch(
-    "/{source_id}",
+    "/{source_id:int}",
     summary="Rename a source or change its status",
     responses=problems.responses(HTTPStatus.BAD_REQUEST, HTTPStatus.NOT_FOUND, HTTPStatus.CONFLICT),
 )

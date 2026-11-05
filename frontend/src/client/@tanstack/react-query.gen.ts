@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addInterest, addSource, changeInterest, changeSource, deletePause, getArticle, getArticleRanking, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, search, setPause } from '../sdk.gen';
-import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
+import { addInterest, addSource, changeInterest, changeSource, deletePause, exportSources, getArticle, getArticleRanking, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, search, setPause } from '../sdk.gen';
+import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -283,6 +283,49 @@ export const addSourceMutation = (options?: Partial<Options<AddSourceData>>): Us
     const mutationOptions: UseMutationOptions<AddSourceResponse, AddSourceError, Options<AddSourceData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await addSource({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const exportSourcesQueryKey = (options?: Options<ExportSourcesData>) => createQueryKey('exportSources', options);
+
+/**
+ * Export sources as OPML
+ *
+ * For a feed reader, or to move the sources to another brzask.
+ */
+export const exportSourcesOptions = (options?: Options<ExportSourcesData>) => queryOptions<unknown, ExportSourcesError, unknown, ReturnType<typeof exportSourcesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await exportSources({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: exportSourcesQueryKey(options)
+});
+
+/**
+ * Import sources from OPML
+ *
+ * Every feed is checked first, its site's page when the feed URL fails.
+ *
+ * New ones are pending (or active with `active`); known ones are left as
+ * they are, so importing a file twice adds nothing. Checking stops after
+ * 45 seconds, and what is left is listed in `unchecked`.
+ */
+export const importSourcesMutation = (options?: Partial<Options<ImportSourcesData>>): UseMutationOptions<ImportSourcesResponse, ImportSourcesError, Options<ImportSourcesData>> => {
+    const mutationOptions: UseMutationOptions<ImportSourcesResponse, ImportSourcesError, Options<ImportSourcesData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await importSources({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
