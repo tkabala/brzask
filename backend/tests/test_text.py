@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from brzask.text import from_struct_time, strip_html
+from brzask.text import from_struct_time, strip_html, xml_chars
 
 NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
 
@@ -46,3 +46,7 @@ def test_dates_far_in_the_future_are_unknown() -> None:
 
 def test_impossible_dates_are_unknown() -> None:
     assert from_struct_time(time.struct_time((99999, 1, 1, 0, 0, 0, 0, 1, 0)), NOW) is None
+
+
+def test_xml_chars_drops_what_xml_cannot_hold() -> None:
+    assert xml_chars("a\x00b\x07c\td\U0001f600￾") == "abc\td\U0001f600"

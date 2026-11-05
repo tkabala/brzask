@@ -10,6 +10,9 @@ _SCRIPT = re.compile(r"<(script|style)\b[^>]*>.*?</\1\s*>", re.IGNORECASE | re.D
 _TAG = re.compile(r"<[^>]*>")
 _UNCLOSED_TAG = re.compile(r"<[^>]*$")
 _SPACE = re.compile(r"\s+")
+# Characters outside XML 1.0's `Char` production; text comes from any feed or
+# page, and one such character makes a whole XML document unreadable.
+_NOT_XML = re.compile("[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 
 # Feeds with clocks or time zones set wrong date entries hours ahead; anything
 # further ahead than this is treated as an unknown date rather than trusted.
@@ -27,6 +30,11 @@ def strip_html(value: str | None) -> str:
     text = _TAG.sub(" ", text)
     text = _UNCLOSED_TAG.sub(" ", text)
     return _SPACE.sub(" ", html.unescape(text)).strip()
+
+
+def xml_chars(value: str) -> str:
+    """`value` without the characters XML 1.0 cannot hold."""
+    return _NOT_XML.sub("", value)
 
 
 def from_struct_time(value: time.struct_time | None, now: datetime) -> datetime | None:

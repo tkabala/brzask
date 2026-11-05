@@ -5,21 +5,18 @@ are signed.
 """
 
 import html
-import re
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+
+from brzask.text import xml_chars
 
 ATOM = "http://www.w3.org/2005/Atom"
 FEED_ID = "urn:brzask:feed"
 TITLE = "brzask"
 
 ET.register_namespace("", ATOM)
-
-# Characters outside XML 1.0's `Char` production; article text comes from any
-# feed or page, and one such character makes the whole document unreadable.
-_NOT_XML = re.compile("[^\t\n\r\x20-퟿-�\U00010000-\U0010ffff]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +64,9 @@ def _entry(item: FeedEntry) -> ET.Element:
         author = ET.SubElement(entry, _tag("author"))
         _text(author, "name", item.source)
     if item.topic:
-        ET.SubElement(entry, _tag("category"), {"term": _clean(item.topic)})
+        ET.SubElement(entry, _tag("category"), {"term": xml_chars(item.topic)})
     paragraphs = [
-        f"<p>{html.escape(_clean(text), quote=False)}</p>"
+        f"<p>{html.escape(xml_chars(text), quote=False)}</p>"
         for text in (item.summary, item.why_it_matters)
         if text
     ]
@@ -83,15 +80,11 @@ def _tag(name: str) -> str:
 
 
 def _text(parent: ET.Element, name: str, value: str, **attributes: str) -> None:
-    ET.SubElement(parent, _tag(name), attributes).text = _clean(value)
+    ET.SubElement(parent, _tag(name), attributes).text = xml_chars(value)
 
 
 def _link(parent: ET.Element, href: str, **attributes: str) -> None:
-    ET.SubElement(parent, _tag("link"), {"href": _clean(href), **attributes})
-
-
-def _clean(value: str) -> str:
-    return _NOT_XML.sub("", value)
+    ET.SubElement(parent, _tag("link"), {"href": xml_chars(href), **attributes})
 
 
 def _date(moment: datetime) -> str:
