@@ -13,12 +13,12 @@ snippet, as the LLM ranking does.
 """
 
 from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
 from brzask.clients.judge import Judge, JudgeError, Score, ScoreAnswer
 from brzask.clients.usage import UsageMeter
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.log import get_logger
 from brzask.services.digest.pool import Candidate
 
@@ -144,7 +144,7 @@ def score_candidates(
             return error
         return Scored(position, {name: judgement.score(name) for name in DIMENSIONS})
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ContextThreadPoolExecutor(max_workers=workers) as executor:
         results = list(executor.map(judge_one, range(len(candidates))))
     scored = [result for result in results if isinstance(result, Scored)]
     errors = [result for result in results if isinstance(result, JudgeError)]

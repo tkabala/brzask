@@ -22,7 +22,6 @@ import math
 import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any, Protocol
@@ -36,6 +35,7 @@ from brzask.clients.feeds import FeedEntry, FeedFetcher
 from brzask.clients.judge import Judge, JudgeError, Score, build_judge
 from brzask.clients.usage import UsageMeter
 from brzask.clients.web_search import WebSearch, WebSearchError, build_web_search
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.config import get_settings
 from brzask.config.settings import BudgetSettings
 from brzask.db.models import SourceOrigin, SourceStatus
@@ -348,7 +348,7 @@ def discover_sources(
             proposed.extend(Proposal(r.url, r.title, r.snippet, interest["topic"]) for r in results)
     proposed = unique_sites(proposed, known_sites)
 
-    with context.stage("resolve"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
+    with context.stage("resolve"), ContextThreadPoolExecutor(max_workers=WORKERS) as pool:
         found = list(pool.map(lambda p: _resolve(finder, p.url), proposed))
     candidates: list[Candidate] = []
     feed_urls = set(known_urls)
@@ -368,7 +368,7 @@ def discover_sources(
         log.info("feed copies a known source", url=candidate.feed.url, source_id=source_id)
         copies.append(Verdict(candidate, SourceStatus.REJECTED, None, reason))
 
-    with context.stage("judge"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
+    with context.stage("judge"), ContextThreadPoolExecutor(max_workers=WORKERS) as pool:
         verdicts = list(pool.map(lambda c: judge_feed(c, judge, interests, context.usage), active))
     if verdicts and all(verdict.scores is None for verdict in verdicts):
         # An unusable judge would store every feed as pending, and pending feeds

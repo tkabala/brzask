@@ -10,7 +10,7 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterable, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,6 +22,7 @@ from defusedxml.ElementTree import fromstring
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FoundFeed, with_scheme
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.db.models import Source, SourceOrigin, SourceStatus
 from brzask.log import get_logger
 from brzask.repositories import SourceRepository
@@ -237,7 +238,7 @@ def _look_up(
     """The feed found for each outline's URL, and the URLs not looked up in time."""
     found: dict[str, FoundFeed] = {}
     stopped = threading.Event()
-    pool = ThreadPoolExecutor(max_workers=workers)
+    pool = ContextThreadPoolExecutor(max_workers=workers)
     futures: dict[Future[FoundFeed | None], Outline] = {
         pool.submit(_find, finder, outline, stopped): outline for outline in outlines
     }

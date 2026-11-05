@@ -5,7 +5,6 @@ stops the others: one broken source must not cost the day's digest.
 """
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -17,6 +16,7 @@ import httpx2
 
 from brzask.clients.extractors.base import is_block_page
 from brzask.clients.http import REQUEST_ERRORS, USER_AGENT, read_limited
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.log import get_logger
 from brzask.text import from_struct_time, strip_html
 from brzask.urls import is_http_url
@@ -114,7 +114,7 @@ class FeedFetcher:
 
     def fetch_all(self, requests: Sequence[FeedRequest]) -> list[FeedResult]:
         """Results in the same order as `requests`."""
-        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+        with ContextThreadPoolExecutor(max_workers=self.workers) as pool:
             results = list(pool.map(self.fetch, requests))
         log.info(
             "feeds fetched",

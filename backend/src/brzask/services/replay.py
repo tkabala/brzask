@@ -25,7 +25,6 @@ What the measure can and cannot say:
 import tomllib
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -45,6 +44,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.clients.judge import Judge
 from brzask.clients.retry import APIError
 from brzask.clients.usage import CallUsage, UsageMeter
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.db.models import Article, RunKind
 from brzask.log import get_logger
 from brzask.prompts import Language
@@ -376,7 +376,7 @@ def replay(
             "(brzask reembed --model ... --no-switch computes them)"
         )
     log.info("replaying digests", days=len(runs), since=since.isoformat())
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ContextThreadPoolExecutor(max_workers=workers) as executor:
         return list(
             executor.map(
                 lambda run: replay_day(sessions, run, clients, config),

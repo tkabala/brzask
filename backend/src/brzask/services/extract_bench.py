@@ -16,7 +16,6 @@ import statistics
 import time
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Any
@@ -27,6 +26,7 @@ from brzask.clients.extractors import ExtractionInput, Extractor, ExtractorChain
 from brzask.clients.extractors.base import BLOCK_PAGE_MAX_CHARS, BLOCK_PHRASES
 from brzask.clients.extractors.chain import RobotsCheck
 from brzask.clients.feeds import FeedRequest
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.db.models import Article
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository
@@ -177,7 +177,7 @@ def run_bench(
                     time.sleep(interval)
                 attempts.append(_attempt(chain, item))
         else:
-            with ThreadPoolExecutor(max_workers=workers) as executor:
+            with ContextThreadPoolExecutor(max_workers=workers) as executor:
                 attempts.extend(executor.map(_attempt, [chain] * len(items), items))
     return attempts
 

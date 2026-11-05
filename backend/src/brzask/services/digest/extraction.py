@@ -6,13 +6,13 @@ run, and deduplication and selection only look at the top.
 
 from collections import Counter
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from typing import Protocol
 
 from brzask.clients.embeddings import EmbeddingKind
 from brzask.clients.extractors import ExtractionInput, ExtractionResult
 from brzask.clients.usage import UsageMeter
+from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository
 from brzask.repositories.articles import Extraction
@@ -65,7 +65,7 @@ def extract_and_embed(
     """
     if not candidates:
         return []
-    with context.stage("extraction"), ThreadPoolExecutor(max_workers=WORKERS) as pool:
+    with context.stage("extraction"), ContextThreadPoolExecutor(max_workers=WORKERS) as pool:
         results = list(pool.map(extractor.extract, [_input(c) for c in candidates]))
     extracted = [
         replace(c, text=_text(result), extracted_by=result.extracted_by)
