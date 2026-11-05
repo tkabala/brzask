@@ -19,6 +19,13 @@ In daily use since July 2026, with more than 5,000 articles ranked so far.
 
 </details>
 
+<details>
+<summary>With the optional observability profile: runs, articles, LLM cost and opens in Grafana</summary>
+
+![The brzask dashboard in Grafana: runs per day, digest duration and stages, the digest funnel, LLM cost per day and purpose, the open rate and recent run traces](docs/assets/dashboard.png)
+
+</details>
+
 ## How it picks 7
 
 ```mermaid
@@ -48,7 +55,7 @@ docker compose up -d
 
 `setup` asks for a login password and an LLM API key and writes them, with generated secrets, to `./secrets`. Then open <http://localhost:8000>, add a few feeds under *Sources* and interests under *Interests*; the first digest is built at 07:00. To look around first, `docker compose run --rm migrate seed-demo` fills an empty instance with a month of invented digests.
 
-The [documentation](https://tkabala.github.io/brzask/) covers [installation](https://tkabala.github.io/brzask/install/) with the optional crawler and search services, [providers](https://tkabala.github.io/brzask/providers/) such as Ollama for a fully local setup, a [reverse proxy](https://tkabala.github.io/brzask/reverse-proxy/), the digest as an [Atom feed](https://tkabala.github.io/brzask/feed/) for any reader, installing the app on a phone with [today's digest offline](https://tkabala.github.io/brzask/frontend/#install-and-offline), [backups](https://tkabala.github.io/brzask/backup/) and verifying the signed image.
+The [documentation](https://tkabala.github.io/brzask/) covers [installation](https://tkabala.github.io/brzask/install/) with the optional crawler and search services, [providers](https://tkabala.github.io/brzask/providers/) such as Ollama for a fully local setup, a [reverse proxy](https://tkabala.github.io/brzask/reverse-proxy/), the digest as an [Atom feed](https://tkabala.github.io/brzask/feed/) for any reader, installing the app on a phone with [today's digest offline](https://tkabala.github.io/brzask/frontend/#install-and-offline), [backups](https://tkabala.github.io/brzask/backup/), a Grafana [dashboard](https://tkabala.github.io/brzask/observability/) of runs, cost and opens, and verifying the signed image.
 
 ## Configuration
 

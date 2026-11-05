@@ -226,4 +226,5 @@ unreachable or not migrated to the latest revision, for example while
 measures, such as `http_server_request_duration_seconds` by route and status
 (probes and scrapes are left out). With `OTEL_EXPORTER_OTLP_ENDPOINT` set,
 requests are also traced, together with the SQL queries and outgoing calls
-they make.
+they make. [Observability](observability.md) lists every metric and sets up
+Grafana to look at them.

@@ -46,6 +46,7 @@ nav:
       - Reverse proxy: reverse-proxy.md
       - Feed: feed.md
       - Backup and restore: backup.md
+      - Observability: observability.md
   - How it works:
       - Architecture: architecture.md
       - Data model: data-model.md

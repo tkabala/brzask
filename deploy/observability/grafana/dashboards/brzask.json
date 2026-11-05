@@ -10,8 +10,8 @@
   "schemaVersion": 41,
   "version": 1,
   "time": {
-    "from": "now-30d",
-    "to": "now"
+    "from": "now-30d/d",
+    "to": "now/d"
   },
   "timepicker": {},
   "refresh": "",
@@ -91,7 +91,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -103,7 +104,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (kind, status) (increase(brzask_pipeline_runs_total{dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum by (kind, status) (increase(brzask_pipeline_runs_total{dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{kind}} {{status}}",
           "range": true,
           "instant": false
@@ -135,7 +136,8 @@
             "lineWidth": 1,
             "showPoints": "never",
             "spanNulls": false
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -147,7 +149,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum(increase(brzask_pipeline_duration_seconds_sum{kind=\"digest\", status=\"ok\", dry_run=\"$dry_run\"}[$__interval] anchored)) / sum(increase(brzask_pipeline_duration_seconds_count{kind=\"digest\", status=\"ok\", dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum(increase(brzask_pipeline_duration_seconds_sum{kind=\"digest\", status=\"ok\", dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval)) / sum(increase(brzask_pipeline_duration_seconds_count{kind=\"digest\", status=\"ok\", dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "digest",
           "range": true,
           "instant": false
@@ -183,7 +185,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -195,7 +198,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (stage) (increase(brzask_pipeline_stage_duration_seconds_sum{kind=\"digest\", dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum by (stage) (increase(brzask_pipeline_stage_duration_seconds_sum{kind=\"digest\", dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{stage}}",
           "range": true,
           "instant": false
@@ -282,12 +285,13 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "lineWidth": 1,
-            "showPoints": "auto",
-            "spanNulls": true
-          }
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -299,7 +303,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (stage) (increase(brzask_digest_articles_total{stage=~\"fresh|candidates|kept|picked\", dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum by (stage) (increase(brzask_digest_articles_total{stage=~\"candidates|kept|picked\", dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{stage}}",
           "range": true,
           "instant": false
@@ -335,7 +339,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -347,7 +352,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (stage) (increase(brzask_digest_articles_total{stage=~\".*duplicates\", dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum by (stage) (increase(brzask_digest_articles_total{stage=~\".*duplicates\", dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{stage}}",
           "range": true,
           "instant": false
@@ -378,7 +383,7 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 12,
         "x": 0,
         "y": 19
@@ -396,7 +401,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -408,7 +414,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (purpose) (increase(brzask_llm_cost_USD_total{dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum by (purpose) (increase(brzask_llm_cost_USD_total{dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{purpose}}",
           "range": true,
           "instant": false
@@ -444,6 +450,10 @@
           ],
           "fields": "",
           "values": false
+        },
+        "text": {
+          "valueSize": 36,
+          "titleSize": 14
         },
         "colorMode": "none",
         "graphMode": "none",
@@ -492,6 +502,10 @@
           "fields": "",
           "values": false
         },
+        "text": {
+          "valueSize": 36,
+          "titleSize": 14
+        },
         "colorMode": "none",
         "graphMode": "none",
         "textMode": "value"
@@ -539,6 +553,10 @@
           "fields": "",
           "values": false
         },
+        "text": {
+          "valueSize": 36,
+          "titleSize": 14
+        },
         "colorMode": "none",
         "graphMode": "none",
         "textMode": "value"
@@ -567,7 +585,7 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 12,
         "x": 12,
         "y": 23
@@ -585,7 +603,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -597,7 +616,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (type) (increase(brzask_llm_tokens_total{dry_run=\"$dry_run\"}[$__interval] anchored))",
+          "expr": "sum by (type) (increase(brzask_llm_tokens_total{dry_run=\"$dry_run\"}[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{type}}",
           "range": true,
           "instant": false
@@ -614,7 +633,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 29
       },
       "panels": []
     },
@@ -631,7 +650,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 28
+        "y": 30
       },
       "fieldConfig": {
         "defaults": {
@@ -646,6 +665,10 @@
           ],
           "fields": "",
           "values": false
+        },
+        "text": {
+          "valueSize": 36,
+          "titleSize": 14
         },
         "colorMode": "none",
         "graphMode": "none",
@@ -678,7 +701,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 28
+        "y": 30
       },
       "fieldConfig": {
         "defaults": {
@@ -693,6 +716,10 @@
           ],
           "fields": "",
           "values": false
+        },
+        "text": {
+          "valueSize": 36,
+          "titleSize": 14
         },
         "colorMode": "none",
         "graphMode": "none",
@@ -736,7 +763,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 30
       },
       "fieldConfig": {
         "defaults": {
@@ -747,7 +774,8 @@
             "lineWidth": 1,
             "showPoints": "auto",
             "spanNulls": true
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -775,7 +803,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 36
       },
       "panels": []
     },
@@ -792,7 +820,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 35
+        "y": 37
       },
       "fieldConfig": {
         "defaults": {
@@ -807,7 +835,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -839,7 +868,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 35
+        "y": 37
       },
       "fieldConfig": {
         "defaults": {
@@ -850,7 +879,8 @@
             "lineWidth": 1,
             "showPoints": "auto",
             "spanNulls": true
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -882,7 +912,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 35
+        "y": 37
       },
       "fieldConfig": {
         "defaults": {
@@ -897,7 +927,8 @@
               "mode": "normal",
               "group": "A"
             }
-          }
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -909,7 +940,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (extractor, outcome) (increase(brzask_extraction_attempts_total[$__interval] anchored))",
+          "expr": "sum by (extractor, outcome) (increase(brzask_extraction_attempts_total[$__interval] anchored offset -$__interval))",
           "legendFormat": "{{extractor}} {{outcome}}",
           "range": true,
           "instant": false
@@ -926,14 +957,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 45
       },
       "panels": []
     },
     {
       "id": 24,
       "type": "table",
-      "title": "Pipeline runs",
+      "title": "Pipeline runs, last 7 days",
       "description": "One trace per run, with every LLM, embedding, HTTP and SQL call inside it.",
       "datasource": {
         "type": "tempo",
@@ -943,7 +974,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 46
       },
       "fieldConfig": {
         "defaults": {},
@@ -962,7 +993,8 @@
           "limit": 50,
           "tableType": "traces"
         }
-      ]
+      ],
+      "timeFrom": "7d"
     }
   ]
 }

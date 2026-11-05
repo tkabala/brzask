@@ -46,6 +46,7 @@ Compose itself reads a few variables from the same `.env`:
 | `BRZASK_PUBLISH` | `127.0.0.1:8000` | Host address and port of the web app; `8000` alone listens on every address |
 | `BRZASK_SECRETS` | `./secrets` | Directory of the secret files |
 | `COMPOSE_PROFILES` | | Optional services, below |
+| `GRAFANA_PUBLISH` | `127.0.0.1:3000` | Host address and port of Grafana (`observability` profile) |
 
 The web app is published on the loopback address only. To reach it from
 other machines, put a [reverse proxy](reverse-proxy.md) with TLS in front,
@@ -58,8 +59,9 @@ or set `BRZASK_PUBLISH`. Back up the database with `pg_dump` as described in
 |---|---|---|
 | `crawler` | [Crawl4AI](https://github.com/unclecode/crawl4ai): a headless browser for pages plain HTTP cannot read | `COMPOSE_PROFILES=crawler`, `EXTRACTORS=feed,trafilatura,crawl4ai` |
 | `search` | [SearXNG](https://github.com/searxng/searxng): web search for source discovery, without a paid API | `COMPOSE_PROFILES=search`, `WEB_SEARCH=searxng` |
+| `observability` | Collector, Prometheus, Tempo and Grafana with a dashboard of runs, cost and opens; see [Observability](observability.md) | `COMPOSE_PROFILES=observability`, `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318` |
 
-Both at once: `COMPOSE_PROFILES=crawler,search`. Their secrets come from
+Several at once: `COMPOSE_PROFILES=crawler,search`. Their secrets come from
 `setup` too. The Crawl4AI image is large (about 8 GB) and wants 2 GB of
 memory.
 
