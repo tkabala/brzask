@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.12](https://github.com/tkabala/brzask/compare/v0.1.11...v0.1.12) (2026-11-05)
+
+
+### Features
+
+* **ranking:** show each candidate's age in the ranking prompt ([58f88f5](https://github.com/tkabala/brzask/commit/58f88f5042d400b37f4ef76405d05174aad92bd2))
+* **sources:** import and export sources as OPML ([c9b4198](https://github.com/tkabala/brzask/commit/c9b4198283daa1147e211bcbd6ec55303088194f))
+
+
+### Bug Fixes
+
+* **selection:** read a topic copied with its keywords as the interest topic ([af9a22d](https://github.com/tkabala/brzask/commit/af9a22d6fc85e37285239bf16e653ea70b937628))
+* **selection:** top up a short answer from the candidates it left ([f349191](https://github.com/tkabala/brzask/commit/f349191b6d2aa09f0b6c425db1a579377fb271b6))
+
+
+### Chores
+
+* release 0.1.12 ([f963ef2](https://github.com/tkabala/brzask/commit/f963ef2a5aa024996d0cd059e998498c8cf6c7d1))
+
 ## [0.1.11](https://github.com/tkabala/brzask/compare/v0.1.10...v0.1.11) (2026-11-04)
 
 
