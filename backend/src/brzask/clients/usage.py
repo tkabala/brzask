@@ -51,5 +51,8 @@ def _totals(calls: list[CallUsage]) -> dict[str, Any]:
         "output_tokens": sum(call.output_tokens for call in calls),
         # A partial sum would understate spending; report it only when every call had a cost.
         "cost_usd": round(sum(costs), 6) if calls and len(costs) == len(calls) else None,
+        # What spending limits sum: the reported part, with the unpriced calls counted.
+        "cost_usd_known": round(float(sum(costs)), 6),
+        "unpriced_calls": len(calls) - len(costs),
         "duration_ms": sum(call.duration_ms for call in calls),
     }

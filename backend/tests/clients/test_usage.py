@@ -25,6 +25,8 @@ def test_summary_totals_per_purpose() -> None:
         "input_tokens": 600,
         "output_tokens": 300,
         "cost_usd": 0.0015,
+        "cost_usd_known": 0.0015,
+        "unpriced_calls": 0,
         "duration_ms": 200,
     }
 
@@ -47,6 +49,8 @@ def test_empty_meter() -> None:
         "input_tokens": 0,
         "output_tokens": 0,
         "cost_usd": None,
+        "cost_usd_known": 0.0,
+        "unpriced_calls": 0,
         "duration_ms": 0,
         "by_purpose": {},
     }
@@ -59,3 +63,21 @@ def test_calls_from_many_threads_are_all_counted() -> None:
         list(pool.map(lambda _: meter.add(call("embedding", 0.0001)), range(400)))
 
     assert meter.summary()["calls"] == 400
+
+
+def test_known_cost_sums_priced_calls_and_counts_the_rest() -> None:
+    meter = UsageMeter()
+    meter.add(call("ranking", 0.002))
+    meter.add(call("embedding", None))
+    meter.add(call("selection", 0.0015))
+
+    summary = meter.summary()
+
+    assert summary["cost_usd"] is None
+    assert summary["cost_usd_known"] == 0.0035
+    assert summary["unpriced_calls"] == 1
+    assert summary["by_purpose"]["embedding"]["cost_usd_known"] == 0.0
+
+    unpriced = UsageMeter()
+    unpriced.add(call("ranking", None))
+    assert unpriced.summary()["cost_usd_known"] == 0.0
