@@ -62,9 +62,10 @@ Once a limit is reached:
 
 - **the digest** still publishes its picks with summaries, but ranks the
   pool without the LLM or judge (sources in turns, newest first) and decides
-  duplicates by similarity alone. It costs well under half of a full run and
-  fits your interests less well, since the selection sees fewer, unranked
-  candidates;
+  duplicates by similarity alone. That leaves out about half of a digest's
+  cost (ranking was 52% of it over 13 daily digests); the selection, which
+  stays, varies most from run to run ($0.0004 to $0.0098). The picks fit your
+  interests less well, since the selection sees fewer, unranked candidates;
 - **discovery** is skipped, because nearly all of its cost is the web search.
 
 The run's statistics record the limits, what was spent and what was
