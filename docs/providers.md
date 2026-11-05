@@ -39,6 +39,40 @@ selection $0.002, embeddings $0.001, measured on a 200-article pool). On
 OpenRouter, brzask asks for each call's cost and records it in the run's
 statistics, shown on the Status page.
 
+## Spending limits
+
+`LLM_BUDGET_DAILY_USD` and `LLM_BUDGET_MONTHLY_USD` cap what brzask spends on
+paid calls (LLM, embeddings, judge, web search). Both are off by default.
+
+```sh
+# .env
+LLM_BUDGET_DAILY_USD=0.05
+LLM_BUDGET_MONTHLY_USD=1
+```
+
+Spending is the cost the provider reported, summed over every recorded run
+of the local day or calendar month (in `TZ`), manual, forced and dry runs
+included. Commands that record no run, such as `brzask replay` and the
+benches, do not count.
+
+A pipeline checks the limits when it starts. A run that starts under them
+runs in full, so one run can go past a limit by its own cost: about $0.02 for
+a digest and $0.05 for discovery with the defaults, measured in daily use.
+Once a limit is reached:
+
+- **the digest** still publishes its picks with summaries, but ranks the
+  pool without the LLM or judge (sources in turns, newest first) and decides
+  duplicates by similarity alone. It costs well under half of a full run and
+  fits your interests less well, since the selection sees fewer, unranked
+  candidates;
+- **discovery** is skipped, because nearly all of its cost is the web search.
+
+The run's statistics record the limits, what was spent and what was
+skipped, and the Status page says so. Providers that report no cost (an
+OpenAI-compatible API other than OpenRouter, Ollama, TypeSafe's judge API)
+count as $0: the limit then sees only part of the spending, and the Status
+page says that too.
+
 ## Ollama
 
 For a fully local setup, run [Ollama](https://ollama.com) and point every
