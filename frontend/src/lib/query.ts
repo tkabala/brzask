@@ -3,6 +3,7 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import { getSessionStateQueryKey } from '@/client/@tanstack/react-query.gen'
 
 import { ApiProblem } from './api'
+import { forgetSaved } from './offline-cache'
 
 // Another try helps after a network hiccup or a restart, never for a 4xx.
 const RETRIES = 2
@@ -33,6 +34,7 @@ export function createQueryClient(): QueryClient {
 
   function onError(error: unknown): void {
     if (error instanceof ApiProblem && error.status === 401) {
+      forgetSaved(queryClient)
       void queryClient.invalidateQueries({ queryKey: getSessionStateQueryKey() })
     }
   }

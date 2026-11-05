@@ -7,6 +7,7 @@ import type { SessionOut } from '@/client/types.gen'
 import { Button } from '@/components/ui/button'
 import { LANGUAGES } from '@/i18n'
 import { setCsrfToken } from '@/lib/api'
+import { forgetSaved } from '@/lib/offline-cache'
 
 const NAV = [
   ['/', 'today'],
@@ -24,6 +25,7 @@ export function AppHeader({ session }: { session: SessionOut }) {
     ...logoutMutation(),
     onSettled: () => {
       setCsrfToken(null)
+      forgetSaved(queryClient)
       // Back to nothing known: the session is asked again, and the gate shows the login.
       void queryClient.resetQueries()
     },

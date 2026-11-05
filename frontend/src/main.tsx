@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 
 import { App } from '@/app'
 import { configureApi } from '@/lib/api'
+import { createPersister } from '@/lib/offline-cache'
 import { createQueryClient } from '@/lib/query'
 
 const rootElement = document.getElementById('root')
@@ -16,6 +17,6 @@ configureApi()
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App queryClient={createQueryClient()} />
+    <App queryClient={createQueryClient()} persister={createPersister()} />
   </StrictMode>,
 )
