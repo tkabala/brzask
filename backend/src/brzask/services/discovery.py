@@ -24,7 +24,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
@@ -37,9 +37,11 @@ from brzask.clients.judge import Judge, JudgeError, Score, build_judge
 from brzask.clients.usage import UsageMeter
 from brzask.clients.web_search import WebSearch, WebSearchError, build_web_search
 from brzask.config import get_settings
+from brzask.config.settings import BudgetSettings
 from brzask.db.models import SourceOrigin, SourceStatus
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository, SourceRepository
+from brzask.services.budget import check_budget
 from brzask.services.digest.ranking import interest_context
 from brzask.services.runs import RunContext, SkipRunError
 from brzask.services.sources import propose_source
@@ -304,12 +306,20 @@ def discover_sources(
     search: WebSearch | None,
     finder: FindsSourceFeeds,
     judge: Judge,
+    *,
+    budget: BudgetSettings | None = None,
+    timezone: tzinfo = UTC,
 ) -> None:
-    """Search, resolve, sample and judge; store verdicts outside a dry run."""
+    """Search, resolve, sample and judge; store verdicts outside a dry run.
+
+    Skipped when a spending limit is reached: nearly all of its cost is the
+    web search, so there is no cheaper way to run it.
+    """
     if search is None:
         raise SkipRunError("no web search configured (WEB_SEARCH)")
     now = context.started_at
     with context.sessions.begin() as session:
+        state = check_budget(session, now, budget, timezone) if budget is not None else None
         interests = interest_context(session)
         sources = SourceRepository(session).find()
         known_urls = {feed_key(source.url) for source in sources}
@@ -318,6 +328,10 @@ def discover_sources(
         known = known_items(ArticleRepository(session).links_by_source(now - KNOWN_ITEMS_WINDOW))
     if not interests:
         raise SkipRunError("no active interests")
+    if state is not None:
+        context.stats["budget"] = state.stats(["discovery"] if state.over else [])
+        if state.reason is not None:
+            raise SkipRunError(state.reason)
 
     proposed: list[Proposal] = []
     failed_searches: list[str] = []
@@ -402,7 +416,14 @@ def run_discovery(context: RunContext) -> None:
     judge = build_judge(settings)
     search = build_web_search(settings)
     try:
-        discover_sources(context, search, finder, judge)
+        discover_sources(
+            context,
+            search,
+            finder,
+            judge,
+            budget=settings.budget,
+            timezone=settings.scheduler.timezone,
+        )
     finally:
         finder.close()
         judge.close()

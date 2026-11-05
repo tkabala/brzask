@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -10,6 +11,7 @@ from brzask.clients.feeds import FeedEntry
 from brzask.clients.judge import JudgeError, Judgement, ScoreAnswer, Text
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.clients.web_search import SearchResult, WebSearchError
+from brzask.config.settings import BudgetSettings
 from brzask.db.models import Source, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository
 from brzask.services import discovery
@@ -576,7 +578,7 @@ def test_run_discovery_closes_the_web_search_when_the_run_fails(
     search = FakeSearch({})
     monkeypatch.setattr(discovery, "build_web_search", lambda settings: search)
 
-    def fail(*args: Any) -> None:
+    def fail(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("judge down")
 
     monkeypatch.setattr(discovery, "discover_sources", fail)
@@ -585,3 +587,55 @@ def test_run_discovery_closes_the_web_search_when_the_run_fails(
         run_discovery(context(sessions))
 
     assert search.closed
+
+
+def test_over_budget_discovery_is_skipped_without_searching(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    make.interest("Rust")
+    make.run(NOW - timedelta(hours=1), cost=0.05)
+    search = FakeSearch({})
+    run = context(sessions)
+
+    with pytest.raises(SkipRunError, match=r"^daily LLM budget \$0\.01 reached"):
+        discover_sources(
+            run,
+            search,
+            FakeFinder({}),
+            FakeJudge({}),
+            budget=BudgetSettings(daily_usd=Decimal("0.01")),
+        )
+
+    assert search.queries == []
+    assert run.stats["budget"]["over"] is True
+    assert run.stats["budget"]["skipped"] == ["discovery"]
+
+
+def test_under_budget_discovery_runs_and_records_the_budget(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    search, finder = setup(make)
+    run = context(sessions, dry_run=True)
+
+    discover_sources(
+        run, search, finder, FakeJudge(SCORES), budget=BudgetSettings(daily_usd=Decimal("1"))
+    )
+
+    assert len(search.queries) == 2
+    assert run.stats["budget"]["over"] is False
+    assert run.stats["budget"]["skipped"] == []
+
+
+def test_run_discovery_passes_the_spending_limits_and_time_zone(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_BUDGET_MONTHLY_USD", "2")
+    monkeypatch.setenv("TZ", "Europe/Warsaw")
+    monkeypatch.setattr(discovery, "build_web_search", lambda settings: FakeSearch({}))
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(discovery, "discover_sources", lambda *args, **kwargs: seen.update(kwargs))
+
+    run_discovery(context(sessions))
+
+    assert seen["budget"].monthly_usd == Decimal("2")
+    assert str(seen["timezone"]) == "Europe/Warsaw"
