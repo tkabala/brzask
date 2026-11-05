@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from functools import cache
 from typing import Any
 
+from opentelemetry import trace
 from sqlalchemy import Connection, Engine, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
@@ -30,6 +31,7 @@ from brzask.log import get_logger, logged_run
 from brzask.repositories import RunRepository
 from brzask.services.errors import NotFoundError, ServiceError
 from brzask.services.run_metrics import RunInstruments
+from brzask.telemetry import tracer
 
 log = get_logger(__name__)
 
@@ -143,7 +145,15 @@ def run_pipeline(
 
     run_id = uuid.uuid4()
     lock = pipeline_lock(session_bind(sessions), kind)
-    with logged_run(kind.value, str(run_id)), lock as acquired:
+    span = tracer.start_as_current_span(
+        f"pipeline {kind.value}",
+        attributes={
+            "brzask.run_id": str(run_id),
+            "brzask.run.kind": kind.value,
+            "brzask.run.dry_run": dry_run,
+        },
+    )
+    with logged_run(kind.value, str(run_id)), span, lock as acquired:
         context = RunContext(
             run_id=run_id,
             kind=kind,
@@ -195,6 +205,11 @@ def _finish(context: RunContext, status: RunStatus, error: str | None = None) ->
             timings=dict(context.timings),
             error=error,
         )
+    span = trace.get_current_span()
+    span.set_attribute("brzask.run.status", status.value)
+    if status is RunStatus.FAILED:
+        # Also for an interruption, which the span itself does not count as an error.
+        span.set_status(trace.StatusCode.ERROR, error)
     if context.instruments is not None:
         context.instruments.record(run)
     return run

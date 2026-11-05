@@ -1,3 +1,4 @@
+import atexit
 import json
 from collections.abc import Iterator
 from typing import Any
@@ -16,14 +17,16 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
 from sqlalchemy import text
+from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from brzask import telemetry
 from brzask.clients.embeddings import Embedder
 from brzask.clients.llm import LLMClient, LLMError
 from brzask.config.settings import TelemetrySettings
-from brzask.db.models import EMBEDDING_DIMENSIONS
+from brzask.db.models import EMBEDDING_DIMENSIONS, RunKind
 from brzask.db.session import create_db_engine
+from brzask.services.runs import RunContext, SkipRunError, run_pipeline
 
 # The global tracer provider can be set once per process; every test shares it.
 _EXPORTER = InMemorySpanExporter()
@@ -149,7 +152,9 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         "httpx2": [],
         "sql": [],
         "sentry": [],
+        "atexit": [],
     }
+    monkeypatch.setattr(atexit, "register", lambda *args: recorded["atexit"].append(args))
     monkeypatch.setattr(trace, "set_tracer_provider", recorded["tracer"].append)
     monkeypatch.setattr(metrics, "set_meter_provider", recorded["meter"].append)
     monkeypatch.setattr(
@@ -186,6 +191,10 @@ def test_an_otlp_endpoint_turns_on_traces_metrics_and_instrumentation(
     assert calls["httpx2"] == [1]
     assert calls["sql"] == [{"skip_dep_check": True}]
     assert calls["sentry"] == []
+    # The SDK providers flush what is buffered when the process ends, so a run
+    # started from the command line is exported too.
+    assert provider.shutdown in [args[0] for args in calls["atexit"]]
+    assert calls["meter"][0]._atexit_handler is not None
 
 
 def test_a_sentry_dsn_turns_on_error_reports_only(calls: dict[str, list[Any]]) -> None:
@@ -261,3 +270,56 @@ def test_sentry_events_hide_feed_tokens(calls: dict[str, list[Any]]) -> None:
         scrubbed = options[hook](json.loads(json.dumps(event)), {})
         assert "brz_secret" not in json.dumps(scrubbed), hook
         assert scrubbed["request"]["query_string"] == "token=REDACTED"
+
+
+# --- pipeline runs -------------------------------------------------------------
+
+
+def named(exporter: InMemorySpanExporter, name: str) -> ReadableSpan:
+    [span] = [span for span in exporter.get_finished_spans() if span.name == name]
+    return span
+
+
+def test_a_run_is_one_trace(spans: InMemorySpanExporter, sessions: sessionmaker[Session]) -> None:
+    def pipeline(context: RunContext) -> None:
+        with telemetry.api_call_span("chat", "m", "ranking"):
+            pass
+
+    run = run_pipeline(sessions, RunKind.DIGEST, dry_run=True, pipelines={RunKind.DIGEST: pipeline})
+
+    root = named(spans, "pipeline digest")
+    call = named(spans, "chat m")
+    assert call.parent is not None and call.parent.span_id == root.context.span_id
+    assert dict(root.attributes or {}) == {
+        "brzask.run_id": str(run.id),
+        "brzask.run.kind": "digest",
+        "brzask.run.dry_run": True,
+        "brzask.run.status": "ok",
+    }
+
+
+def test_interrupted_run_ends_its_span(
+    spans: InMemorySpanExporter, sessions: sessionmaker[Session]
+) -> None:
+    def pipeline(context: RunContext) -> None:
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: pipeline})
+
+    root = named(spans, "pipeline review")
+    assert (root.attributes or {})["brzask.run.status"] == "failed"
+    assert root.status.status_code is StatusCode.ERROR
+
+
+def test_skipped_run_span_is_not_an_error(
+    spans: InMemorySpanExporter, sessions: sessionmaker[Session]
+) -> None:
+    def pipeline(context: RunContext) -> None:
+        raise SkipRunError("paused")
+
+    run_pipeline(sessions, RunKind.VISITED, pipelines={RunKind.VISITED: pipeline})
+
+    root = named(spans, "pipeline visited")
+    assert (root.attributes or {})["brzask.run.status"] == "skipped"
+    assert root.status.status_code is not StatusCode.ERROR
