@@ -1,4 +1,5 @@
 from datetime import time
+from decimal import Decimal
 from ipaddress import ip_network
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -12,6 +13,7 @@ from brzask.config.env_example import render
 from brzask.config.settings import (
     GROUPS,
     AuthSettings,
+    BudgetSettings,
     DatabaseSettings,
     EmbeddingSettings,
     ExtractorSettings,
@@ -373,3 +375,36 @@ def test_log_level_is_case_insensitive(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOG_LEVEL", "debug")
 
     assert LoggingSettings().level == "DEBUG"
+
+
+# --- Spending limits -------------------------------------------------------------
+
+
+def test_budget_is_off_by_default() -> None:
+    budget = BudgetSettings()
+
+    assert (budget.daily_usd, budget.monthly_usd) == (None, None)
+
+
+def test_empty_budget_counts_as_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_BUDGET_DAILY_USD", "")
+    monkeypatch.setenv("LLM_BUDGET_MONTHLY_USD", "")
+
+    assert BudgetSettings().daily_usd is None
+    assert BudgetSettings().monthly_usd is None
+
+
+def test_budget_reads_decimals(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_BUDGET_DAILY_USD", "0.05")
+    monkeypatch.setenv("LLM_BUDGET_MONTHLY_USD", "1")
+
+    assert BudgetSettings().daily_usd == Decimal("0.05")
+    assert BudgetSettings().monthly_usd == Decimal("1")
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_budget_must_be_positive(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("LLM_BUDGET_DAILY_USD", value)
+
+    with pytest.raises(ValidationError):
+        BudgetSettings()

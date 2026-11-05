@@ -116,6 +116,13 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 | `DIGEST_RANKING` | `llm` | llm (the LLM orders the pool) or judge (each article scored on several dimensions by JUDGE_BACKEND, weighted in code). |
 | `DIGEST_DEDUPLICATION` | `judge` | judge (JUDGE_BACKEND decides same-day pairs in the grey zone; the threshold if it fails) or threshold (an adaptive similarity threshold). |
 
+## Spending limits
+
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_BUDGET_DAILY_USD` | (none) | Spending limit per day in USD for paid API calls (LLM, embeddings, judge, web search) as providers report them; checked when a run starts. When reached, the digest ranks without the LLM and skips the dedup judge, and discovery is skipped. Empty: no limit. |
+| `LLM_BUDGET_MONTHLY_USD` | (none) | Spending limit per calendar month in USD, counted and applied like LLM_BUDGET_DAILY_USD. Empty: no limit. |
+
 ## Logging
 
 | Variable | Default | Description |

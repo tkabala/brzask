@@ -10,6 +10,7 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import time
+from decimal import Decimal
 from functools import cached_property, lru_cache
 from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
@@ -462,6 +463,27 @@ class DigestSettings(SettingsGroup):
     )
 
 
+class BudgetSettings(SettingsGroup):
+    """Spending limits."""
+
+    model_config = SettingsConfigDict(env_prefix="LLM_BUDGET_")
+
+    daily_usd: Annotated[Decimal | None, BeforeValidator(_empty_to_none)] = Field(
+        None,
+        gt=0,
+        description="Spending limit per day in USD for paid API calls (LLM, embeddings, "
+        "judge, web search) as providers report them; checked when a run starts. When "
+        "reached, the digest ranks without the LLM and skips the dedup judge, and "
+        "discovery is skipped. Empty: no limit.",
+    )
+    monthly_usd: Annotated[Decimal | None, BeforeValidator(_empty_to_none)] = Field(
+        None,
+        gt=0,
+        description="Spending limit per calendar month in USD, counted and applied like "
+        "LLM_BUDGET_DAILY_USD. Empty: no limit.",
+    )
+
+
 class LoggingSettings(SettingsGroup):
     """Logging."""
 
@@ -513,6 +535,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     ServerSettings,
     SchedulerSettings,
     DigestSettings,
+    BudgetSettings,
     LoggingSettings,
     TelemetrySettings,
 )
@@ -563,6 +586,10 @@ class Settings:
     @cached_property
     def digest(self) -> DigestSettings:
         return DigestSettings()
+
+    @cached_property
+    def budget(self) -> BudgetSettings:
+        return BudgetSettings()
 
     @cached_property
     def logging(self) -> LoggingSettings:
