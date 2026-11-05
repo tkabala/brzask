@@ -17,6 +17,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import cache
 from typing import Any
 
 from sqlalchemy import Connection, Engine, func, select
@@ -28,6 +29,7 @@ from brzask.db.models import Run, RunKind, RunStatus
 from brzask.log import get_logger, logged_run
 from brzask.repositories import RunRepository
 from brzask.services.errors import NotFoundError, ServiceError
+from brzask.services.run_metrics import RunInstruments
 
 log = get_logger(__name__)
 
@@ -53,6 +55,7 @@ class RunContext:
     stats: dict[str, Any] = field(default_factory=dict)
     timings: dict[str, int] = field(default_factory=dict)
     usage: UsageMeter = field(default_factory=UsageMeter)  # pass to LLM and embedding calls
+    instruments: RunInstruments | None = None  # where the finished run is measured
 
     @contextmanager
     def stage(self, name: str) -> Iterator[None]:
@@ -119,17 +122,21 @@ def run_pipeline(
     dry_run: bool = False,
     force: bool = False,
     pipelines: Mapping[RunKind, Pipeline] | None = None,
+    instruments: RunInstruments | None = None,
 ) -> Run:
     """Run one pipeline and return its finished run row.
 
-    `pipelines` defaults to `brzask.services.pipelines.PIPELINES`. A pipeline
-    error is recorded on the run and raised again.
+    `pipelines` defaults to `brzask.services.pipelines.PIPELINES`, and the
+    run's metrics go to `instruments` (the global meter provider's unless
+    given). A pipeline error is recorded on the run and raised again.
     """
     if pipelines is None:
         # Imported here: the pipelines themselves import this module.
         from brzask.services.pipelines import PIPELINES
 
         pipelines = PIPELINES
+    if instruments is None:
+        instruments = default_instruments()
     pipeline = pipelines.get(kind)
     if pipeline is None:
         raise ServiceError(f"the {kind.value} pipeline is not available")
@@ -144,6 +151,7 @@ def run_pipeline(
             sessions=sessions,
             dry_run=dry_run,
             force=force,
+            instruments=instruments,
         )
         with sessions.begin() as session:
             RunRepository(session).start(run_id, kind, context.started_at, dry_run=dry_run)
@@ -187,7 +195,15 @@ def _finish(context: RunContext, status: RunStatus, error: str | None = None) ->
             timings=dict(context.timings),
             error=error,
         )
+    if context.instruments is not None:
+        context.instruments.record(run)
     return run
+
+
+@cache
+def default_instruments() -> RunInstruments:
+    """Instruments on the global meter provider, created once per process."""
+    return RunInstruments()
 
 
 def _with_usage(context: RunContext) -> dict[str, Any]:

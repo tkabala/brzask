@@ -1,10 +1,13 @@
 import pytest
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.usage import CallUsage
 from brzask.db.models import RunKind, RunStatus
 from brzask.repositories import RunRepository
 from brzask.services.errors import ServiceError
+from brzask.services.run_metrics import RunInstruments
 from brzask.services.runs import RunContext, SkipRunError, run_pipeline
 
 
@@ -110,3 +113,54 @@ def test_runs_without_paid_calls_have_no_usage(sessions: sessionmaker[Session]) 
     run = run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed})
 
     assert "usage" not in run.stats
+
+
+def run_points(reader: InMemoryMetricReader, name: str) -> dict[str, float]:
+    """The data points of one instrument by status."""
+    data = reader.get_metrics_data()
+    assert data is not None
+    return {
+        str((point.attributes or {})["status"]): point.value  # type: ignore[union-attr]
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+        if metric.name == name
+        for point in metric.data.data_points
+    }
+
+
+def test_finished_runs_are_measured(sessions: sessionmaker[Session]) -> None:
+    reader = InMemoryMetricReader()
+    instruments = RunInstruments(MeterProvider(metric_readers=[reader]).get_meter("test"))
+    pipelines = {RunKind.DIGEST: succeed}
+
+    run_pipeline(sessions, RunKind.DIGEST, pipelines=pipelines, instruments=instruments)
+    run_pipeline(
+        sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: skip}, instruments=instruments
+    )
+    with pytest.raises(RuntimeError):
+        run_pipeline(
+            sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: fail}, instruments=instruments
+        )
+
+    assert run_points(reader, "brzask.pipeline.runs") == {"ok": 1, "skipped": 1, "failed": 1}
+
+
+class BrokenInstruments(RunInstruments):
+    def __init__(self) -> None:
+        super().__init__(MeterProvider().get_meter("test"))
+        self._counters = {}  # every point now fails to find its counter
+
+
+def test_a_failing_recorder_keeps_the_run(
+    sessions: sessionmaker[Session], session: Session
+) -> None:
+    run = run_pipeline(
+        sessions,
+        RunKind.DIGEST,
+        pipelines={RunKind.DIGEST: succeed},
+        instruments=BrokenInstruments(),
+    )
+
+    stored = RunRepository(session).get(run.id)
+    assert stored is not None and stored.status is RunStatus.OK
