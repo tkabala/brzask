@@ -3,6 +3,7 @@
 import re
 from dataclasses import replace
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -14,6 +15,7 @@ from brzask import prompts
 from brzask.clients.feeds import FeedEntry, FeedResult, FetchStatus
 from brzask.clients.llm import Completion
 from brzask.clients.usage import CallUsage, UsageMeter
+from brzask.config.settings import BudgetSettings
 from brzask.db.models import Article, ArticleState, RunKind, RunStatus, Source
 from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.services.digest import pipeline
@@ -334,3 +336,84 @@ def test_one_judge_serves_ranking_and_deduplication_as_set(
     run_digest(context(sessions))
 
     assert built == [expected]
+
+
+# --- Spending limits --------------------------------------------------------------
+
+
+def limited(digest: DigestClients, daily: str) -> DigestClients:
+    return replace(digest, budget=BudgetSettings(daily_usd=Decimal(daily)))
+
+
+def test_over_budget_the_digest_ranks_by_pool_and_skips_the_dedup_judge(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    make.run(NOW - timedelta(hours=1), cost=0.05)
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel()
+    judge = FakeJudge()
+    digest = replace(clients(feeds_for(sources), model), judge=judge, dedup_judge=judge)
+
+    finished = run(sessions, limited(digest, "0.01"))
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert len(shown(session)) == DIGEST_SIZE
+    assert model.purposes == ["selection"]
+    assert judge.states == []
+    assert finished.stats["ranking"]["method"] == "pool (budget)"
+    budget = finished.stats["budget"]
+    assert budget["over"] is True
+    assert budget["reason"] == "daily LLM budget $0.01 reached ($0.0500 spent today)"
+    assert budget["skipped"] == ["ranking", "deduplication_judge"]
+
+
+def test_under_budget_the_digest_runs_in_full_and_records_the_budget(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel()
+
+    finished = run(sessions, limited(clients(feeds_for(sources), model), "1.00"))
+
+    assert model.purposes == ["ranking", "selection"]
+    assert finished.stats["budget"]["over"] is False
+    assert finished.stats["budget"]["skipped"] == []
+
+
+def test_without_a_budget_no_budget_stats(sessions: sessionmaker[Session], make: Factories) -> None:
+    sources = [make.source() for _ in range(6)]
+
+    finished = run(sessions, clients(feeds_for(sources)))
+
+    assert "budget" not in finished.stats
+
+
+def test_a_forced_rerun_after_the_limit_runs_degraded(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    first, second = FakeModel(), FakeModel()
+
+    # Each fake call costs $0.001: the first run spends $0.002 and passes the limit.
+    run(sessions, limited(clients(feeds_for(sources), first), "0.0015"))
+    finished = run(sessions, limited(clients(feeds_for(sources), second), "0.0015"), force=True)
+
+    assert first.purposes == ["ranking", "selection"]
+    assert second.purposes == ["selection"]
+    assert finished.stats["budget"]["over"] is True
+
+
+def test_run_digest_passes_the_spending_limits(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_BUDGET_DAILY_USD", "0.5")
+    built: list[BudgetSettings | None] = []
+
+    def build(context: RunContext, clients: DigestClients) -> None:
+        built.append(clients.budget)
+
+    monkeypatch.setattr(pipeline, "build_digest", build)
+    run_digest(context(sessions))
+
+    assert built[0] is not None
+    assert built[0].daily_usd == Decimal("0.5")

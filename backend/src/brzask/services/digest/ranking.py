@@ -166,13 +166,17 @@ def rank_candidates(
     limits: RankingLimits = DEFAULT_LIMITS,
     judge: Judge | None = None,
     weights: Mapping[str, float] = scoring.WEIGHTS,
+    *,
+    pool_order: bool = False,
 ) -> list[Candidate]:
     """The top of the pool's ranking; stores the ranks outside a dry run.
 
     The LLM ranks the pool, or, given a `judge`, each candidate is scored and
     the `weights` order them; when the judge answers for no candidate, the LLM
-    ranks instead. An answer that is not a usable ranking is logged and the
-    pool order is used instead: a bad answer must not cost the day's digest.
+    ranks instead. With `pool_order` (a spending limit is reached) nothing is
+    asked and the top is taken in pool order. An answer that is not a usable
+    ranking is logged and the pool order is used instead: a bad answer must
+    not cost the day's digest.
     Only opens before the run's start count, so a replayed day sees what that
     day's run saw.
     """
@@ -189,7 +193,10 @@ def rank_candidates(
     ranking: list[int] | None = None
     method = "llm"
     with context.stage("ranking"):
-        if judge is not None:
+        if pool_order:
+            ranking = []
+            stats = {"method": "pool (budget)"}
+        elif judge is not None:
             opened_titles = [opened.title for opened in opens[:OPENED_TITLES]]
             try:
                 scored = scoring.score_candidates(
@@ -213,7 +220,7 @@ def rank_candidates(
                 answer = None
             ranking = parse_ranking(answer, len(candidates))
             stats = {"method": method, "prompt_chars": len(prompt)}
-    if not ranking:
+    if not ranking and not pool_order:
         log.warning("no usable ranking; taking candidates in pool order")
     top = select_top(candidates, ranking, limits)
 

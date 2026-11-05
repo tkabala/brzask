@@ -14,10 +14,12 @@ from brzask.clients.http import new_client
 from brzask.clients.judge import Judge, build_judge
 from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
+from brzask.config.settings import BudgetSettings
 from brzask.log import get_logger
 from brzask.prompts import Language
 from brzask.repositories import ArticleRepository
 from brzask.repositories.articles import DigestEntry
+from brzask.services.budget import check_budget
 from brzask.services.digest.dedup import Deduplicated, deduplicate_candidates
 from brzask.services.digest.extraction import DocumentEmbedder, TextExtractor, extract_and_embed
 from brzask.services.digest.pool import Candidate, FeedReader, gather_candidates
@@ -40,6 +42,7 @@ class DigestClients:
     timezone: tzinfo  # the digest date is the local date when the run starts
     judge: Judge | None = None  # ranks by composite score instead of the LLM when set
     dedup_judge: Judge | None = None  # decides same-day grey-zone pairs when set
+    budget: BudgetSettings | None = None  # spending limits; over them ranking and dedup are cheap
 
 
 def build_digest(context: RunContext, clients: DigestClients) -> None:
@@ -47,6 +50,8 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
 
     A forced run on a day that has a digest appends to it, numbering on from
     the last position. A dry run computes everything and writes nothing.
+    When a spending limit is reached, the pool order replaces the ranking and
+    duplicates are decided without the judge; selection still writes the 7.
     """
     now = context.started_at
     day = now.astimezone(clients.timezone).date()
@@ -54,18 +59,31 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
     with context.sessions.begin() as session:
         pause = paused_until(session, now)
         existing = ArticleRepository(session).last_digest_position(day)
+        budget = (
+            check_budget(session, now, clients.budget, clients.timezone)
+            if clients.budget is not None
+            else None
+        )
     if pause is not None and not context.force:
         raise SkipRunError(f"paused until {pause.isoformat()}")
     if existing is not None and not context.force:
         raise SkipRunError("today's digest already exists")
+    over = False
+    if budget is not None:
+        over = budget.over
+        context.stats["budget"] = budget.stats(["ranking", "deduplication_judge"] if over else [])
+        if over:
+            log.warning("LLM budget reached; ranking and dedup judge skipped", reason=budget.reason)
 
     pool = gather_candidates(context, clients.feeds)
     if not pool:
         raise SkipRunError("no candidates")
-    top = rank_candidates(context, pool, clients.llm, judge=clients.judge)
+    top = rank_candidates(
+        context, pool, clients.llm, judge=None if over else clients.judge, pool_order=over
+    )
     extracted = extract_and_embed(context, top, clients.extractor, clients.embedder)
     deduplicated = deduplicate_candidates(
-        context, extracted, clients.embedder.model, judge=clients.dedup_judge
+        context, extracted, clients.embedder.model, judge=None if over else clients.dedup_judge
     )
     picks = select_digest(context, deduplicated.survivors, clients.llm, clients.language)
 
@@ -115,6 +133,7 @@ def run_digest(context: RunContext) -> None:
                 timezone=settings.scheduler.timezone,
                 judge=judge if digest.ranking == "judge" else None,
                 dedup_judge=judge if digest.deduplication == "judge" else None,
+                budget=settings.budget,
             ),
         )
 

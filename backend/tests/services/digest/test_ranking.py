@@ -22,7 +22,7 @@ from brzask.services.digest.ranking import (
     select_top,
 )
 from tests.factories import Factories
-from tests.services.digest.fakes import NOW, context
+from tests.services.digest.fakes import NOW, FakeJudge, context
 
 
 def candidate(n: int, source_id: int | None = None, **fields: Any) -> Candidate:
@@ -295,3 +295,19 @@ def test_an_empty_pool_asks_nothing(sessions: sessionmaker[Session]) -> None:
 
     assert rank_candidates(context(sessions), [], model) == []
     assert model.prompts == []
+
+
+def test_pool_order_ranks_without_any_call(sessions: sessionmaker[Session]) -> None:
+    pool = [candidate(n) for n in range(1, 13)]
+    model = FakeModel(AssertionError("the model must not be asked"))
+    judge = FakeJudge()
+    run = context(sessions, dry_run=True)
+
+    top = rank_candidates(run, pool, model, judge=judge, pool_order=True)
+
+    assert titles(top) == [f"Article {n}" for n in range(1, MIN_CANDIDATES + 1)]
+    assert model.prompts == []
+    assert judge.states == []
+    assert not run.usage.calls
+    assert run.stats["ranking"]["method"] == "pool (budget)"
+    assert run.stats["ranking"]["ranked"] == 0
