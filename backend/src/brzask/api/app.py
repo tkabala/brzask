@@ -41,6 +41,7 @@ from brzask.api.clients import ApiClients
 from brzask.config import get_settings
 from brzask.config.settings import AuthSettings
 from brzask.log import get_logger
+from brzask.services.open_rate import register_open_rate
 from brzask.telemetry import instrument_app
 
 log = get_logger(__name__)
@@ -105,6 +106,9 @@ def create_app(
 
     app.openapi = lambda: _openapi(app)  # type: ignore[method-assign]
     instrument_app(app, meter_provider)
+    register_open_rate(
+        sessions, meter_provider.get_meter("brzask.digest") if meter_provider else None
+    )
     return app
 
 
