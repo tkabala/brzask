@@ -182,6 +182,11 @@ services:
       # A point or so a day per pipeline: a year of history takes little space.
       - --storage.tsdb.retention.time=400d
       - --web.enable-otlp-receiver
+      # Every process (the worker after a restart, each command-line run)
+      # starts its counters anew: a zero at the start time lets increase()
+      # count its first run, and `anchored` ranges in the dashboard give exact
+      # daily counts instead of extrapolating from a point or two a day.
+      - --enable-feature=created-timestamp-zero-ingestion,promql-extended-range-selectors
     volumes:
       - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
       - prometheus-data:/prometheus

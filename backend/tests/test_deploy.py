@@ -1,11 +1,16 @@
 """The compose file: what runs by default and what the observability profile adds."""
 
+import json
 import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+
+from brzask.clients.extractors.chain import ATTEMPTS_METRIC
+from brzask.services.open_rate import OPENED, SHOWN
+from brzask.services.run_metrics import INSTRUMENTS
 
 DEPLOY = Path(__file__).parents[2] / "deploy"
 OBSERVABILITY = ("otel-collector", "prometheus", "tempo", "grafana")
@@ -85,3 +90,61 @@ def test_grafana_makes_no_outside_requests(compose: dict[str, Any]) -> None:
 )
 def test_observability_config_parses(path: Path) -> None:
     assert isinstance(yaml.safe_load(path.read_text()), dict)
+
+
+# --- dashboard ------------------------------------------------------------------
+
+DASHBOARD = DEPLOY / "observability" / "grafana" / "dashboards" / "brzask.json"
+# What Prometheus' OTLP receiver appends: the unit, then _total or a histogram series.
+_SUFFIXES = re.compile(r"(_(seconds|USD))?(_total|_bucket|_sum|_count)?$")
+
+
+def _targets(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
+    return [target for panel in dashboard["panels"] for target in panel.get("targets", [])]
+
+
+def test_dashboard_queries_known_metrics() -> None:
+    dashboard = json.loads(DASHBOARD.read_text())
+    known = {name.replace(".", "_") for name in (*INSTRUMENTS, SHOWN, OPENED, ATTEMPTS_METRIC)}
+    used = {
+        _SUFFIXES.sub("", name)
+        for target in _targets(dashboard)
+        for name in re.findall(r"\bbrzask_[a-z_A-Z]+", target.get("expr", ""))
+    }
+    assert used, "the dashboard queries no brzask metric"
+    assert used <= known, used - known
+    # Every instrument has a panel.
+    assert known <= used, known - used
+
+
+def test_dashboard_uses_the_provisioned_datasources() -> None:
+    dashboard = json.loads(DASHBOARD.read_text())
+    assert dashboard["uid"] == "brzask"
+    for panel in dashboard["panels"]:
+        if panel["type"] == "row":
+            continue
+        assert panel["datasource"]["uid"] in {"prometheus", "tempo"}, panel["title"]
+    [dry_run] = dashboard["templating"]["list"]
+    assert dry_run["name"] == "dry_run"
+    assert dry_run["current"]["value"] == "false"
+
+
+def test_the_home_dashboard_is_provisioned(compose: dict[str, Any]) -> None:
+    environment = compose["services"]["grafana"]["environment"]
+    path = environment["GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH"]
+    assert path == "/var/lib/grafana/dashboards/" + DASHBOARD.name
+
+
+def test_daily_counts_are_exact(compose: dict[str, Any]) -> None:
+    # A process's counters start anew and see a point or two a day: increase()
+    # needs the zero at the start time and an anchored (not extrapolated) range.
+    flags = ",".join(
+        flag.split("=", 1)[1]
+        for flag in compose["services"]["prometheus"]["command"]
+        if flag.startswith("--enable-feature=")
+    ).split(",")
+    assert {"created-timestamp-zero-ingestion", "promql-extended-range-selectors"} <= set(flags)
+    dashboard = json.loads(DASHBOARD.read_text())
+    for target in _targets(dashboard):
+        for call in re.findall(r"increase\([^\[]*\[[^\]]+\]\s*\w*", target.get("expr", "")):
+            assert call.endswith("anchored"), call
