@@ -11,16 +11,20 @@ file cut short has no trailer, so it is never mistaken for a whole one.
 import gzip
 import json
 import uuid
-from collections.abc import Mapping
+import zlib
+from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime
 from typing import Any, BinaryIO
 
-from sqlalchemy import Date, DateTime, Enum, Table, Uuid, select
-from sqlalchemy.orm import Session
+from sqlalchemy import Date, DateTime, Enum, Table, Uuid, exists, func, insert, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.db import migrations
 from brzask.db.base import Base
+from brzask.db.models import RunKind
 from brzask.services.errors import ServiceError
+from brzask.services.runs import pipeline_lock, session_bind
 
 FORMAT = "brzask-export"
 FORMAT_VERSION = 1
@@ -45,8 +49,8 @@ EXCLUDED = frozenset({"login_sessions"})
 
 Counts = dict[str, int]
 
-# Rows fetched from the database at a time while exporting.
-EXPORT_BATCH = 500
+# Rows fetched from the database, or inserted into it, at a time.
+BATCH = 500
 
 
 class ArchiveError(ServiceError):
@@ -139,7 +143,7 @@ def export_archive(session: Session, out: BinaryIO, *, version: str) -> Counts:
             counts[table.name] = 0
             rows = session.execute(
                 select(table).order_by(*table.primary_key.columns),
-                execution_options={"yield_per": EXPORT_BATCH},
+                execution_options={"yield_per": BATCH},
             ).mappings()
             for row in rows:
                 _write(archive, {"table": table.name, "row": encode_row(table, row)})
@@ -151,3 +155,122 @@ def export_archive(session: Session, out: BinaryIO, *, version: str) -> Counts:
 def _write(archive: gzip.GzipFile, line: Mapping[str, Any]) -> None:
     archive.write(json.dumps(line, ensure_ascii=False, separators=(",", ":")).encode())
     archive.write(b"\n")
+
+
+def import_archive(sessions: sessionmaker[Session], source: BinaryIO) -> Counts:
+    """Load an archive into an empty database at the latest migration, all or nothing.
+
+    Rows keep their IDs; the ID sequences continue after the highest one. The
+    digest lock is held throughout, so a worker that is still running cannot
+    start a digest halfway.
+    """
+    with pipeline_lock(session_bind(sessions), RunKind.DIGEST) as acquired:
+        if not acquired:
+            raise ArchiveError("a pipeline is running; stop the worker first")
+        with sessions.begin() as session:
+            return _load(session, _lines(source))
+
+
+def _load(session: Session, lines: Iterator[tuple[int, Any]]) -> Counts:
+    if not migrations.is_current(session.connection()):
+        raise ArchiveError("the database is not at the latest migration; run brzask migrate first")
+    number, first = next(lines, (1, None))
+    if not isinstance(first, dict):
+        raise ArchiveError("the archive is empty or has no header")
+    revision = check_header(first)
+    if revision not in migrations.known_revisions():
+        raise ArchiveError(
+            f"the archive comes from a newer brzask (schema revision {revision}); upgrade first"
+        )
+    filled = [t.name for t in TABLES if session.scalar(select(exists().select_from(t)))]
+    if filled:
+        raise ArchiveError(f"the database is not empty: {', '.join(filled)}")
+
+    by_name = {t.name: t for t in TABLES}
+    position = 0
+    counts: Counts = dict.fromkeys(by_name, 0)
+    batch: list[dict[str, Any]] = []
+    batch_table: Table | None = None
+
+    def flush() -> None:
+        if batch_table is not None and batch:
+            session.execute(insert(batch_table), batch)
+        batch.clear()
+
+    try:
+        for number, line in lines:
+            if not isinstance(line, dict):
+                raise ArchiveError(f"line {number}: not a JSON object")
+            if "end" in line:
+                flush()
+                _check_trailer(line, counts)
+                break
+            name = line.get("table")
+            table = by_name.get(name) if isinstance(name, str) else None
+            if table is None or not isinstance(line.get("row"), dict):
+                raise ArchiveError(f"line {number}: unknown table {name!r}")
+            if TABLES.index(table) < position:
+                raise ArchiveError(f"line {number}: rows of {table.name} out of order")
+            position = TABLES.index(table)
+            row = decode_row(table, line["row"])
+            # One INSERT takes rows with the same columns; an older archive
+            # may leave columns out.
+            if table is not batch_table or (batch and batch[0].keys() != row.keys()):
+                flush()
+                batch_table = table
+            batch.append(row)
+            counts[table.name] += 1
+            if len(batch) >= BATCH:
+                flush()
+        else:
+            raise ArchiveError("the archive ends without its trailer: the file is incomplete")
+        for number, _ in lines:
+            raise ArchiveError(f"line {number}: data after the trailer")
+        session.flush()
+    except IntegrityError as error:
+        raise ArchiveError(f"the archive does not fit the database: {error.orig}") from error
+    _continue_ids(session, counts)
+    return counts
+
+
+def _lines(source: BinaryIO) -> Iterator[tuple[int, Any]]:
+    """(line number, parsed JSON) for each line; `ArchiveError` for a damaged file."""
+    number = 0
+    try:
+        with gzip.GzipFile(fileobj=source, mode="rb") as archive:
+            for number, raw in enumerate(archive, start=1):
+                yield number, json.loads(raw)
+    except (OSError, EOFError, zlib.error, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ArchiveError(f"line {number + 1}: the archive is damaged ({error})") from error
+
+
+def _check_trailer(line: Mapping[str, Any], counts: Counts) -> None:
+    expected = line["end"].get("counts") if isinstance(line["end"], dict) else None
+    if not isinstance(expected, dict):
+        raise ArchiveError("the trailer has no row counts")
+    # An archive from an older schema may not know every table; its rows must
+    # still all be there.
+    read = {name: n for name, n in counts.items() if n or name in expected}
+    if read != expected:
+        wrong = ", ".join(
+            f"{name} {read.get(name, 0)} of {expected.get(name, 0)}"
+            for name in sorted(read.keys() | expected.keys(), key=str)
+            if read.get(name, 0) != expected.get(name, 0)
+        )
+        raise ArchiveError(f"the archive is incomplete: rows read {wrong}")
+
+
+def _continue_ids(session: Session, counts: Counts) -> None:
+    """Move each ID sequence past the highest restored ID."""
+    for table in TABLES:
+        column = table.columns.get("id")
+        if column is None or column.identity is None or not counts[table.name]:
+            continue
+        session.execute(
+            select(
+                func.setval(
+                    func.pg_get_serial_sequence(table.name, "id"),
+                    select(func.max(column)).scalar_subquery(),
+                )
+            )
+        )

@@ -6,20 +6,30 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, delete, func, select
+from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.db.migrations import head_revision
 from brzask.db.models import (
     ApiToken,
     Change,
     ChangeStatus,
+    Interest,
     LoginSession,
+    RunKind,
     Setting,
+    Source,
     SourceStatus,
     TokenScope,
 )
-from brzask.services.archive import FORMAT, TABLES, export_archive
+from brzask.services.archive import (
+    FORMAT,
+    TABLES,
+    ArchiveError,
+    export_archive,
+    import_archive,
+)
+from brzask.services.runs import pipeline_lock
 from tests.factories import Factories
 
 NOW = datetime(2026, 11, 6, 5, 0, tzinfo=UTC)
@@ -132,3 +142,187 @@ def test_export_needs_the_latest_schema(session: Session, monkeypatch: pytest.Mo
 
     with pytest.raises(Exception, match="run brzask migrate first"):
         export_archive(session, io.BytesIO(), version="0.1.17")
+
+
+# --- Import ----------------------------------------------------------------------
+
+
+def snapshot(session: Session) -> dict[str, list[dict[str, Any]]]:
+    return {
+        table.name: [
+            dict(row)
+            for row in session.execute(
+                select(table).order_by(*table.primary_key.columns)
+            ).mappings()
+        ]
+        for table in TABLES
+    }
+
+
+def clear(session: Session) -> None:
+    session.execute(delete(LoginSession))
+    for table in reversed(TABLES):
+        session.execute(delete(table))
+    session.flush()
+
+
+def archive_of(session: Session) -> bytes:
+    out = io.BytesIO()
+    export_archive(session, out, version="0.1.17")
+    return out.getvalue()
+
+
+def lines_to_archive(lines: list[dict[str, Any]]) -> bytes:
+    return gzip.compress(b"".join(json.dumps(line).encode() + b"\n" for line in lines))
+
+
+def assert_empty(session: Session) -> None:
+    session.expire_all()
+    assert all(not rows for rows in snapshot(session).values())
+
+
+def test_round_trip(session: Session, sessions: sessionmaker[Session], make: Factories) -> None:
+    fill_every_table(session, make)
+    before = snapshot(session)
+    data = archive_of(session)
+    clear(session)
+
+    counts = import_archive(sessions, io.BytesIO(data))
+
+    session.expire_all()
+    assert snapshot(session) == before
+    assert counts == {name: len(rows) for name, rows in before.items()}
+    assert session.scalar(select(func.count()).select_from(LoginSession)) == 0
+
+
+def test_new_rows_get_ids_after_the_restored_ones(
+    session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    for n in range(3):
+        make.source(name=f"S{n}")
+    highest = session.scalar(select(func.max(Source.id)))
+    data = archive_of(session)
+    clear(session)
+
+    import_archive(sessions, io.BytesIO(data))
+
+    assert make.source(name="After").id > (highest or 0)
+    assert make.interest(topic="New").id is not None  # an empty table's sequence still works
+
+
+def test_refuses_a_database_with_rows(
+    session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    make.interest(topic="AI")
+    data = archive_of(session)
+
+    with pytest.raises(ArchiveError, match="the database is not empty: interests"):
+        import_archive(sessions, io.BytesIO(data))
+
+
+def test_refuses_a_database_behind_the_latest_migration(
+    session: Session, sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = archive_of(session)
+    monkeypatch.setattr("brzask.services.archive.migrations.is_current", lambda connection: False)
+
+    with pytest.raises(ArchiveError, match="run brzask migrate first"):
+        import_archive(sessions, io.BytesIO(data))
+
+
+def test_refuses_an_archive_from_a_newer_brzask(
+    session: Session, sessions: sessionmaker[Session]
+) -> None:
+    first, *rest = [json.loads(line) for line in gzip.decompress(archive_of(session)).splitlines()]
+    first["revision"] = "ffffffffffff"
+
+    with pytest.raises(ArchiveError, match="newer brzask"):
+        import_archive(sessions, io.BytesIO(lines_to_archive([first, *rest])))
+
+
+def broken_archives(data: bytes) -> dict[str, bytes]:
+    lines = [json.loads(line) for line in gzip.decompress(data).splitlines()]
+    *body, trailer = lines
+    wrong = json.loads(json.dumps(trailer))
+    wrong["end"]["counts"]["sources"] += 1
+    return {
+        "without the trailer": lines_to_archive(body),
+        "with a wrong count": lines_to_archive([*body, wrong]),
+        "with lines after the trailer": lines_to_archive([*lines, body[1]]),
+        "cut in the middle": data[: len(data) // 2],
+        "not gzip": b"sources,articles\n",
+        "with an unknown table": lines_to_archive(
+            [body[0], {"table": "colours", "row": {}}, *body[1:], trailer]
+        ),
+        "with tables out of order": lines_to_archive([body[0], *reversed(body[1:]), trailer]),
+    }
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "without the trailer",
+        "with a wrong count",
+        "with lines after the trailer",
+        "cut in the middle",
+        "not gzip",
+        "with an unknown table",
+        "with tables out of order",
+    ],
+)
+def test_refuses_a_damaged_archive_and_writes_nothing(
+    case: str, session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    fill_every_table(session, make)
+    data = broken_archives(archive_of(session))[case]
+    clear(session)
+
+    with pytest.raises(ArchiveError):
+        import_archive(sessions, io.BytesIO(data))
+
+    assert_empty(session)
+
+
+def test_a_wrong_count_names_the_table(
+    session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    fill_every_table(session, make)
+    data = broken_archives(archive_of(session))["with a wrong count"]
+    clear(session)
+
+    with pytest.raises(ArchiveError, match=r"rows read sources 2 of 3$"):
+        import_archive(sessions, io.BytesIO(data))
+
+
+def test_refuses_while_a_digest_runs(
+    session: Session, sessions: sessionmaker[Session], make: Factories, db_engine: Engine
+) -> None:
+    make.interest(topic="AI")
+    data = archive_of(session)
+    clear(session)
+
+    with pipeline_lock(db_engine, RunKind.DIGEST) as acquired:
+        assert acquired
+        with pytest.raises(ArchiveError, match="a pipeline is running"):
+            import_archive(sessions, io.BytesIO(data))
+
+    assert_empty(session)
+
+
+def test_an_older_archive_without_a_column_gets_its_default(
+    session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    make.source(name="Old")
+    make.source(name="Older")
+    lines = [json.loads(line) for line in gzip.decompress(archive_of(session)).splitlines()]
+    for line in lines:
+        if line.get("table") == "sources":
+            del line["row"]["kind"]
+            del line["row"]["fetch_failures"]
+    lines[2]["row"].pop("note")  # rows of one table need not share their columns
+    clear(session)
+
+    import_archive(sessions, io.BytesIO(lines_to_archive(lines)))
+
+    assert [s.kind for s in session.scalars(select(Source))] == ["feed", "feed"]
+    assert session.scalar(select(func.count()).select_from(Interest)) == 0
