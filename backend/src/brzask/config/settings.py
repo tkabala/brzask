@@ -525,8 +525,14 @@ class BudgetSettings(SettingsGroup):
     )
 
 
+# A comma separates two targets only before another URL; inside one it lists
+# recipients (`mailtos://u:p@example.com?to=a@example.com,b@example.com`).
+_TARGET_SEPARATOR = re.compile(r"\s+|,\s*(?=[a-zA-Z][a-zA-Z0-9+.-]*://)")
+
+
 def _split_targets(value: str) -> tuple[str, ...]:
-    return tuple(part for part in re.split(r"[\s,]+", value) if part)
+    parts = (part.strip(",") for part in _TARGET_SEPARATOR.split(value))
+    return tuple(part for part in parts if part)
 
 
 class NotificationSettings(SettingsGroup):

@@ -420,6 +420,13 @@ def test_notifications_are_off_by_default(monkeypatch: pytest.MonkeyPatch) -> No
     assert NotificationSettings().targets == ()
 
 
+def test_a_comma_inside_a_notify_url_stays_in_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    mail = "mailtos://u:p@example.com?to=a@example.com,b@example.com"
+    monkeypatch.setenv("NOTIFY_URLS", f"{mail},ntfys://ntfy.sh/a ,json://localhost:9/x,")
+
+    assert NotificationSettings().targets == (mail, "ntfys://ntfy.sh/a", "json://localhost:9/x")
+
+
 def test_notify_urls_split_on_spaces_and_commas(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(
         "NOTIFY_URLS", "ntfys://ntfy.sh/a, json://localhost:9/x\n mailtos://u:p@example.com"
