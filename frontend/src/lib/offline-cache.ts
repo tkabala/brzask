@@ -52,6 +52,18 @@ function withoutCsrf(client: PersistedClient): PersistedClient {
   return { ...client, clientState: { ...client.clientState, queries } }
 }
 
+/** What a write would change. Not the timestamps or the fetch status, which
+ * move on every event of the query cache; the copy's age is that of its data. */
+function savedContent(client: PersistedClient): string {
+  return JSON.stringify(
+    client.clientState.queries.map((query) => [
+      query.queryHash,
+      query.state.dataUpdatedAt,
+      query.state.data,
+    ]),
+  )
+}
+
 /**
  * Writes at once on every change, unthrottled: a delayed write could put a
  * digest back after a logout removed it. It skips writes that change nothing.
@@ -61,11 +73,12 @@ export function createPersister(storage: Storage | undefined = browserStorage())
   return {
     persistClient: (client) => {
       if (storage === undefined) return
-      const text = JSON.stringify(withoutCsrf(client))
-      if (text === written) return
+      const saved = withoutCsrf(client)
+      const content = savedContent(saved)
+      if (content === written) return
       try {
-        storage.setItem(CACHE_KEY, text)
-        written = text
+        storage.setItem(CACHE_KEY, JSON.stringify(saved))
+        written = content
       } catch {
         // Storage full or blocked: the app works, only without the offline copy.
       }
@@ -73,7 +86,11 @@ export function createPersister(storage: Storage | undefined = browserStorage())
     restoreClient: () => {
       try {
         const text = storage?.getItem(CACHE_KEY)
-        return text ? (JSON.parse(text) as PersistedClient) : undefined
+        if (!text) return undefined
+        const client = JSON.parse(text) as PersistedClient
+        // Unchanged data stays unwritten after a reload too, so its age keeps counting.
+        written = savedContent(client)
+        return client
       } catch {
         return undefined
       }
@@ -97,7 +114,8 @@ export function persistOptions(
     maxAge: MAX_AGE_MS,
     // A new release may change what the API answers; its copy starts afresh.
     buster: __APP_VERSION__,
-    dehydrateOptions: { shouldDehydrateQuery: shouldSave },
+    // Not even paused mutations, which the default keeps with what the reader typed.
+    dehydrateOptions: { shouldDehydrateQuery: shouldSave, shouldDehydrateMutation: () => false },
   }
 }
 

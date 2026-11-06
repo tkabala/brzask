@@ -95,6 +95,68 @@ describe('the saved copy', () => {
     }
   })
 
+  it('leaves out changes waiting for a connection', async () => {
+    const client = filledClient()
+    client.getMutationCache().build(
+      client,
+      { mutationFn: () => Promise.resolve() },
+      {
+        context: undefined,
+        data: undefined,
+        error: null,
+        failureCount: 0,
+        failureReason: null,
+        isPaused: true,
+        status: 'pending',
+        variables: { body: { topic: 'typed offline' } },
+        submittedAt: 0,
+      },
+    )
+
+    await save(client)
+
+    expect(localStorage.getItem(CACHE_KEY)).not.toContain('typed offline')
+  })
+
+  it('is written again only when its data changed', async () => {
+    const client = filledClient()
+    const options = persistOptions(createPersister(localStorage))
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    const now = vi.spyOn(Date, 'now')
+    try {
+      now.mockReturnValue(1_000)
+      await persistQueryClientSave({ queryClient: client, ...options })
+      now.mockReturnValue(2_000)
+      await persistQueryClientSave({ queryClient: client, ...options })
+      expect(setItem).toHaveBeenCalledTimes(1)
+
+      client.setQueryData(getTodayDigestQueryKey(), { ...digest, date: '2026-11-06' })
+      await persistQueryClientSave({ queryClient: client, ...options })
+      expect(setItem).toHaveBeenCalledTimes(2)
+    } finally {
+      setItem.mockRestore()
+      now.mockRestore()
+    }
+  })
+
+  it('keeps its age when a reload saves the same data', async () => {
+    const now = vi.spyOn(Date, 'now')
+    try {
+      now.mockReturnValue(1_000)
+      await save(filledClient())
+      const first = localStorage.getItem(CACHE_KEY)
+
+      now.mockReturnValue(2_000)
+      const options = persistOptions(createPersister(localStorage))
+      const client = await restore(options)
+      await persistQueryClientSave({ queryClient: client, ...options })
+
+      expect(localStorage.getItem(CACHE_KEY)).toBe(first)
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it('is forgotten on request, in storage and in memory', async () => {
     const client = filledClient()
     await save(client)
