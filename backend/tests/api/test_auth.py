@@ -5,14 +5,16 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from opentelemetry.metrics import NoOpMeterProvider
 from sqlalchemy import update
 from sqlalchemy.orm import Session, sessionmaker
 from structlog.testing import capture_logs
 
 from brzask.api.app import create_app
+from brzask.api.auth import CSRF_HEADER
 from brzask.api.metrics import prometheus_reader
-from brzask.config.settings import AuthSettings
+from brzask.config.settings import AuthSettings, ServerSettings
 from brzask.db.models import LoginSession
 from brzask.services import auth
 from brzask.services.auth import FAILURES_PER_CLIENT, link_signature
@@ -281,3 +283,60 @@ def test_cookie_is_secure_when_the_login_came_over_https(
     # Only a trusted proxy is believed.
     stranger = TestClient(app, client=("203.0.113.9", 41000))
     assert not secure(stranger, {"X-Forwarded-Proto": "https"})
+
+
+def _cookie(response: Response) -> str:
+    cookies = [c for c in response.headers.get_list("set-cookie") if c.startswith("brzask_session")]
+    assert len(cookies) == 1
+    return cookies[0].lower()
+
+
+def test_session_cookie_path_at_the_root(client: TestClient) -> None:
+    response = client.post("/api/v1/auth/login", json={"password": PASSWORD})
+
+    assert "path=/;" in _cookie(response) or _cookie(response).endswith("path=/")
+
+
+@pytest.mark.parametrize("base_url_setting", ["https://h.example/brzask"])
+def test_session_cookie_path_under_a_prefix(client: TestClient) -> None:
+    response = client.post("/brzask/api/v1/auth/login", json={"password": PASSWORD})
+
+    assert "path=/brzask/" in _cookie(response)
+    assert client.get("/brzask/api/v1/status").status_code == 200
+
+
+@pytest.mark.parametrize("base_url_setting", ["https://h.example/brzask"])
+def test_logout_clears_both_cookie_paths(client: TestClient) -> None:
+    csrf = log_in_at(client, "/brzask")
+
+    response = client.post("/brzask/api/v1/auth/logout", headers={CSRF_HEADER: csrf})
+
+    assert response.status_code == 204
+    cleared = [c.lower() for c in response.headers.get_list("set-cookie")]
+    # A cookie from before the app moved under the prefix has Path=/.
+    assert any("path=/brzask/" in c and "max-age=0" in c for c in cleared)
+    assert any(("path=/;" in c or c.endswith("path=/")) and "max-age=0" in c for c in cleared)
+
+
+def test_auto_secure_from_an_https_base_url(
+    sessions: sessionmaker[Session], password_auth: AuthSettings
+) -> None:
+    _, registry = prometheus_reader()
+    app = create_app(
+        sessions,
+        metrics_registry=registry,
+        meter_provider=NoOpMeterProvider(),
+        auth_settings=password_auth,
+        server=ServerSettings.model_validate({"BASE_URL": "https://h.example/"}),
+    )
+    # Plain HTTP from a proxy that is not trusted: BASE_URL alone says HTTPS.
+    response = TestClient(app).post("/api/v1/auth/login", json={"password": PASSWORD})
+
+    assert "secure" in _cookie(response)
+
+
+def log_in_at(client: TestClient, prefix: str) -> str:
+    response = client.post(f"{prefix}/api/v1/auth/login", json={"password": PASSWORD})
+    assert response.status_code == 200
+    token: str = response.json()["csrf_token"]
+    return token

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
@@ -81,10 +82,12 @@ class Auth:
         return self.settings.password_hash.get_secret_value()
 
     def open_url(self, article_id: int) -> str:
-        """The path that opens an article; signed, so it works without a session."""
+        """The path that opens an article, prefix included; signed, so it works without
+        a session."""
+        path = f"{self.root_path}/open?id={article_id}"
         if self.secret is None:
-            return f"/open?id={article_id}"
-        return f"/open?id={article_id}&sig={auth.link_signature(self.secret, article_id)}"
+            return path
+        return f"{path}&sig={auth.link_signature(self.secret, article_id)}"
 
 
 def get_auth(request: Request) -> Auth:
@@ -235,8 +238,9 @@ def _client(request: Request, config: Auth) -> str:
 
 
 def _over_https(request: Request, config: Auth) -> bool:
-    """Whether the browser reached us over HTTPS, here or at a trusted proxy."""
-    if request.url.scheme == "https":
+    """Whether the browser reached us over HTTPS: here, at a trusted proxy, or as
+    BASE_URL says."""
+    if request.url.scheme == "https" or (config.public_url or "").startswith("https://"):
         return True
     if not auth.is_trusted(peer(request), config.settings.trusted_proxies):
         return False
@@ -248,9 +252,13 @@ def _over_https(request: Request, config: Auth) -> bool:
 def public_origin(request: Request, config: Auth) -> str:
     """Scheme and host the browser or reader used, e.g. `https://news.example`.
 
-    For absolute links, as in a feed; the scheme follows a trusted proxy's
-    X-Forwarded-Proto, the host is the Host header the proxy passed on.
+    For absolute links, as in a feed. Those of BASE_URL when it is set;
+    otherwise the scheme follows a trusted proxy's X-Forwarded-Proto and the
+    host is the Host header the proxy passed on.
     """
+    if config.public_url is not None:
+        parts = urlsplit(config.public_url)
+        return f"{parts.scheme}://{parts.netloc}"
     scheme = "https" if _over_https(request, config) else request.url.scheme
     host = request.headers.get("host") or request.url.netloc
     return f"{scheme}://{host}"
@@ -269,7 +277,13 @@ def _set_cookie(request: Request, response: Response, config: Auth, token: str) 
         httponly=True,
         secure=secure,
         samesite="lax",
+        path=cookie_path(config),
     )
+
+
+def cookie_path(config: Auth) -> str:
+    """The session cookie belongs to the path the app is served at."""
+    return f"{config.root_path}/"
 
 
 @router.post(
@@ -317,11 +331,16 @@ def login(
     dependencies=[Depends(require_user)],
     responses=problems.responses(HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
 )
-def logout(response: Response, session: DbSession, token: SessionCookie) -> None:
+def logout(
+    response: Response, session: DbSession, config: AuthConfig, token: SessionCookie
+) -> None:
     """Ends the session, here and wherever its cookie was copied."""
     if token is not None:
         auth.log_out(session, token)
-    response.delete_cookie(SESSION_COOKIE)
+    response.delete_cookie(SESSION_COOKIE, path=cookie_path(config))
+    if config.root_path:
+        # A cookie set before the app moved under its prefix still has Path=/.
+        response.delete_cookie(SESSION_COOKIE, path="/")
 
 
 @router.get("/session", summary="Whether this browser is logged in")

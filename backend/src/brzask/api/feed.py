@@ -84,7 +84,10 @@ def get_feed(
     ]
     updated = max((e.published for e in entries), default=datetime.now(UTC))
     body = atom_feed(
-        entries, origin=origin, language=get_settings().digest.language, updated=updated
+        entries,
+        base=origin + config.root_path,
+        language=get_settings().digest.language,
+        updated=updated,
     )
     etag = f'"{hashlib.sha256(body).hexdigest()[:32]}"'
     headers = {"ETag": etag, "Cache-Control": CACHE_CONTROL}

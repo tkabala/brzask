@@ -27,7 +27,7 @@ def entry(**overrides: Any) -> FeedEntry:
 
 
 def parse(*entries: FeedEntry, language: str = "en") -> Any:
-    body = atom_feed(list(entries), origin=ORIGIN, language=language, updated=NOW)
+    body = atom_feed(list(entries), base=ORIGIN, language=language, updated=NOW)
     parsed = feedparser.parse(body)
     assert parsed.bozo == 0, parsed.get("bozo_exception")
     return parsed
@@ -52,7 +52,7 @@ def test_a_feed_reader_parses_it() -> None:
 
 
 def test_self_link_has_no_token() -> None:
-    body = atom_feed([], origin=ORIGIN, language="en", updated=NOW)
+    body = atom_feed([], base=ORIGIN, language="en", updated=NOW)
 
     assert b'href="https://news.example/feed"' in body
     assert b"token" not in body

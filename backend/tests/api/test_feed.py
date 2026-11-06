@@ -165,3 +165,21 @@ def test_unchanged_feed_answers_304(client: TestClient, session: Session, make: 
     changed = client.get("/feed", params={"token": value}, headers={"If-None-Match": etag})
     assert changed.status_code == 200
     assert changed.headers["etag"] != etag
+
+
+@pytest.mark.parametrize("base_url_setting", ["https://h.example/brzask"])
+def test_feed_links_follow_base_url(client: TestClient, session: Session, make: Factories) -> None:
+    make.article(digest_date=DAY, title="Today")
+    value = token(session)
+
+    # Neither the Host header nor a forwarded scheme decides the links.
+    response = client.get("/brzask/feed", params={"token": value}, headers={"Host": "other"})
+    parsed = feedparser.parse(response.content)
+
+    assert parsed.bozo == 0
+    links = {link.rel: link.href for link in parsed.feed.links}
+    assert links == {
+        "self": "https://h.example/brzask/feed",
+        "alternate": "https://h.example/brzask/",
+    }
+    assert parsed.entries[0].link.startswith("https://h.example/brzask/open?id=")

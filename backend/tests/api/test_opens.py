@@ -87,3 +87,13 @@ def test_articles_carry_their_open_url(client: TestClient, make: Factories) -> N
     body = client.get("/api/v1/digests/2026-10-21").json()
 
     assert body["articles"][0]["open_url"] == f"/open?id={article.id}"
+
+
+@pytest.mark.parametrize("base_url_setting", ["https://h.example/brzask"])
+def test_open_url_carries_the_prefix(client: TestClient, make: Factories) -> None:
+    article = make.article(digest_date=date(2026, 10, 21))
+
+    body = client.get("/brzask/api/v1/digests/2026-10-21").json()
+
+    assert body["articles"][0]["open_url"] == f"/brzask/open?id={article.id}"
+    assert client.get(body["articles"][0]["open_url"], follow_redirects=False).status_code == 302

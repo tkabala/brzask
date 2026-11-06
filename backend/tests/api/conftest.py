@@ -14,7 +14,7 @@ from brzask.api.metrics import prometheus_reader
 from brzask.clients.embeddings import EmbeddingKind
 from brzask.clients.feed_finder import FoundFeed
 from brzask.clients.retry import APIError
-from brzask.config.settings import AuthSettings
+from brzask.config.settings import AuthSettings, ServerSettings
 from brzask.services.auth import hash_password
 from tests.factories import unit_vector
 
@@ -90,7 +90,14 @@ def password_auth(password_hash: str) -> AuthSettings:
 
 
 @pytest.fixture
+def base_url_setting() -> str | None:
+    """BASE_URL of the app; parametrize a test with it to serve under a prefix."""
+    return None
+
+
+@pytest.fixture
 def app(
+    base_url_setting: str | None,
     sessions: sessionmaker[Session],
     embedders: dict[str, FakeEmbedder],
     query_vectors: dict[str, list[float]],
@@ -110,6 +117,7 @@ def app(
         meter_provider=MeterProvider(metric_readers=[reader]),
         clients=ApiClients(feed_finder=lambda: nullcontext(feed_finder), new_embedder=new_embedder),
         auth_settings=auth_settings,
+        server=ServerSettings.model_validate({"BASE_URL": base_url_setting}),
     )
 
 

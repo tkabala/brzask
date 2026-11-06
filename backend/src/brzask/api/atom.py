@@ -32,16 +32,17 @@ class FeedEntry:
 
 
 def atom_feed(
-    entries: Sequence[FeedEntry], *, origin: str, language: str, updated: datetime
+    entries: Sequence[FeedEntry], *, base: str, language: str, updated: datetime
 ) -> bytes:
-    """The feed document; `origin` is the server's public origin, without a trailing slash."""
+    """The feed document; `base` is the server's public address with its path prefix,
+    without a trailing slash (`https://home.example/brzask`)."""
     feed = ET.Element(_tag("feed"), {"xml:lang": language})
     _text(feed, "id", FEED_ID)
     _text(feed, "title", TITLE)
     _text(feed, "updated", _date(updated))
     # The self link leaves the token out: the document must not repeat it.
-    _link(feed, f"{origin}/feed", rel="self", type="application/atom+xml")
-    _link(feed, f"{origin}/", rel="alternate", type="text/html")
+    _link(feed, f"{base}/feed", rel="self", type="application/atom+xml")
+    _link(feed, f"{base}/", rel="alternate", type="text/html")
     _text(feed, "generator", TITLE)
     # RFC 4287 wants a feed author unless every entry has one; an article
     # whose source was removed has none.
