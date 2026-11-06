@@ -29,6 +29,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Span
 
 from brzask import __version__
+from brzask.clients.apprise_log import apprise_active
 from brzask.clients.usage import CallUsage
 from brzask.config.settings import TelemetrySettings
 from brzask.log import get_logger, redact_tokens
@@ -61,6 +62,7 @@ def setup_telemetry(
             # Sentry copies the request's query string as it is, the feed's token included.
             before_send=_redact_event_tokens,
             before_send_transaction=_redact_event_tokens,
+            before_breadcrumb=_drop_notification_requests,
         )
         sentry_sdk.set_tag("component", component)
         log.info("sentry enabled", environment=settings.sentry_environment)
@@ -105,6 +107,13 @@ def instrument_app(app: FastAPI, meter_provider: MeterProviderAPI | None = None)
         excluded_urls="/healthz,/readyz,/metrics",
         server_request_hook=_redact_span_tokens,
     )
+
+
+def _drop_notification_requests(crumb: Any, _hint: Any) -> Any:
+    """Drop the breadcrumb of an HTTP request Apprise makes: its URL holds the token."""
+    if crumb.get("category") == "httplib" and apprise_active():
+        return None
+    return crumb
 
 
 def _redact_event_tokens(event: Any, _hint: Any) -> Any:

@@ -18,6 +18,8 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
+from sentry_sdk.envelope import Envelope
+from sentry_sdk.transport import Transport
 from sqlalchemy import text
 from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.community.postgres import PostgresContainer
@@ -28,6 +30,7 @@ from brzask.clients.llm import LLMClient, LLMError
 from brzask.config.settings import TelemetrySettings
 from brzask.db.models import EMBEDDING_DIMENSIONS, RunKind
 from brzask.db.session import create_db_engine
+from brzask.services.notify import AppriseNotifier, Message
 from brzask.services.open_rate import register_open_rate
 from brzask.services.runs import RunContext, SkipRunError, run_pipeline
 
@@ -350,3 +353,31 @@ def test_open_rate_collection_is_not_traced(
     finally:
         engine.dispose()
         instrumentor.uninstrument()
+
+
+def test_sentry_gets_no_notification_urls(monkeypatch: pytest.MonkeyPatch, hook_url: str) -> None:
+    events: list[Any] = []
+
+    class Capture(Transport):
+        def capture_envelope(self, envelope: Envelope) -> None:
+            events.extend(item.get_event() for item in envelope.items)
+
+    real_init = sentry_sdk.init
+
+    def init(**options: Any) -> None:
+        real_init(**options, transport=Capture(options))
+
+    monkeypatch.setattr(sentry_sdk, "init", init)
+    try:
+        telemetry.setup_telemetry(
+            TelemetrySettings.model_validate({"SENTRY_DSN": "https://key@sentry.example/1"}),
+            component="worker",
+        )
+        assert AppriseNotifier([hook_url]).send(Message("t", "b")) is True
+        sentry_sdk.capture_message("run failed")
+        sentry_sdk.flush()
+    finally:
+        real_init()  # no DSN: reports off again
+
+    assert events
+    assert "secret-path-token" not in json.dumps(events)

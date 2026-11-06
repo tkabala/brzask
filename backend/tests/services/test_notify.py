@@ -164,3 +164,13 @@ def test_real_digest_after_a_dry_one_still_notifies(make: Factories) -> None:
 
     assert message is not None
     assert message.title == "brzask: today's 1 is ready"
+
+
+def test_a_sent_notification_logs_no_url_even_at_debug(
+    hook_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.DEBUG):
+        sent = AppriseNotifier([hook_url]).send(Message("t", "b"))
+
+    assert sent is True
+    assert "secret-path-token" not in caplog.text

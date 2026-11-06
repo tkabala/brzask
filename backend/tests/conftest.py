@@ -1,5 +1,7 @@
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from uuid import uuid4
 
 import pytest
@@ -110,3 +112,22 @@ def session(sessions: sessionmaker[Session]) -> Iterator[Session]:
 def make(session: Session) -> Factories:
     """Factories that add rows to the test session."""
     return Factories(session)
+
+
+@pytest.fixture
+def hook_url() -> Iterator[str]:
+    """A local web hook that answers 200, at a path holding a secret."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("content-length", 0)))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *_args: object) -> None:
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"json://127.0.0.1:{server.server_address[1]}/secret-path-token"
+    server.shutdown()
