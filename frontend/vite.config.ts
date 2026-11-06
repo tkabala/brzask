@@ -19,6 +19,8 @@ const { version } = JSON.parse(
 const ICON_BACKGROUND = '#171717'
 
 export default defineConfig({
+  // Relative URLs: the server's <base href> says where the app is served (BASE_URL).
+  base: './',
   plugins: [
     // Must run before the React plugin so generated routes are compiled.
     tanstackRouter({
@@ -38,8 +40,9 @@ export default defineConfig({
         short_name: 'brzask',
         description: 'A calm, finite, personal news digest: exactly 7 articles a day.',
         display: 'standalone',
-        start_url: '/',
-        scope: '/',
+        // Relative to the manifest, so the installed app keeps the path prefix.
+        start_url: './',
+        scope: './',
         theme_color: ICON_BACKGROUND,
         background_color: ICON_BACKGROUND,
         icons: [

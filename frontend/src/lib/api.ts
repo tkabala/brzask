@@ -1,5 +1,6 @@
 import { client } from '@/client/client.gen'
 import type { Problem } from '@/client/types.gen'
+import { apiBaseUrl } from '@/lib/base'
 
 /** An error answer of the API: an RFC 9457 problem, or a stand-in when the body was none. */
 export class ApiProblem extends Error {
@@ -51,7 +52,7 @@ export function setCsrfToken(token: string | null): void {
 let configured = false
 
 /** Point the generated client at this server and attach CSRF tokens and problems. */
-export function configureApi(baseUrl: string = window.location.origin): void {
+export function configureApi(baseUrl: string = apiBaseUrl()): void {
   client.setConfig({ baseUrl, credentials: 'same-origin' })
   if (configured) return
   configured = true

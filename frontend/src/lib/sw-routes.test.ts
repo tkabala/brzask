@@ -10,13 +10,25 @@ it.each([
   '/readyz',
   '/?signin',
   '/archive?signin',
+  '/brzask/api/v1/digests/today',
+  '/brzask/open?id=1&sig=x',
+  '/brzask/feed?token=t',
+  '/brzask/readyz',
+  '/brzask/?signin',
 ])('%s goes to the server', (url) => {
   expect(servedByApi(url)).toBe(true)
 })
 
-it.each(['/', '/archive/2026-10-01', '/openings', '/search?q=signing', '/?q=signin2'])(
-  '%s is the app',
-  (url) => {
-    expect(servedByApi(url)).toBe(false)
-  },
-)
+it.each([
+  '/',
+  '/archive/2026-10-01',
+  '/openings',
+  '/search?q=signing',
+  '/?q=signin2',
+  '/brzask/',
+  '/brzask/archive/2026-10-01',
+  '/brzask/sources?q=api',
+  '/brzask/search?q=open',
+])('%s is the app', (url) => {
+  expect(servedByApi(url)).toBe(false)
+})
