@@ -124,6 +124,14 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 | `LLM_BUDGET_DAILY_USD` | (none) | Spending limit per day in USD for paid API calls (LLM, embeddings, judge, web search) as providers report them; checked when a run starts. When reached, the digest ranks without the LLM and skips the dedup judge, and discovery is skipped. Empty: no limit. |
 | `LLM_BUDGET_MONTHLY_USD` | (none) | Spending limit per calendar month in USD, counted and applied like LLM_BUDGET_DAILY_USD. Empty: no limit. |
 
+## Notifications
+
+Digest ready and pipeline failed, nothing else.
+
+| Variable | Default | Description |
+|---|---|---|
+| `NOTIFY_URLS` | secret | Apprise URLs to send the two notifications to (digest ready, pipeline failed), separated by spaces or commas. Empty: no notifications. See the notifications page for examples. |
+
 ## Logging
 
 | Variable | Default | Description |

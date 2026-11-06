@@ -525,6 +525,48 @@ class BudgetSettings(SettingsGroup):
     )
 
 
+def _split_targets(value: str) -> tuple[str, ...]:
+    return tuple(part for part in re.split(r"[\s,]+", value) if part)
+
+
+class NotificationSettings(SettingsGroup):
+    """Notifications: digest ready and pipeline failed, nothing else."""
+
+    # The URLs carry tokens: a validation error must not quote them.
+    model_config = SettingsConfigDict(env_prefix="NOTIFY_", hide_input_in_errors=True)
+
+    urls: OptionalSecret = Field(
+        None,
+        description="Apprise URLs to send the two notifications to (digest ready, pipeline "
+        "failed), separated by spaces or commas. Empty: no notifications. See the "
+        "notifications page for examples.",
+        examples=["ntfys://ntfy.sh/my-brzask-topic"],
+    )
+
+    @field_validator("urls")
+    @classmethod
+    def _known_urls(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        # Imported here: loading Apprise's plugins takes most of a second.
+        from apprise import Apprise
+
+        from brzask.clients.apprise_log import quiet_apprise
+
+        with quiet_apprise():
+            for position, target in enumerate(_split_targets(value.get_secret_value()), 1):
+                if Apprise.instantiate(target, suppress_exceptions=True) is None:
+                    raise ValueError(f"NOTIFY_URLS entry {position} is not a URL Apprise knows")
+        return value
+
+    @property
+    def targets(self) -> tuple[str, ...]:
+        """The URLs one by one; empty when notifications are off."""
+        if self.urls is None:
+            return ()
+        return _split_targets(self.urls.get_secret_value())
+
+
 class LoggingSettings(SettingsGroup):
     """Logging."""
 
@@ -577,6 +619,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     SchedulerSettings,
     DigestSettings,
     BudgetSettings,
+    NotificationSettings,
     LoggingSettings,
     TelemetrySettings,
 )
@@ -631,6 +674,10 @@ class Settings:
     @cached_property
     def budget(self) -> BudgetSettings:
         return BudgetSettings()
+
+    @cached_property
+    def notifications(self) -> NotificationSettings:
+        return NotificationSettings()
 
     @cached_property
     def logging(self) -> LoggingSettings:

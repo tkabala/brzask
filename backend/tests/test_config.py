@@ -19,6 +19,7 @@ from brzask.config.settings import (
     ExtractorSettings,
     LLMSettings,
     LoggingSettings,
+    NotificationSettings,
     Schedule,
     SchedulerSettings,
     ServerSettings,
@@ -408,6 +409,49 @@ def test_budget_must_be_positive(monkeypatch: pytest.MonkeyPatch, value: str) ->
 
     with pytest.raises(ValidationError):
         BudgetSettings()
+
+
+# --- Notifications ---------------------------------------------------------------
+
+
+def test_notifications_are_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NOTIFY_URLS", "")
+
+    assert NotificationSettings().targets == ()
+
+
+def test_notify_urls_split_on_spaces_and_commas(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "NOTIFY_URLS", "ntfys://ntfy.sh/a, json://localhost:9/x\n mailtos://u:p@example.com"
+    )
+
+    assert NotificationSettings().targets == (
+        "ntfys://ntfy.sh/a",
+        "json://localhost:9/x",
+        "mailtos://u:p@example.com",
+    )
+
+
+def test_bad_notify_url_names_its_position_not_its_value(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("NOTIFY_URLS", "ntfys://ntfy.sh/ok nope://secret-token-123")
+
+    with caplog.at_level("DEBUG"), pytest.raises(ValidationError) as raised:
+        NotificationSettings()
+
+    assert "NOTIFY_URLS entry 2 is not a URL Apprise knows" in str(raised.value)
+    assert "secret-token-123" not in str(raised.value)
+    assert "secret" not in caplog.text
+
+
+def test_notify_urls_from_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    path = tmp_path / "notify_urls"
+    path.write_text("ntfys://ntfy.sh/from-file\n")
+    monkeypatch.delenv("NOTIFY_URLS", raising=False)
+    monkeypatch.setenv("NOTIFY_URLS_FILE", str(path))
+
+    assert NotificationSettings().targets == ("ntfys://ntfy.sh/from-file",)
 
 
 # --- BASE_URL --------------------------------------------------------------------

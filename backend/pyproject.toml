@@ -6,6 +6,7 @@ license = "MIT"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.16",
+    "apprise>=2.1",
     "apscheduler>=3.11,<4",
     "argon2-cffi>=25.1.0",
     "defusedxml>=0.7.1",
