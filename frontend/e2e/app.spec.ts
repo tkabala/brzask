@@ -3,7 +3,6 @@ import { expect, expectAccessible, logIn, test } from './fixtures.ts'
 test('the login refuses a wrong password, then shows today’s digest', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible()
-  await expectAccessible(page)
 
   await page.getByLabel('Password').fill('wrong')
   await page.getByRole('button', { name: 'Log in' }).click()
@@ -22,16 +21,94 @@ const SCREENS = [
   ['/status', 'Status'],
 ] as const
 
-for (const [path, heading] of SCREENS) {
-  test(`${heading} has no accessibility violations`, async ({ page }) => {
-    await logIn(page)
-    await page.goto(path)
-    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible()
-    // Wait for the data, so axe checks the filled page.
-    await page.waitForLoadState('networkidle')
-    await expectAccessible(page)
+for (const colorScheme of ['light', 'dark'] as const) {
+  test.describe(`in the ${colorScheme} theme`, () => {
+    test.use({ colorScheme })
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/')
+      // Axe must judge the theme it is named after.
+      const html = page.locator('html')
+      await (colorScheme === 'dark'
+        ? expect(html).toHaveClass(/\bdark\b/)
+        : expect(html).not.toHaveClass(/\bdark\b/))
+    })
+
+    test('the login has no accessibility violations', async ({ page }) => {
+      await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible()
+      await expectAccessible(page)
+
+      // An error's colour too, without a wrong password counting towards a lockout.
+      await page.getByRole('button', { name: 'Log in' }).click()
+      await expect(page.getByText('Enter the password.')).toBeVisible()
+      await expectAccessible(page)
+    })
+
+    for (const [path, heading] of SCREENS) {
+      test(`${heading} has no accessibility violations`, async ({ page }) => {
+        await logIn(page)
+        await page.goto(path)
+        await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible()
+        // Wait for the data, so axe checks the filled page.
+        await page.waitForLoadState('networkidle')
+        await expectAccessible(page)
+      })
+    }
+
+    test('the open ranking explanation has no accessibility violations', async ({ page }) => {
+      await logIn(page)
+      await page.getByRole('button', { name: 'Why here?' }).first().click()
+      await expect(page.getByRole('region', { name: 'How it got here' })).toBeVisible()
+      await expectAccessible(page)
+    })
   })
 }
+
+test.describe('choosing a theme', () => {
+  test.use({ colorScheme: 'light' })
+
+  test('the choice survives a reload and overrides the system', async ({ page }) => {
+    await logIn(page)
+    const html = page.locator('html')
+    await expect(html).not.toHaveClass(/\bdark\b/)
+
+    await page.getByLabel('Theme').selectOption('dark')
+    await expect(html).toHaveClass(/\bdark\b/)
+
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible()
+    await expect(html).toHaveClass(/\bdark\b/)
+    await expect(page.getByLabel('Theme')).toHaveValue('dark')
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0a0a0a')
+  })
+
+  test('the system theme follows the operating system while open', async ({ page }) => {
+    await page.goto('/')
+    const html = page.locator('html')
+    await expect(html).not.toHaveClass(/\bdark\b/)
+
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(html).toHaveClass(/\bdark\b/)
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0a0a0a')
+  })
+
+  test('a stored theme is on the page before any bundled script runs', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('brzask-theme', 'dark')
+    })
+    let blocked = 0
+    await page.route('**/*.js', (route) => {
+      blocked += 1
+      return route.abort()
+    })
+
+    await page.goto('/')
+
+    expect(blocked).toBeGreaterThan(0)
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0a0a0a')
+  })
+})
 
 test('an archived day, with why an article is there', async ({ page }) => {
   await logIn(page)

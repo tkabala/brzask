@@ -1,8 +1,9 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import type { DigestOut, SessionOut } from '@/client/types.gen'
 import { initI18n } from '@/i18n'
+import { chooseTheme, THEME_KEY } from '@/lib/theme'
 import { emptyDigest, fakeApi, json, loggedIn, loggedOut, problem } from '@/test/fake-api'
 import { renderApp } from '@/test/render'
 
@@ -189,5 +190,46 @@ describe('logged in', () => {
     })
     await user.selectOptions(screen.getByLabelText('Język'), 'en')
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument()
+  })
+})
+
+describe('the theme', () => {
+  afterEach(() => {
+    chooseTheme('system')
+    localStorage.clear()
+    document.documentElement.classList.remove('dark')
+  })
+
+  it('starts on the system and changes from the header', async () => {
+    fakeApi({
+      'GET /api/v1/auth/session': () => json(loggedIn),
+      'GET /api/v1/digests/today': () => json(emptyDigest),
+    })
+    const user = userEvent.setup()
+    renderApp()
+
+    const select = await screen.findByRole('combobox', { name: 'Theme' })
+    expect(select).toHaveValue('system')
+
+    await user.selectOptions(select, 'Dark')
+
+    expect(select).toHaveValue('dark')
+    expect(document.documentElement).toHaveClass('dark')
+    expect(localStorage.getItem(THEME_KEY)).toBe('dark')
+  })
+
+  it('shows a choice made elsewhere', async () => {
+    fakeApi({
+      'GET /api/v1/auth/session': () => json(loggedIn),
+      'GET /api/v1/digests/today': () => json(emptyDigest),
+    })
+    renderApp()
+    const select = await screen.findByRole('combobox', { name: 'Theme' })
+
+    act(() => {
+      chooseTheme('light')
+    })
+
+    expect(select).toHaveValue('light')
   })
 })

@@ -2,11 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      // The theme, before first paint: a bundled script would run too late and
+      // flash the light page. Keep in step with src/lib/theme.ts (its test runs this).
+      ;(function () {
+        var theme = null
+        try {
+          theme = localStorage.getItem('brzask-theme')
+        } catch (e) {
+          // Blocked storage: follow the system.
+        }
+        var dark =
+          theme === 'dark' ||
+          (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute('content', dark ? '#0a0a0a' : '#ffffff')
+      })()
+    </script>
     <link rel="icon" href="favicon.ico" sizes="48x48" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon-180x180.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#171717" />
     <meta
       name="description"
       content="A calm, finite, personal news digest: exactly 7 articles a day."

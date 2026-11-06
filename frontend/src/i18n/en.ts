@@ -10,6 +10,7 @@ export const en = {
       status: 'Status',
     },
     language: 'Language',
+    theme: { label: 'Theme', system: 'System', light: 'Light', dark: 'Dark' },
     logout: 'Log out',
     loadMore: 'Load more',
     save: 'Save',

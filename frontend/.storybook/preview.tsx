@@ -14,6 +14,7 @@ import { I18nextProvider } from 'react-i18next'
 import { handlers, resetDemo } from '../src/demo/handlers'
 import { initI18n, LANGUAGES } from '../src/i18n'
 import { configureApi } from '../src/lib/api'
+import { applyTheme, type Theme } from '../src/lib/theme'
 
 configureApi()
 
@@ -34,11 +35,22 @@ const preview: Preview = {
         items: Object.entries(LANGUAGES).map(([value, title]) => ({ value, title })),
       },
     },
+    theme: {
+      description: 'Theme',
+      toolbar: {
+        icon: 'mirror',
+        items: [
+          { value: 'light', title: 'Light', icon: 'sun' },
+          { value: 'dark', title: 'Dark', icon: 'moon' },
+        ],
+      },
+    },
   },
-  initialGlobals: { locale: 'en' },
+  initialGlobals: { locale: 'en', theme: 'light' },
   decorators: [
     (Story, context) => {
       const i18n = initI18n(context.globals.locale as 'en' | 'pl')
+      applyTheme(context.globals.theme as Theme)
       // Pages render the whole app, with its own router and query client.
       if (context.parameters.app === true) return <Story />
       // Views take their data as props; a client only backs components that

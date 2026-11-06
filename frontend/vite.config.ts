@@ -15,7 +15,8 @@ const { version } = JSON.parse(
   version: string
 }
 
-// The icon's own background: the installed app's splash screen and title bar.
+// The icon's own background: the installed app's splash screen. Its title bar
+// follows the theme through the page's theme-color meta tag (src/lib/theme.ts).
 const ICON_BACKGROUND = '#171717'
 
 export default defineConfig({

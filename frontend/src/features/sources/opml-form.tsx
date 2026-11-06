@@ -58,7 +58,7 @@ export function OpmlForm({
             id={`${id}-file`}
             type="file"
             accept=".opml,.xml,text/x-opml,text/xml,application/xml"
-            className="text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1"
+            className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-1"
             onChange={(event) => {
               setFile(event.target.files?.[0] ?? null)
             }}

@@ -12,6 +12,7 @@ export const pl: Resources = {
       status: 'Stan',
     },
     language: 'Język',
+    theme: { label: 'Motyw', system: 'Systemowy', light: 'Jasny', dark: 'Ciemny' },
     logout: 'Wyloguj',
     loadMore: 'Pokaż więcej',
     save: 'Zapisz',

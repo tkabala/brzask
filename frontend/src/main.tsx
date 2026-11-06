@@ -8,6 +8,7 @@ import { configureApi } from '@/lib/api'
 import { createPersister } from '@/lib/offline-cache'
 import { followBrowserOnline } from '@/lib/online'
 import { createQueryClient } from '@/lib/query'
+import { followTheme } from '@/lib/theme'
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {
@@ -22,6 +23,7 @@ if (url.searchParams.has('signin')) {
   window.history.replaceState(null, '', url)
 }
 followBrowserOnline()
+followTheme()
 
 createRoot(rootElement).render(
   <StrictMode>

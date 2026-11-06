@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { LANGUAGES } from '@/i18n'
 import { setCsrfToken } from '@/lib/api'
 import { forgetSaved } from '@/lib/offline-cache'
+import { chooseTheme, type Theme, THEMES, useTheme } from '@/lib/theme'
 
 const NAV = [
   ['/', 'today'],
@@ -21,6 +22,7 @@ const NAV = [
 export function AppHeader({ session }: { session: SessionOut }) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
+  const theme = useTheme()
   const logout = useMutation({
     ...logoutMutation(),
     // Offline the request fails at once instead of waiting: the saved copy
@@ -66,6 +68,23 @@ export function AppHeader({ session }: { session: SessionOut }) {
             {Object.entries(LANGUAGES).map(([code, name]) => (
               <option key={code} value={code}>
                 {name}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="theme">
+            {t('app.theme.label')}
+          </label>
+          <select
+            id="theme"
+            className="rounded-md border bg-background px-2 py-1 text-sm"
+            value={theme}
+            onChange={(event) => {
+              chooseTheme(event.target.value as Theme)
+            }}
+          >
+            {THEMES.map((value) => (
+              <option key={value} value={value}>
+                {t(`app.theme.${value}`)}
               </option>
             ))}
           </select>

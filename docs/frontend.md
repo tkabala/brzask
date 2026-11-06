@@ -125,6 +125,16 @@ The language comes from an earlier choice, then the browser; the header
 switches it. `pl.ts` must have every key of `en.ts`, which the type checker
 enforces.
 
+## Themes
+
+Light and dark, following the operating system until the header's switch says
+otherwise; the choice stays in `localStorage`. A small inline script in
+`index.html` sets the theme before first paint, so a dark page never flashes
+light, and `src/lib/theme.test.ts` runs it against the app's own logic. The
+browser's bar over the page follows through the `theme-color` meta tag; the
+manifest keeps the icon's background for the splash screen, since a manifest
+cannot change with the theme. Stories have a theme switch in the toolbar.
+
 ## End-to-end tests
 
 `just e2e` (`pnpm e2e` in `frontend/`) runs Playwright against the app as
@@ -132,7 +142,8 @@ people run it: `e2e/stack.sh` builds the image from the checkout and starts
 `deploy/compose.yaml` as its own compose project (`brzask-e2e`, so a running
 instance is never touched) with a test password, then fills it with
 `brzask seed-demo`. The tests log in, use every screen and check each with
-[axe](https://github.com/dequelabs/axe-core) for WCAG 2.1 A and AA violations.
+[axe](https://github.com/dequelabs/axe-core) for WCAG 2.1 A and AA violations,
+in both themes.
 They share one database and run one after another; the stack is removed
 afterwards. CI runs them in the `e2e` job and keeps the report when they fail.
 
