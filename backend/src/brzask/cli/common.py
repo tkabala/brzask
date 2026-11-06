@@ -30,6 +30,16 @@ def get_sessions() -> sessionmaker[Session]:
 
 
 @lru_cache(maxsize=1)
+def get_snapshot_sessions() -> sessionmaker[Session]:
+    """Read-only sessions that see one snapshot for the whole transaction (`brzask export`)."""
+    return session_factory(
+        create_db_engine().execution_options(
+            isolation_level="REPEATABLE READ", postgresql_readonly=True
+        )
+    )
+
+
+@lru_cache(maxsize=1)
 def get_read_only_sessions() -> sessionmaker[Session]:
     """Sessions whose transactions the database keeps read-only (`brzask replay`)."""
     return session_factory(create_db_engine().execution_options(postgresql_readonly=True))
@@ -105,11 +115,12 @@ def parse_moment(value: str) -> datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=zone)
 
 
-def table(headers: Sequence[str], rows: Sequence[Sequence[object]]) -> None:
-    """Print rows as left-aligned columns."""
+def table(headers: Sequence[str], rows: Sequence[Sequence[object]], *, err: bool = False) -> None:
+    """Print rows as left-aligned columns (to stderr with `err`)."""
     cells = [[str(cell) for cell in row] for row in [headers, *rows]]
     widths = [max(len(row[column]) for row in cells) for column in range(len(headers))]
     for row in cells:
         typer.echo(
-            "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
+            "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip(),
+            err=err,
         )

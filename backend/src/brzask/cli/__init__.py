@@ -11,6 +11,7 @@ from brzask import __version__
 from brzask.api.app import create_app
 from brzask.api.metrics import prometheus_reader
 from brzask.cli import common, interests, sources, tokens
+from brzask.cli.archive import export_command, import_command
 from brzask.cli.common import (
     ACTOR,
     configuration_problems,
@@ -48,6 +49,8 @@ app.command(name="judge-bench")(judge_bench_command)
 app.command(name="fit-weights")(fit_weights_command)
 app.command(name="reembed")(reembed_command)
 app.command(name="setup")(setup_command)
+app.command(name="export")(export_command)
+app.command(name="import")(import_command)
 
 
 def run_cli() -> None:

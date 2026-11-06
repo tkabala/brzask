@@ -1,3 +1,4 @@
+import gzip
 import json
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -5,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 from typer.testing import CliRunner, Result
 
@@ -13,9 +15,10 @@ from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
 from brzask.config import get_settings
 from brzask.config.settings import LLMSettings, Settings
-from brzask.db.models import RunKind, RunStatus, SourceOrigin, SourceStatus
+from brzask.db.models import Interest, RunKind, RunStatus, Source, SourceOrigin, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services import auth, pipelines
+from brzask.services.archive import TABLES
 from brzask.services.opml import NO_FEED
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
@@ -56,6 +59,7 @@ def cli(
 ) -> Invoke:
     """Run a command against the test database, in UTC."""
     monkeypatch.setattr(common, "get_sessions", lambda: sessions)
+    monkeypatch.setattr(common, "get_snapshot_sessions", lambda: sessions)
     monkeypatch.setattr(common, "get_feed_finder", lambda: finder)
     monkeypatch.setenv("TZ", "UTC")
 
@@ -94,6 +98,7 @@ def test_help_lists_the_commands() -> None:
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
         "extract-bench", "reembed", "tokens", "hash-password", "seed-demo", "setup",
+        "export", "import",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
@@ -650,3 +655,99 @@ def test_setup_as_root_hands_the_files_back_even_when_interrupted(
     assert result.exit_code != 0
     assert directory in owned
     assert directory / "db_password" in owned
+
+
+# --- export and import -----------------------------------------------------------
+
+
+def clear_all(session: Session) -> None:
+    for archived in reversed(TABLES):
+        session.execute(delete(archived))
+    session.flush()
+
+
+def test_export_and_import_through_a_file(
+    cli: Invoke, session: Session, make: Factories, tmp_path: Path
+) -> None:
+    make.source("Followed")
+    make.interest(topic="AI")
+    path = tmp_path / "brzask.jsonl.gz"
+
+    exported = cli("export", str(path))
+    clear_all(session)
+    imported = cli("import", str(path))
+
+    assert exported.exit_code == 0, exported.output
+    assert f"Wrote {path}" in exported.stderr
+    assert imported.exit_code == 0, imported.output
+    assert "sources" in imported.stdout
+    assert session.scalars(select(Source.name)).all() == ["Followed"]
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_export_names_the_file_by_date(
+    cli: Invoke, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = cli("export")
+
+    assert result.exit_code == 0, result.output
+    assert [p.name for p in tmp_path.iterdir()] == [
+        f"brzask-{datetime.now(UTC).date().isoformat()}.jsonl.gz"
+    ]
+
+
+def test_export_refuses_to_overwrite(cli: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "kept.jsonl.gz"
+    path.write_bytes(b"precious")
+
+    result = cli("export", str(path))
+
+    assert result.exit_code == 1
+    assert "already exists" in result.stderr
+    assert path.read_bytes() == b"precious"
+
+
+def test_export_to_stdout_is_only_the_archive(cli: Invoke, make: Factories) -> None:
+    make.source("Followed")
+
+    result = cli("export", "-")
+
+    assert result.exit_code == 0, result.stderr
+    first = json.loads(gzip.decompress(result.stdout_bytes).splitlines()[0])
+    assert first["format"] == "brzask-export"
+    assert "sources" in result.stderr
+
+
+def test_import_from_stdin(cli: Invoke, session: Session, make: Factories) -> None:
+    make.interest(topic="AI")
+    data = cli("export", "-").stdout_bytes
+    clear_all(session)
+
+    result = runner.invoke(app, ["import", "-"], input=data)
+
+    assert result.exit_code == 0, result.output
+    assert session.scalars(select(Interest.topic)).all() == ["AI"]
+    assert "sign in again" in result.stdout
+
+
+def test_import_error_exits_1_with_the_message(
+    cli: Invoke, make: Factories, tmp_path: Path
+) -> None:
+    make.interest(topic="AI")
+    path = tmp_path / "a.jsonl.gz"
+    cli("export", str(path))
+
+    result = cli("import", str(path))
+
+    assert result.exit_code == 1
+    assert "Error: the database is not empty: interests" in result.stderr
+    assert "Traceback" not in result.output
+
+
+def test_import_of_a_missing_file(cli: Invoke, tmp_path: Path) -> None:
+    result = cli("import", str(tmp_path / "nope.jsonl.gz"))
+
+    assert result.exit_code == 1
+    assert "Error: cannot read" in result.stderr
