@@ -7,6 +7,17 @@ directory too: a restored database works with new secrets, but
 one every link handed out before (in a bookmark or a feed reader) stops
 working.
 
+There are two ways to copy it:
+
+- **`pg_dump`**: the whole database, fast to take and to restore into the same
+  setup. The everyday backup.
+- **`brzask export`**: a [portable archive](#portable-export) of the same data
+  that does not depend on the Postgres version, pgvector or the brzask release
+  it came from. For moving to another Postgres major or machine, and for a
+  copy you can still read in a few years.
+
+Whichever you keep, [test that it restores](#test-a-restore) now and then.
+
 ## Backup
 
 `pg_dump` runs inside the `db` container, so its version always matches the
@@ -57,3 +68,90 @@ docker compose up -d db     # creates an empty brzask database
 docker compose exec -T db pg_restore -U brzask -d brzask --no-owner < brzask-2026-10-21.dump
 docker compose up -d
 ```
+
+## Portable export
+
+`brzask export` writes every source, interest, article with its vectors,
+run, setting, change-log entry and API token (their hashes) to one gzip'd
+[JSON Lines](https://jsonlines.org/) file. Like a dump, it is one consistent
+snapshot while the API and the worker keep running:
+
+```sh
+docker compose exec -T api brzask export - > brzask-$(date +%F).jsonl.gz
+```
+
+`-` writes to standard output, so the file lands on the host; give a file
+name instead to write inside the container. Counts per table go to standard
+error.
+
+The first line names the format and the schema revision, each following line
+is one row (`{"table": "sources", "row": {...}}`), and the last line counts
+the rows per table. A file cut short has no last line, so `brzask import`
+refuses it. To look inside:
+
+```sh
+zcat brzask-2026-11-06.jsonl.gz | head -1
+zcat brzask-2026-11-06.jsonl.gz | jq -c 'select(.table == "interests") | .row'
+```
+
+Login sessions are not in an archive: after a restore, everyone signs in
+again. Feed and API tokens keep working.
+
+## Restore from an archive
+
+`brzask import` loads an archive into an empty database at the latest
+migration, in one transaction: either everything is restored or nothing is.
+It refuses a database that already has data, a damaged or incomplete file,
+and an archive from a newer brzask than the one running (an older one is
+fine). To replace an instance:
+
+```sh
+docker compose stop api worker
+docker compose exec -T db dropdb -U brzask brzask
+docker compose exec -T db createdb -U brzask brzask
+docker compose run --rm migrate
+docker compose run --rm -T migrate import - < brzask-2026-11-06.jsonl.gz
+docker compose up -d
+```
+
+On a new machine, copy `compose.yaml`, `.env` and the `secrets` directory,
+then run the last three commands.
+
+## Test a restore
+
+A backup counts once it has been restored. Restore it into a scratch database
+next to the live one, compare, and drop it; the running instance is not
+touched:
+
+=== "Archive"
+
+    ```sh
+    docker compose exec -T db createdb -U brzask brzask_restore_test
+    docker compose run --rm -e DB_NAME=brzask_restore_test migrate
+    docker compose run --rm -T -e DB_NAME=brzask_restore_test migrate import - < brzask-2026-11-06.jsonl.gz
+    ```
+
+    `import` prints the rows it loaded per table, the same counts as the
+    archive's last line (`zcat brzask-2026-11-06.jsonl.gz | tail -1`).
+
+=== "pg_dump"
+
+    ```sh
+    docker compose exec -T db createdb -U brzask brzask_restore_test
+    docker compose exec -T db pg_restore -U brzask -d brzask_restore_test --no-owner < brzask-2026-10-21.dump
+    docker compose run --rm -e DB_NAME=brzask_restore_test migrate
+    ```
+
+Then look at it as brzask sees it, and compare with the live instance:
+
+```sh
+docker compose run --rm -e DB_NAME=brzask_restore_test migrate status
+docker compose exec api brzask status
+docker compose exec -T db dropdb -U brzask brzask_restore_test
+```
+
+`status` counts articles (stored, shown, opened), sources by status and
+stored vectors, and names the last digest and each pipeline's last run; a
+restore of last night's backup matches the live instance up to what came in
+since. Doing this after every upgrade, and now and then from the
+backup copies themselves, is what tells you they are usable.
