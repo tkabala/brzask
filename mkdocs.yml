@@ -47,6 +47,7 @@ nav:
       - Providers: providers.md
       - Reverse proxy: reverse-proxy.md
       - Feed: feed.md
+      - Notifications: notifications.md
       - Backup and restore: backup.md
       - Observability: observability.md
   - How it works:

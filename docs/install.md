@@ -90,7 +90,10 @@ Every `brzask` command runs in the image, for example:
 docker compose exec api brzask status
 docker compose exec api brzask sources add https://example.com/blog
 docker compose run --rm migrate seed-demo   # fill an empty instance with demo data
+docker compose exec worker brzask notify test  # check NOTIFY_URLS
 ```
+
+To hear when the digest is ready or a run fails, see [Notifications](notifications.md).
 
 ## Bringing your feeds
 
