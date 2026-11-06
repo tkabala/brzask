@@ -141,6 +141,50 @@ describe('sources', () => {
     expect(request.headers.get('X-CSRF-Token')).toBe('csrf-1')
   })
 
+  it('reads an OPML file in the encoding it declares', async () => {
+    const api = loggedInApi({
+      'GET /api/v1/sources': listSources,
+      'POST /api/v1/sources/opml': () => json({ added: [], known: [], failed: [], unchecked: [] }),
+    })
+    const user = userEvent.setup()
+    renderApp('/sources')
+
+    const head = '<?xml version="1.0" encoding="ISO-8859-2"?><opml><body><outline title="'
+    const tail = '"/></body></opml>'
+    // "Łódź" in ISO-8859-2.
+    const title = Uint8Array.of(0xa3, 0xf3, 0x64, 0xbc)
+    await user.upload(
+      await screen.findByLabelText('OPML file'),
+      new File([head, title, tail], 'feeds.opml', { type: 'text/x-opml' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+
+    await screen.findByText('Added: 0. Already sources: 0. No feed found: 0.')
+    const request = nth(api.sent('POST /api/v1/sources/opml'), 0)
+    expect(await request.json()).toEqual({ opml: `${head}Łódź${tail}`, active: false })
+  })
+
+  it('reads an OPML file with a UTF-16 byte order mark', async () => {
+    const api = loggedInApi({
+      'GET /api/v1/sources': listSources,
+      'POST /api/v1/sources/opml': () => json({ added: [], known: [], failed: [], unchecked: [] }),
+    })
+    const user = userEvent.setup()
+    renderApp('/sources')
+
+    const opml = '<opml><body><outline title="Łódź"/></body></opml>'
+    const units = Array.from(opml, (char) => char.charCodeAt(0))
+    await user.upload(
+      await screen.findByLabelText('OPML file'),
+      new File([Uint16Array.of(0xfeff, ...units)], 'feeds.opml', { type: 'text/x-opml' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+
+    await screen.findByText('Added: 0. Already sources: 0. No feed found: 0.')
+    const request = nth(api.sent('POST /api/v1/sources/opml'), 0)
+    expect(await request.json()).toEqual({ opml, active: false })
+  })
+
   it('exports the active sources as a file', async () => {
     const api = loggedInApi({
       'GET /api/v1/sources': listSources,

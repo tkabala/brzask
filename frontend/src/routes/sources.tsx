@@ -107,7 +107,8 @@ function SourcesPage() {
             error={importOpml.error}
             report={importOpml.data ?? null}
             onImport={(values) => importOpml.mutateAsync({ body: values })}
-            onExport={() => exportOpml.mutateAsync()}
+            // A failure is shown above, from the mutation's own error.
+            onExport={() => exportOpml.mutateAsync().catch(() => undefined)}
           />
         }
       />

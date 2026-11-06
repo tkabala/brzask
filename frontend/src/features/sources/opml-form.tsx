@@ -20,6 +20,21 @@ interface Props {
   report?: OpmlReport | null
 }
 
+/** The file's text in the encoding its byte order mark or XML declaration names; else UTF-8. */
+async function readOpml(file: File): Promise<string> {
+  const bytes = await file.arrayBuffer()
+  const [first, second] = new Uint8Array(bytes)
+  if (first === 0xff && second === 0xfe) return new TextDecoder('utf-16le').decode(bytes)
+  if (first === 0xfe && second === 0xff) return new TextDecoder('utf-16be').decode(bytes)
+  const start = new TextDecoder('latin1').decode(bytes.slice(0, 200))
+  const encoding = /^\s*<\?xml[^>]*\bencoding=["']([\w.-]+)["']/.exec(start)?.[1] ?? 'utf-8'
+  try {
+    return new TextDecoder(encoding).decode(bytes)
+  } catch {
+    return new TextDecoder().decode(bytes) // An encoding the browser does not know.
+  }
+}
+
 /** OPML in and out: the subscription list every feed reader can export and read. */
 export function OpmlForm({
   onImport,
@@ -44,8 +59,7 @@ export function OpmlForm({
         onSubmit={(event) => {
           event.preventDefault()
           if (!file) return
-          void file
-            .text()
+          void readOpml(file)
             .then((opml) => onImport({ opml, active }))
             .catch(() => {
               // Shown through `error`; the reader may pick another file.
