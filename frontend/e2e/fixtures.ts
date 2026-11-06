@@ -16,8 +16,9 @@ export async function expectAccessible(page: Page): Promise<void> {
   expect(found, found.join('\n')).toEqual([])
 }
 
-export async function logIn(page: Page): Promise<void> {
-  await page.goto('/')
+/** `start` is where the app is: `/`, or `./` under a sub-path's baseURL. */
+export async function logIn(page: Page, start = '/'): Promise<void> {
+  await page.goto(start)
   await page.getByLabel('Password').fill(E2E_PASSWORD)
   await page.getByRole('button', { name: 'Log in' }).click()
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible()

@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 /** Where the compose stack (e2e/stack.sh) publishes the app. */
 export const APP_PORT = 8100
+/** Where nginx serves the same app under /brzask/ (e2e/compose.yaml). */
+export const SUBPATH_PORT = 8101
 
 /** The test password and its argon2 hash; both only ever used here. */
 export const E2E_PASSWORD = 'e2e-password'
@@ -22,7 +24,18 @@ export default defineConfig({
     locale: 'en-US',
     timezoneId: 'UTC',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /subpath\.spec/ },
+    {
+      name: 'subpath',
+      testMatch: /subpath\.spec/,
+      use: {
+        ...devices['Desktop Chrome'],
+        // Paths in this project are relative ('./', 'archive'), so they keep the prefix.
+        baseURL: `http://localhost:${String(SUBPATH_PORT)}/brzask/`,
+      },
+    },
+  ],
   // The app as people run it: deploy/compose.yaml on an image of this checkout.
   globalSetup: './e2e/global-setup.ts',
 })

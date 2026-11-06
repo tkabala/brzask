@@ -1,16 +1,38 @@
 # deploy/compose.yaml as the end-to-end tests run it (see stack.sh): nothing
-# from a local .env, and a worker that schedules no pipeline.
+# from a local .env, and a worker that schedules no pipeline. A second API
+# serves the same database under /brzask/ behind nginx (subpath.spec.ts).
+x-environment: &environment
+  TZ: UTC
+  LOG_FORMAT: json
+  DIGEST_AT: 'off'
+  REVIEW_AT: 'off'
+  VISITED_AT: 'off'
+  DISCOVERY_AT: 'off'
+
 x-e2e: &e2e
   env_file: !reset []
-  environment:
-    TZ: UTC
-    LOG_FORMAT: json
-    DIGEST_AT: 'off'
-    REVIEW_AT: 'off'
-    VISITED_AT: 'off'
-    DISCOVERY_AT: 'off'
+  environment: *environment
 
 services:
   migrate: *e2e
   api: *e2e
   worker: *e2e
+
+  api-subpath:
+    # Paths resolve from the first compose file's directory, deploy/.
+    extends: { file: compose.yaml, service: api }
+    env_file: !reset []
+    environment:
+      <<: *environment
+      BASE_URL: http://localhost:${E2E_SUBPATH_PORT:-8101}/brzask/
+    ports: !reset []
+
+  proxy-subpath:
+    image: nginx:1.31.8-alpine
+    volumes:
+      - ../frontend/e2e/nginx-subpath.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - 127.0.0.1:${E2E_SUBPATH_PORT:-8101}:80
+    depends_on:
+      api-subpath:
+        condition: service_healthy

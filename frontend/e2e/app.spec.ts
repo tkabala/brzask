@@ -116,7 +116,7 @@ test('the app can be installed', async ({ page, request }) => {
     start_url: string
     icons: { sizes: string; purpose?: string }[]
   }
-  expect(manifest).toMatchObject({ name: 'brzask', display: 'standalone', start_url: '/' })
+  expect(manifest).toMatchObject({ name: 'brzask', display: 'standalone', start_url: './' })
   const sizes = manifest.icons.map((icon) => icon.sizes)
   expect(sizes).toEqual(expect.arrayContaining(['192x192', '512x512']))
   expect(manifest.icons.some((icon) => icon.purpose === 'maskable')).toBe(true)
