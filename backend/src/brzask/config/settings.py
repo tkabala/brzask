@@ -538,9 +538,8 @@ class NotificationSettings(SettingsGroup):
     urls: OptionalSecret = Field(
         None,
         description="Apprise URLs to send the two notifications to (digest ready, pipeline "
-        "failed), separated by spaces or commas. Empty: no notifications. See the "
-        "notifications page for examples.",
-        examples=["ntfys://ntfy.sh/my-brzask-topic"],
+        "failed), separated by spaces or commas, e.g. ntfys://ntfy.sh/my-topic. Empty: no "
+        "notifications.",
     )
 
     @field_validator("urls")

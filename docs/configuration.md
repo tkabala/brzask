@@ -130,7 +130,7 @@ Digest ready and pipeline failed, nothing else.
 
 | Variable | Default | Description |
 |---|---|---|
-| `NOTIFY_URLS` | secret | Apprise URLs to send the two notifications to (digest ready, pipeline failed), separated by spaces or commas. Empty: no notifications. See the notifications page for examples. |
+| `NOTIFY_URLS` | secret | Apprise URLs to send the two notifications to (digest ready, pipeline failed), separated by spaces or commas, e.g. ntfys://ntfy.sh/my-topic. Empty: no notifications. |
 
 ## Logging
 
