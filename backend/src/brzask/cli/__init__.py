@@ -148,7 +148,10 @@ def seed_demo_command() -> None:
 @app.command()
 def worker() -> None:
     """Run the pipelines on their schedule (DIGEST_AT, REVIEW_AT, ...) until stopped."""
-    run_worker(get_settings().scheduler, common.get_sessions())
+    settings = get_settings()
+    # Read now: a bad NOTIFY_URLS stops the worker here, not at the first run.
+    settings.notifications  # noqa: B018
+    run_worker(settings.scheduler, common.get_sessions())
 
 
 @app.command()

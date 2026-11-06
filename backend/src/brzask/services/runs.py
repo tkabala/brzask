@@ -17,8 +17,9 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import Enum
 from functools import cache
-from typing import Any
+from typing import Any, Literal
 
 from opentelemetry import trace
 from sqlalchemy import Connection, Engine, func, select
@@ -26,10 +27,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.usage import UsageMeter
+from brzask.config import get_settings
 from brzask.db.models import Run, RunKind, RunStatus
 from brzask.log import get_logger, logged_run
 from brzask.repositories import RunRepository
 from brzask.services.errors import NotFoundError, ServiceError
+from brzask.services.notify import Notifier, message_after_run, notifier_from_settings
 from brzask.services.run_metrics import RunInstruments
 from brzask.telemetry import tracer
 
@@ -70,6 +73,13 @@ class RunContext:
 
 
 Pipeline = Callable[[RunContext], None]
+
+
+class _Default(Enum):
+    FROM_SETTINGS = "from settings"
+
+
+FROM_SETTINGS = _Default.FROM_SETTINGS
 
 
 # First key of every pipeline lock, so brzask's locks never meet another
@@ -125,12 +135,15 @@ def run_pipeline(
     force: bool = False,
     pipelines: Mapping[RunKind, Pipeline] | None = None,
     instruments: RunInstruments | None = None,
+    notifier: Notifier | Literal[_Default.FROM_SETTINGS] | None = FROM_SETTINGS,
 ) -> Run:
     """Run one pipeline and return its finished run row.
 
     `pipelines` defaults to `brzask.services.pipelines.PIPELINES`, and the
     run's metrics go to `instruments` (the global meter provider's unless
-    given). A pipeline error is recorded on the run and raised again.
+    given). The finished run is notified through `notifier` (NOTIFY_URLS
+    unless given; None: off). A pipeline error is recorded on the run and
+    raised again.
     """
     if pipelines is None:
         # Imported here: the pipelines themselves import this module.
@@ -175,12 +188,16 @@ def run_pipeline(
             return _finish(context, RunStatus.SKIPPED)
         except Exception as error:
             _finish(context, RunStatus.FAILED, error=f"{type(error).__name__}: {error}")
+            _notify(context, notifier)
             raise
         except BaseException as error:
-            # Ctrl-C or a worker shutdown: close the row so it does not stay 'running'.
+            # Ctrl-C or a worker shutdown: close the row so it does not stay 'running',
+            # and send nothing on the way out.
             _finish(context, RunStatus.FAILED, error=f"interrupted ({type(error).__name__})")
             raise
-        return _finish(context, RunStatus.OK)
+        run = _finish(context, RunStatus.OK)
+        _notify(context, notifier)
+        return run
 
 
 def session_bind(sessions: sessionmaker[Session]) -> Engine | Connection:
@@ -213,6 +230,27 @@ def _finish(context: RunContext, status: RunStatus, error: str | None = None) ->
     if context.instruments is not None:
         context.instruments.record(run)
     return run
+
+
+def _notify(
+    context: RunContext, notifier: Notifier | Literal[_Default.FROM_SETTINGS] | None
+) -> None:
+    """Send what the finished run calls for; never raises, never changes the run."""
+    try:
+        settings = get_settings()
+        if notifier is FROM_SETTINGS:
+            notifier = notifier_from_settings(settings.notifications)
+        if notifier is None:
+            return
+        with context.sessions() as session:
+            run = RunRepository(session).get(context.run_id)
+            public_url = settings.server.public_url
+            message = None if run is None else message_after_run(session, run, public_url)
+        if message is not None:
+            notifier.send(message)
+    except Exception as error:
+        # The type only: a settings error would quote the URLs, which carry tokens.
+        log.warning("notification not sent", error=type(error).__name__)
 
 
 @cache

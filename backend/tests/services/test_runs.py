@@ -1,14 +1,20 @@
+import uuid
+from datetime import date
+
 import pytest
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from sqlalchemy.orm import Session, sessionmaker
+from structlog.testing import capture_logs
 
 from brzask.clients.usage import CallUsage
 from brzask.db.models import RunKind, RunStatus
 from brzask.repositories import RunRepository
 from brzask.services.errors import ServiceError
+from brzask.services.notify import Message
 from brzask.services.run_metrics import RunInstruments
-from brzask.services.runs import RunContext, SkipRunError, run_pipeline
+from brzask.services.runs import Pipeline, RunContext, SkipRunError, run_pipeline
+from tests.factories import Factories
 
 
 def succeed(context: RunContext) -> None:
@@ -164,3 +170,124 @@ def test_a_failing_recorder_keeps_the_run(
 
     stored = RunRepository(session).get(run.id)
     assert stored is not None and stored.status is RunStatus.OK
+
+
+# --- Notifications -------------------------------------------------------------------
+
+
+class FakeNotifier:
+    """Records each message with the run's status in the database at sending time."""
+
+    def __init__(self, sessions: sessionmaker[Session], error: Exception | None = None) -> None:
+        self.sessions = sessions
+        self.error = error
+        self.sent: list[tuple[Message, RunStatus | None]] = []
+
+    def send(self, message: Message) -> bool:
+        with self.sessions() as session:
+            [run] = RunRepository(session).recent(1)
+            self.sent.append((message, run.status))
+        if self.error is not None:
+            raise self.error
+        return True
+
+
+def test_failed_run_notifies_and_still_raises(sessions: sessionmaker[Session]) -> None:
+    notifier = FakeNotifier(sessions)
+
+    with pytest.raises(RuntimeError, match="no sources"):
+        run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: fail}, notifier=notifier)
+
+    [(message, status)] = notifier.sent
+    assert message.title == "brzask: review run failed"
+    assert message.body.startswith("RuntimeError: no sources\n")
+    assert status is RunStatus.FAILED  # the row is final before anything is sent
+
+
+def test_interrupted_run_does_not_notify(sessions: sessionmaker[Session]) -> None:
+    notifier = FakeNotifier(sessions)
+
+    def interrupt(context: RunContext) -> None:
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_pipeline(
+            sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: interrupt}, notifier=notifier
+        )
+
+    assert notifier.sent == []
+
+
+def test_dry_and_skipped_runs_do_not_notify(sessions: sessionmaker[Session]) -> None:
+    notifier = FakeNotifier(sessions)
+
+    run_pipeline(sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: skip}, notifier=notifier)
+    with pytest.raises(RuntimeError):
+        run_pipeline(
+            sessions,
+            RunKind.REVIEW,
+            dry_run=True,
+            pipelines={RunKind.REVIEW: fail},
+            notifier=notifier,
+        )
+
+    assert notifier.sent == []
+
+
+def test_notifier_errors_never_change_the_run(sessions: sessionmaker[Session]) -> None:
+    notifier = FakeNotifier(sessions, error=OSError("service down"))
+
+    run = run_pipeline(
+        sessions, RunKind.DIGEST, pipelines={RunKind.DIGEST: digest_of(1)}, notifier=notifier
+    )
+    assert run.status is RunStatus.OK
+    with pytest.raises(RuntimeError, match="no sources"):
+        run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: fail}, notifier=notifier)
+
+    assert len(notifier.sent) == 2
+
+
+def test_bad_notify_setting_does_not_fail_the_run(
+    sessions: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NOTIFY_URLS", "nope://secret-x")
+
+    with capture_logs() as logs:
+        run = run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed})
+
+    assert run.status is RunStatus.OK
+    warnings = [line for line in logs if line["event"] == "notification not sent"]
+    assert [line["error"] for line in warnings] == ["ValidationError"]
+    assert "secret-x" not in str(logs)
+
+
+def digest_of(count: int) -> Pipeline:
+    """A digest pipeline that puts `count` articles into today's digest."""
+
+    def pipeline(context: RunContext) -> None:
+        day = date(2026, 11, 6)
+        context.stats["date"] = day.isoformat()
+        with context.sessions.begin() as session:
+            for _ in range(count):
+                Factories(session).article(
+                    digest_date=day, link=f"https://news.example/{uuid.uuid4()}"
+                )
+
+    return pipeline
+
+
+def test_digest_run_notifies_once_per_day(sessions: sessionmaker[Session]) -> None:
+    notifier = FakeNotifier(sessions)
+    pipelines = {RunKind.DIGEST: digest_of(2)}
+
+    run_pipeline(sessions, RunKind.DIGEST, pipelines=pipelines, notifier=notifier)
+    run_pipeline(
+        sessions,
+        RunKind.DIGEST,
+        force=True,
+        pipelines={RunKind.DIGEST: digest_of(0)},
+        notifier=notifier,
+    )
+
+    [(message, _)] = notifier.sent
+    assert message.title == "brzask: today's 2 are ready"

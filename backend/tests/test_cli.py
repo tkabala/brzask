@@ -92,6 +92,26 @@ def test_an_invalid_setting_is_reported_by_its_variable(
     assert "Traceback" not in error
 
 
+def test_worker_refuses_a_bad_notify_setting(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("NOTIFY_URLS", "nope://secret-y")
+    monkeypatch.setattr("sys.argv", ["brzask", "worker"])
+
+    def must_not_start(*_args: object) -> None:
+        raise AssertionError("the worker started")
+
+    monkeypatch.setattr("brzask.cli.run_worker", must_not_start)
+
+    with pytest.raises(SystemExit) as exit_info:
+        run_cli()
+
+    assert exit_info.value.code == 1
+    error = capsys.readouterr().err
+    assert "  NOTIFY_URLS: Value error, NOTIFY_URLS entry 1 is not a URL Apprise knows" in error
+    assert "secret-y" not in error
+
+
 def test_help_lists_the_commands() -> None:
     result = runner.invoke(app, ["--help"])
 
