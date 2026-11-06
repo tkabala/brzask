@@ -49,7 +49,8 @@ Compose itself reads a few variables from the same `.env`:
 | `GRAFANA_PUBLISH` | `127.0.0.1:3000` | Host address and port of Grafana (`observability` profile) |
 
 The web app is published on the loopback address only. To reach it from
-other machines, put a [reverse proxy](reverse-proxy.md) with TLS in front,
+other machines, put a [reverse proxy](reverse-proxy.md) with TLS in front
+(at a host name of its own or [under a path](reverse-proxy.md#under-a-path)),
 or set `BRZASK_PUBLISH`. Back up the database with `pg_dump` as described in
 [Backup and restore](backup.md).
 

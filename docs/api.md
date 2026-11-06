@@ -18,6 +18,10 @@ listens on 0.0.0.0.
 | `/metrics` | Prometheus metrics |
 | `/…` | The web app, when `API_WEB_DIR` is set: its files, and `index.html` for every other path outside `/api` |
 
+With `BASE_URL` set to an address with a path (`https://home.example/brzask/`),
+every path above is under it (`/brzask/api/v1/…`) and also answers without it;
+see [Reverse proxy](reverse-proxy.md#under-a-path).
+
 ## Logging in
 
 `AUTH_MODE` decides who may use the API:
