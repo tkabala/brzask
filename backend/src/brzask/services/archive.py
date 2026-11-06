@@ -83,7 +83,8 @@ def decode_row(table: Table, row: Mapping[str, Any]) -> dict[str, Any]:
             raise ArchiveError(f"{table.name}: unknown column {name}")
         try:
             decoded[name] = None if value is None else _decode(column.type, value)
-        except (ValueError, TypeError) as error:
+        # AttributeError: uuid.UUID given something other than text.
+        except (ValueError, TypeError, AttributeError) as error:
             raise ArchiveError(f"{table.name}.{name}: {error}") from error
     return decoded
 

@@ -54,6 +54,11 @@ def test_article_values_round_trip() -> None:
     assert through_json(table("articles"), row) == row
 
 
+def test_a_uuid_that_is_no_text_is_an_archive_error() -> None:
+    with pytest.raises(ArchiveError, match=r"runs\.id"):
+        decode_row(table("runs"), {"id": 123})
+
+
 def test_vectors_round_trip_exactly() -> None:
     vector = [0.12345679, -1e-7, 3.4028235e38] + [0.0] * 765
     row = {"article_id": 1, "model": "m", "embedding": vector}
