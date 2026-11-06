@@ -15,6 +15,7 @@ those requests instead of answering 405.
 
 import re
 from pathlib import Path
+from urllib.parse import unquote
 
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse, RedirectResponse, Response
@@ -95,12 +96,14 @@ class PathPrefix:
 
     def __init__(self, app: ASGIApp, root_path: str) -> None:
         self.app = app
+        # As in URLs (percent-encoded), for the redirect; ASGI paths are decoded.
         self.root_path = root_path
+        self.decoded = unquote(root_path)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket"):
-            scope = {**scope, "root_path": scope.get("root_path", "") + self.root_path}
-        if scope["type"] == "http" and scope["path"] == self.root_path:
+            scope = {**scope, "root_path": scope.get("root_path", "") + self.decoded}
+        if scope["type"] == "http" and scope["path"] == self.decoded:
             query = scope.get("query_string", b"").decode("latin-1")
             location = f"{self.root_path}/" + (f"?{query}" if query else "")
             await RedirectResponse(location, status_code=308)(scope, receive, send)

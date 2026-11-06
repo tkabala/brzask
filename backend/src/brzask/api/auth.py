@@ -279,6 +279,10 @@ def _set_cookie(request: Request, response: Response, config: Auth, token: str) 
         samesite="lax",
         path=cookie_path(config),
     )
+    if config.root_path:
+        # A cookie from before the app moved under its prefix has Path=/; browsers
+        # send it last and the server reads the last one, so it would always win.
+        response.delete_cookie(SESSION_COOKIE, path="/")
 
 
 def cookie_path(config: Auth) -> str:

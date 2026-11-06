@@ -116,11 +116,16 @@ def create_app(
     if web_dir is not None:
         # Last, so every route above wins over a file of the same name.
         app.mount("/", web.WebApp(web_dir, f"{server.root_path}/"), name="web")
-    if server.root_path:
-        app.add_middleware(web.PathPrefix, root_path=server.root_path)
 
     app.openapi = lambda: _openapi(app)  # type: ignore[method-assign]
     instrument_app(app, meter_provider)
+    if server.root_path:
+        # Outside the instrumentation's middleware, which matches the route
+        # before any middleware added with add_middleware runs.
+        build = app.build_middleware_stack
+        app.build_middleware_stack = lambda: web.PathPrefix(  # type: ignore[method-assign]
+            build(), root_path=server.root_path
+        )
     register_open_rate(
         sessions, meter_provider.get_meter("brzask.digest") if meter_provider else None
     )

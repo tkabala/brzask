@@ -437,6 +437,9 @@ class ServerSettings(SettingsGroup):
             raise ValueError("BASE_URL takes no query or fragment")
         if value.username is not None or value.password is not None:
             raise ValueError("BASE_URL takes no user name or password")
+        if "//" in (value.path or ""):
+            # `<base href="//x/">` would name another host.
+            raise ValueError("BASE_URL's path has an empty segment (//)")
         return value
 
     @property

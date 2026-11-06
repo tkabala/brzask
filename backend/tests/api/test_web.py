@@ -211,3 +211,15 @@ def test_probes_answer_without_the_prefix(prefixed: TestClient, path: str) -> No
     # only because these tests have no database.
     assert prefixed.get(path).status_code in (200, 503)
     assert prefixed.get(path).headers["content-type"] != "text/html; charset=utf-8"
+
+
+def test_a_non_ascii_prefix_routes(web_dir: Path, password_auth: AuthSettings) -> None:
+    client = _client(web_dir, password_auth, "http://testserver/wiadomości/")
+
+    # The browser sends the path percent-encoded; ASGI hands it on decoded.
+    session = client.get("/wiadomo%C5%9Bci/api/v1/auth/session")
+    assert session.headers["content-type"] == "application/json"
+    assert client.get("/wiadomo%C5%9Bci/").text == served("/wiadomo%C5%9Bci/")
+    redirect = client.get("/wiadomo%C5%9Bci", follow_redirects=False)
+    assert redirect.status_code == 308
+    assert redirect.headers["location"] == "/wiadomo%C5%9Bci/"

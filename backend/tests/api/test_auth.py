@@ -286,7 +286,12 @@ def test_cookie_is_secure_when_the_login_came_over_https(
 
 
 def _cookie(response: Response) -> str:
-    cookies = [c for c in response.headers.get_list("set-cookie") if c.startswith("brzask_session")]
+    """The session cookie set, leaving out cookies being cleared."""
+    cookies = [
+        c
+        for c in response.headers.get_list("set-cookie")
+        if c.startswith("brzask_session") and "max-age=0" not in c.lower()
+    ]
     assert len(cookies) == 1
     return cookies[0].lower()
 
@@ -340,3 +345,16 @@ def log_in_at(client: TestClient, prefix: str) -> str:
     assert response.status_code == 200
     token: str = response.json()["csrf_token"]
     return token
+
+
+@pytest.mark.parametrize("base_url_setting", ["https://h.example/brzask"])
+def test_login_drops_a_cookie_left_at_the_root(client: TestClient) -> None:
+    # Browsers send the longer path's cookie first and the server keeps the
+    # last one, so a dead cookie from before the move would win every time.
+    client.cookies.set("brzask_session", "dead", domain="testserver.local", path="/")
+
+    response = client.post("/brzask/api/v1/auth/login", json={"password": PASSWORD})
+
+    cleared = [c.lower() for c in response.headers.get_list("set-cookie")]
+    assert any(("path=/;" in c or c.endswith("path=/")) and "max-age=0" in c for c in cleared)
+    assert any("path=/brzask/" in c and "max-age=2592000" in c for c in cleared)

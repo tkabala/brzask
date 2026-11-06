@@ -97,6 +97,9 @@ healthchecks and scrapers inside your network keep their paths.
     }
     ```
 
+    `proxy_pass http://127.0.0.1:8000/;` (with a path) strips the prefix
+    instead, which works as well.
+
 === "Traefik"
 
     As for a host name of its own, with this rule:
@@ -105,7 +108,12 @@ healthchecks and scrapers inside your network keep their paths.
           traefik.http.routers.brzask.rule: Host(`home.example`) && PathPrefix(`/brzask`)
     ```
 
-    A `StripPrefix` middleware on the router works as well.
+    Stripping the prefix works as well:
+
+    ```yaml
+          traefik.http.middlewares.brzask-strip.stripprefix.prefixes: /brzask
+          traefik.http.routers.brzask.middlewares: brzask-strip
+    ```
 
 `BASE_URL` is also what the feed's links and `brzask tokens create --scope
 feed` use, so it is worth setting with a host name of its own too
@@ -177,6 +185,19 @@ Without it, their host is the `Host` header the proxy passes on, and their
 scheme `https` when a trusted proxy sends `X-Forwarded-Proto: https`. Proxies log query strings by default, so the
 feed token ends up in their access log; brzask's own log shows
 `token=REDACTED`.
+
+With Traefik, a second router for the two paths, without the login
+middleware, wins over the main one by its longer rule:
+
+```yaml
+      traefik.http.routers.brzask-public.rule: >-
+        Host(`home.example`) && (Path(`/brzask/feed`) || Path(`/brzask/open`))
+      traefik.http.routers.brzask-public.entrypoints: websecure
+      traefik.http.routers.brzask-public.tls.certresolver: letsencrypt
+      # No login ran here: drop a user name the client may have sent itself.
+      traefik.http.middlewares.brzask-no-user.headers.customrequestheaders.Remote-User: ""
+      traefik.http.routers.brzask-public.middlewares: brzask-no-user
+```
 
 With `AUTH_MODE=header`, the paths that skip the login must also remove the
 user header (`AUTH_HEADER`), as above: brzask believes it from the proxy, and

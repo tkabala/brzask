@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.factories import Factories
@@ -38,3 +39,18 @@ def test_metrics_show_the_open_rate(client: TestClient, make: Factories) -> None
 
     assert value("brzask_digest_shown") == "2.0"
     assert value("brzask_digest_opened") == "1.0"
+
+
+@pytest.mark.parametrize("base_url_setting", ["http://testserver/brzask/"])
+@pytest.mark.parametrize("prefix", ["/brzask", ""])
+def test_metrics_name_the_route_under_a_prefix(client: TestClient, prefix: str) -> None:
+    # Passed through by the proxy or stripped, the request is the same route.
+    client.get(f"{prefix}/api/v1/runs")
+
+    lines = client.get("/metrics").text.splitlines()
+
+    assert any(
+        line.startswith("http_server_request_duration_seconds_count")
+        and 'http_route="/api/v1/runs"' in line
+        for line in lines
+    )
