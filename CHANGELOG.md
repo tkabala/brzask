@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.0](https://github.com/tkabala/brzask/compare/v0.1.16...v0.2.0) (2026-11-06)
+
+
+### Features
+
+* **frontend:** dark mode ([a9ac43a](https://github.com/tkabala/brzask/commit/a9ac43a811f00a3c20330baf90bdb1985671ab28))
+
+
+### Bug Fixes
+
+* **archive:** report a non-text UUID value as an archive error ([10b0bed](https://github.com/tkabala/brzask/commit/10b0beda8174be4820ac21452829e2d07fd2a767))
+* **feed:** keep the ETag of an empty feed between polls ([a10035a](https://github.com/tkabala/brzask/commit/a10035a7da62f55a402f5206ccb1d3a088f83246))
+* **frontend:** save the offline copy only when its data changes ([2d50519](https://github.com/tkabala/brzask/commit/2d505194bc0ec04ca6a3d123c068f2fe3d4ab90a))
+* **log:** redact API tokens wherever an error report shows them ([c285a37](https://github.com/tkabala/brzask/commit/c285a370def7943c60ee5cfad3890721b0d0899d))
+* **notify:** keep a comma inside one NOTIFY_URLS entry ([badc85a](https://github.com/tkabala/brzask/commit/badc85a0f663158a67ad8eb147327524936e661d))
+* **sources:** read OPML uploads in their encoding, handle export failures ([791cba0](https://github.com/tkabala/brzask/commit/791cba059891a3f14f93eaa69c67b86f38ee80f0))
+* **telemetry:** keep credentials out of Sentry reports ([e96bc3c](https://github.com/tkabala/brzask/commit/e96bc3c6247e66da83213d5633b19bec60826e4e))
+
+
+### Documentation
+
+* **notifications:** reflow the NOTIFY_URLS paragraph ([2024a2f](https://github.com/tkabala/brzask/commit/2024a2fc801c0f0af54cbf1cfab42636a915da3f))
+
 ## [0.1.16](https://github.com/tkabala/brzask/compare/v0.1.15...v0.1.16) (2026-11-06)
 
 
