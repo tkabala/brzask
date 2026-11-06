@@ -408,3 +408,65 @@ def test_budget_must_be_positive(monkeypatch: pytest.MonkeyPatch, value: str) ->
 
     with pytest.raises(ValidationError):
         BudgetSettings()
+
+
+# --- BASE_URL --------------------------------------------------------------------
+
+
+def test_base_url_is_optional(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BASE_URL", "")
+    server = ServerSettings()
+
+    assert server.base_url is None
+    assert server.public_url is None
+    assert server.root_path == ""
+
+
+def test_base_url_gets_a_trailing_slash(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BASE_URL", "https://home.example/brzask")
+    server = ServerSettings()
+
+    assert server.public_url == "https://home.example/brzask/"
+    assert server.root_path == "/brzask"
+
+
+@pytest.mark.parametrize(
+    ("value", "public", "root"),
+    [
+        ("https://news.example", "https://news.example/", ""),
+        ("https://news.example/", "https://news.example/", ""),
+        ("HTTPS://News.Example:443/", "https://news.example/", ""),
+        ("http://news.example:8080/a/b", "http://news.example:8080/a/b/", "/a/b"),
+    ],
+)
+def test_base_url_is_normalised(
+    monkeypatch: pytest.MonkeyPatch, value: str, public: str, root: str
+) -> None:
+    monkeypatch.setenv("BASE_URL", value)
+    server = ServerSettings()
+
+    assert server.public_url == public
+    assert server.root_path == root
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "ftp://h.example/",
+        "https://h.example/?a=1",
+        "https://h.example/#x",
+        "https://u:p@h.example/",
+    ],
+)
+def test_base_url_rejects(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("BASE_URL", value)
+
+    with pytest.raises(ValidationError):
+        ServerSettings()
+
+
+def test_base_url_env_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("API_BASE_URL", "https://h.example/x/")
+
+    assert env_name(ServerSettings, "base_url") == "BASE_URL"
+    assert ServerSettings().base_url is None

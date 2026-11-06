@@ -11,6 +11,7 @@ from typer.testing import CliRunner, Result
 from brzask import __version__
 from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
+from brzask.config import get_settings
 from brzask.config.settings import LLMSettings, Settings
 from brzask.db.models import RunKind, RunStatus, SourceOrigin, SourceStatus
 from brzask.repositories import RunRepository
@@ -550,6 +551,15 @@ def test_feed_token_says_where_to_subscribe(cli: Invoke) -> None:
     assert created.exit_code == 0, created.output
     assert created.stdout.strip().startswith("brz_")
     assert "/feed?token=" in created.stderr
+
+
+def test_feed_token_hint_uses_base_url(cli: Invoke, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BASE_URL", "https://h.example/brzask")
+    get_settings.cache_clear()
+
+    created = cli("tokens", "create", "reader", "--scope", "feed")
+
+    assert "Subscribe to https://h.example/brzask/feed?token=<token>" in created.stderr
 
 
 def test_seed_demo(cli: Invoke) -> None:

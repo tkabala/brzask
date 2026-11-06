@@ -23,6 +23,7 @@ from pydantic import (
     HttpUrl,
     PlainSerializer,
     SecretStr,
+    field_validator,
     model_validator,
 )
 from pydantic.fields import FieldInfo
@@ -417,6 +418,43 @@ class ServerSettings(SettingsGroup):
         description="Directory of the built web app (frontend/dist) to serve at /; "
         "empty serves the API only.",
     )
+    base_url: Annotated[HttpUrl | None, BeforeValidator(_empty_to_none)] = Field(
+        None,
+        validation_alias="BASE_URL",
+        description="Public address brzask is served at, e.g. https://home.example/brzask/; "
+        "sets the path prefix, open and feed links and the cookie path. Empty: served at "
+        "the root, links follow the request.",
+    )
+
+    @field_validator("base_url")
+    @classmethod
+    def _plain_base_url(cls, value: HttpUrl | None) -> HttpUrl | None:
+        if value is None:
+            return None
+        if value.scheme not in ("http", "https"):
+            raise ValueError("BASE_URL must start with http:// or https://")
+        if value.query is not None or value.fragment is not None:
+            raise ValueError("BASE_URL takes no query or fragment")
+        if value.username is not None or value.password is not None:
+            raise ValueError("BASE_URL takes no user name or password")
+        return value
+
+    @property
+    def public_url(self) -> str | None:
+        """BASE_URL with exactly one trailing slash, e.g. `https://home.example/brzask/`."""
+        if self.base_url is None:
+            return None
+        url = self.base_url
+        default_port = {"http": 80, "https": 443}[url.scheme]
+        port = "" if url.port in (None, default_port) else f":{url.port}"
+        return f"{url.scheme}://{url.host}{port}{self.root_path}/"
+
+    @property
+    def root_path(self) -> str:
+        """The path prefix without its trailing slash: `/brzask`, or `""` at the root."""
+        if self.base_url is None:
+            return ""
+        return (self.base_url.path or "/").rstrip("/")
 
 
 class SchedulerSettings(SettingsGroup):

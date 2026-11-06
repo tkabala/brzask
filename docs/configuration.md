@@ -95,6 +95,7 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 | `API_HOST` | `127.0.0.1` | Address to listen on; 0.0.0.0 for all. |
 | `API_PORT` | `8000` | Port to listen on. |
 | `API_WEB_DIR` | (none) | Directory of the built web app (frontend/dist) to serve at /; empty serves the API only. |
+| `BASE_URL` | (none) | Public address brzask is served at, e.g. https://home.example/brzask/; sets the path prefix, open and feed links and the cookie path. Empty: served at the root, links follow the request. |
 
 ## Pipeline schedule for the worker
 

@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from brzask.cli.common import ACTOR, errors_as_messages, local, table, unit_of_work
+from brzask.config import get_settings
 from brzask.db.models import TokenScope
 from brzask.services import tokens
 
@@ -31,8 +32,9 @@ def create(
         token, value = tokens.create_token(session, name, scope, actor=ACTOR)
         scope_name = token.scope.value
     typer.echo(value)
+    server = get_settings().server.public_url or "<your server>/"
     use = (
-        "Subscribe to <your server>/feed?token=<token>"
+        f"Subscribe to {server}feed?token=<token>"
         if scope is TokenScope.FEED
         else "Send it as 'Authorization: Bearer <token>'"
     )
