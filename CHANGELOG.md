@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.1.16](https://github.com/tkabala/brzask/compare/v0.1.15...v0.1.16) (2026-11-06)
+
+
+### Features
+
+* **notify:** brzask notify test ([66561f9](https://github.com/tkabala/brzask/commit/66561f9184b32597104895bf6963923723983d88))
+* **notify:** digest-ready and run-failed messages ([5388a69](https://github.com/tkabala/brzask/commit/5388a69e9965c6fa9cca420d0e54e10d6b90dcc5))
+* **notify:** notify after pipeline runs ([ab80b5c](https://github.com/tkabala/brzask/commit/ab80b5c197431610adde27c25aaf25f47d507a29))
+* **notify:** NOTIFY_URLS setting ([6006127](https://github.com/tkabala/brzask/commit/60061278e322defdb28a3d98386caa17f57106bd))
+
+
+### Bug Fixes
+
+* **notify:** keep notification URLs out of debug logs and Sentry breadcrumbs ([e1800ea](https://github.com/tkabala/brzask/commit/e1800ea9816ee4091aa60f1f838b5955cb02444a))
+* **notify:** leave NOTIFY_URLS empty in .env.example ([fbbb4f0](https://github.com/tkabala/brzask/commit/fbbb4f00e9b6a11486294c2e9d014b1f6a968645))
+* **notify:** name the failed NOTIFY_URLS entries in the log ([e5641b0](https://github.com/tkabala/brzask/commit/e5641b06002524841f26872a67a106b2980b653a))
+
+
+### Documentation
+
+* notifications ([bae9965](https://github.com/tkabala/brzask/commit/bae9965765487e6e30edba90a2f40da11ac75d8b))
+
+
+### Chores
+
+* release 0.1.16 ([6338359](https://github.com/tkabala/brzask/commit/633835961221c107d5275db6d49704f0cf5b36f5))
+
 ## [0.1.15](https://github.com/tkabala/brzask/compare/v0.1.14...v0.1.15) (2026-11-06)
 
 
