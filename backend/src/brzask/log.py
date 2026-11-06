@@ -25,13 +25,17 @@ LogFormat = Literal["auto", "json", "console"]
 _QUIET_LOGGERS = ("httpx2", "httpcore2", "apscheduler.executors.default")
 
 # A token in a query string (the feed's URL carries one): every poll would
-# write it into the access log.
-_QUERY_TOKEN = re.compile(r"((?:^|[?&])token=)[^&#\s\"]+")
+# write it into the access log. Not only after `?` or `&`: an error report
+# shows the ASGI scope's query as `b'token=...'`.
+_QUERY_TOKEN = re.compile(r"((?<![\w-])token=)[^&#\s\"']+")
+# A token anywhere else: an error report's stack frames show local variables
+# and the ASGI scope's headers, under names no filter knows.
+_BARE_TOKEN = re.compile(r"(?<![\w-])brz_[\w-]+")
 
 
 def redact_tokens(text: str) -> str:
-    """`text` (a URL, a query or a log line) with every `token=` value replaced."""
-    return _QUERY_TOKEN.sub(r"\1REDACTED", text)
+    """`text` (a URL, a query or a log line) with every token value replaced."""
+    return _BARE_TOKEN.sub("REDACTED", _QUERY_TOKEN.sub(r"\1REDACTED", text))
 
 
 class _RedactTokens(logging.Filter):

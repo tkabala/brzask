@@ -231,6 +231,10 @@ def test_redact_tokens() -> None:
     assert redact_tokens("/open?id=3&sig=ff") == "/open?id=3&sig=ff"
     assert redact_tokens("token=brz_abc&x=1") == "token=REDACTED&x=1"  # a bare query
     assert redact_tokens("/feed?mytoken=a") == "/feed?mytoken=a"
+    assert redact_tokens("b'token=brz_abc'") == "b'token=REDACTED'"  # a scope in an error report
+    assert redact_tokens("'brz_a-b_c'") == "'REDACTED'"  # a local variable
+    assert redact_tokens("b'Bearer brz_abc'") == "b'Bearer REDACTED'"  # a scope's header
+    assert redact_tokens("no-brz_abc") == "no-brz_abc"
 
 
 def test_access_log_hides_feed_tokens(output: io.StringIO) -> None:
