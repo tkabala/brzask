@@ -53,7 +53,7 @@ class ArchiveError(ServiceError):
     pass
 
 
-def encode_row(table: Table, row: Mapping[str, Any]) -> dict[str, Any]:
+def encode_row(table: Table, row: Mapping[Any, Any]) -> dict[str, Any]:
     """`row` as plain JSON values: timestamps and dates in ISO 8601, UUIDs as text."""
     return {name: _encode(value) for name, value in row.items()}
 
