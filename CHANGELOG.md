@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.1.15](https://github.com/tkabala/brzask/compare/v0.1.14...v0.1.15) (2026-11-06)
+
+
+### Features
+
+* **api:** prefix open and feed links and the session cookie ([9b68d93](https://github.com/tkabala/brzask/commit/9b68d9367d90dedf0181283434e816fda8e78dfa))
+* **api:** serve under the BASE_URL path ([c9447b3](https://github.com/tkabala/brzask/commit/c9447b31e215c0a5684ca88337de83026df26734))
+* **archive:** export every durable table ([41b034c](https://github.com/tkabala/brzask/commit/41b034c99a9202c9780aceb2efe3a98432f51987))
+* **archive:** import into an empty database ([29f6c12](https://github.com/tkabala/brzask/commit/29f6c12d7953d602ab50aa983214b65f2ecd481a))
+* **archive:** portable archive format ([618b500](https://github.com/tkabala/brzask/commit/618b500d7fbe6271ddd4ed8a25ef4c6df6d33210))
+* **cli:** brzask export and import ([91459a5](https://github.com/tkabala/brzask/commit/91459a533391d7e4c5dc73d6d47d479080ceaf23))
+* **config:** add BASE_URL ([f4c8224](https://github.com/tkabala/brzask/commit/f4c8224d7aa05867df985b4fb69bc1172c9e9158))
+* **deploy:** add an observability profile ([6c44f69](https://github.com/tkabala/brzask/commit/6c44f6953b548f05049b006de77008435116fe4d))
+* **deploy:** provision a brzask dashboard ([e434a92](https://github.com/tkabala/brzask/commit/e434a92e6743aa309ca5bc01833859e304f2cc97))
+* **telemetry:** measure pipeline runs, LLM cost and digest articles ([8687687](https://github.com/tkabala/brzask/commit/86876873bf02807ca33712dacb8c8d10a3f12024))
+* **telemetry:** report the open rate of the last seven digests ([7850090](https://github.com/tkabala/brzask/commit/7850090517ab0365054f0cc43af9551a43e38c60))
+* **telemetry:** trace each pipeline run as one span ([35200f6](https://github.com/tkabala/brzask/commit/35200f69a1d133a8d7f4e5dbaf423aad36b9eb2f))
+* **web:** run under any path prefix ([0de9cd8](https://github.com/tkabala/brzask/commit/0de9cd85ffac61312fc50d055e42ef068232771c))
+
+
+### Bug Fixes
+
+* **api:** keep routes, cookies and odd prefixes right under BASE_URL ([6843b4d](https://github.com/tkabala/brzask/commit/6843b4deda4cbb91f8132297d507ad16f6e743dc))
+* **archive:** accept database rows in encode_row ([d25cc82](https://github.com/tkabala/brzask/commit/d25cc82ba6514e4c6fc312d9d9f32754f17c0492))
+* **archive:** one-line errors for bad values and unwritable paths ([81ecb00](https://github.com/tkabala/brzask/commit/81ecb0002507dc0e947c62e400924d2ca63af6d5))
+* **telemetry:** keep the run's context in worker threads ([81b7bbf](https://github.com/tkabala/brzask/commit/81b7bbfb1c28f1300f451153718b7497986a4059))
+* **telemetry:** show the open rate all day and keep its reads out of traces ([896d38e](https://github.com/tkabala/brzask/commit/896d38e3bcef9dc09c2944d9220203d91de0bdb5))
+
+
+### Documentation
+
+* describe the observability profile ([aa36524](https://github.com/tkabala/brzask/commit/aa3652477e4cde0d7a2c128ab8730cb6bdf9b1cf))
+* portable export and a restore test ([4920e45](https://github.com/tkabala/brzask/commit/4920e453ad5b097ff7a2b02406e385f6ddd34991))
+* serving under a sub-path and Traefik examples ([0a1ee16](https://github.com/tkabala/brzask/commit/0a1ee16e5c8719ac411b274be1104d329c0f5986))
+
+
+### Chores
+
+* release 0.1.15 ([214c498](https://github.com/tkabala/brzask/commit/214c49870464c329ab8a1e96b49041ef5849a7e4))
+* release 0.1.15 ([3d75601](https://github.com/tkabala/brzask/commit/3d7560106bc63b948aa63b55c0849d215e2de32d))
+* release 0.1.16 ([408c504](https://github.com/tkabala/brzask/commit/408c5048fb4f1b5982938e01f851c78c6507e23b))
+* release 0.1.17 ([bf5ddc4](https://github.com/tkabala/brzask/commit/bf5ddc4d534eb3909d1d0d0303ed6f920324806c))
+
 ## [0.1.14](https://github.com/tkabala/brzask/compare/v0.1.13...v0.1.14) (2026-11-05)
 
 
