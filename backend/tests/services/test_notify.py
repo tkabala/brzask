@@ -75,7 +75,11 @@ def test_apprise_notifier_reports_failure_without_urls(caplog: pytest.LogCapture
     assert sent is False
     assert "secret-abc" not in caplog.text + str(logs)
     assert logs == [
-        {"event": "notification not sent", "services": ["JSON"], "log_level": "warning"}
+        {
+            "event": "notification not sent",
+            "failed": [{"entry": 1, "service": "JSON", "status": "failure"}],
+            "log_level": "warning",
+        }
     ]
 
 
@@ -174,3 +178,19 @@ def test_a_sent_notification_logs_no_url_even_at_debug(
 
     assert sent is True
     assert "secret-path-token" not in caplog.text
+
+
+def test_a_failed_target_is_logged_by_position_and_service(hook_url: str) -> None:
+    notifier = AppriseNotifier([hook_url, "json://127.0.0.1:9/secret-dead"])
+
+    with capture_logs() as logs:
+        sent = notifier.send(Message("t", "b"))
+
+    assert sent is False
+    assert logs == [
+        {
+            "event": "notification not sent",
+            "failed": [{"entry": 2, "service": "JSON", "status": "failure"}],
+            "log_level": "warning",
+        }
+    ]

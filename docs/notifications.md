@@ -46,7 +46,8 @@ Nothing else, by design. No message for:
 - new or muted sources, single articles, or anything else.
 
 The run itself never depends on a notification: when the service is down, the
-worker logs `notification not sent` with the service's name and goes on.
+worker logs `notification not sent` with the failed entry's place in
+`NOTIFY_URLS` and its service (never the URL) and goes on.
 
 ## Set it up
 

@@ -49,29 +49,42 @@ class AppriseNotifier:
         from apprise import Apprise
 
         self._apprise = Apprise()
+        # Each target's place in NOTIFY_URLS and service, by Apprise's id for its URL.
+        self._entries: dict[str, tuple[int, str]] = {}
         with quiet_apprise():
-            for target in targets:
-                self._apprise.add(target)
-        self._services = [service.service_name for service in self._apprise]
+            for position, target in enumerate(targets, start=1):
+                server = Apprise.instantiate(target, suppress_exceptions=True)
+                if server is None:
+                    continue  # the settings refuse such a URL already
+                self._apprise.add(server)
+                url_id = server.url_id()  # type: ignore[no-untyped-call]  # untyped in Apprise
+                self._entries[str(url_id)] = (position, str(server.service_name))
 
     def send(self, message: Message) -> bool:
-        from apprise import NotifyFormat
+        from apprise import AppriseResultStatus, NotifyFormat
 
         try:
             with quiet_apprise():
-                sent = bool(
-                    self._apprise.notify(
-                        body=message.body, title=message.title, body_format=NotifyFormat.TEXT
-                    )
+                result = self._apprise.notify(
+                    body=message.body, title=message.title, body_format=NotifyFormat.TEXT
                 )
         except Exception as error:
-            log.warning(
-                "notification not sent", services=self._services, error=type(error).__name__
-            )
+            log.warning("notification not sent", error=type(error).__name__)
             return False
-        if not sent:
-            log.warning("notification not sent", services=self._services)
-        return sent
+        if result:
+            return True
+        # Which entries failed, by place and service: Apprise's reasons quote the URLs.
+        failed = [
+            {
+                "entry": self._entries.get(item.url_id or "", (0, ""))[0],
+                "service": item.name,
+                "status": item.status.name.lower(),
+            }
+            for item in result.results
+            if item.status is not AppriseResultStatus.SUCCESS
+        ]
+        log.warning("notification not sent", failed=sorted(failed, key=lambda f: f["entry"]))
+        return False
 
 
 def notifier_from_settings(settings: NotificationSettings) -> Notifier | None:
