@@ -1,10 +1,10 @@
 """`brzask export` and `brzask import`."""
 
-import contextlib
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, BinaryIO
+from typing import IO, Annotated
 
 import typer
 
@@ -41,20 +41,34 @@ def export_command(
         )
         if target.exists():
             raise ArchiveError(f"{target} already exists")
-        # A failed export leaves no file that looks complete.
-        partial = target.with_name(target.name + ".partial")
         try:
-            with partial.open("xb") as out:
-                counts = _export(out)
-            partial.replace(target)
-        finally:
-            with contextlib.suppress(FileNotFoundError):
-                partial.unlink()
+            counts = _export_to(target)
+        except OSError as error:
+            raise ArchiveError(f"cannot write {target}: {error.strerror}") from error
     _print_counts(counts, err=True)
     typer.echo(f"Wrote {target}", err=True)
 
 
-def _export(out: BinaryIO) -> Counts:
+def _export_to(target: Path) -> Counts:
+    """Export to a temporary file next to `target`, renamed on success.
+
+    A failed export leaves no file that looks complete; a name of its own per
+    run keeps a leftover or a parallel export out of the way.
+    """
+    with tempfile.NamedTemporaryFile(
+        dir=target.parent, prefix=f"{target.name}.", suffix=".partial", delete=False
+    ) as out:
+        partial = Path(out.name)
+        try:
+            counts = _export(out)
+        except BaseException:
+            partial.unlink(missing_ok=True)
+            raise
+    partial.replace(target)
+    return counts
+
+
+def _export(out: IO[bytes]) -> Counts:
     with common.get_snapshot_sessions().begin() as session:
         return export_archive(session, out, version=__version__)
 

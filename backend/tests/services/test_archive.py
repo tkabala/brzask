@@ -198,16 +198,34 @@ def test_round_trip(session: Session, sessions: sessionmaker[Session], make: Fac
 def test_new_rows_get_ids_after_the_restored_ones(
     session: Session, sessions: sessionmaker[Session], make: Factories
 ) -> None:
-    for n in range(3):
-        make.source(name=f"S{n}")
-    highest = session.scalar(select(func.max(Source.id)))
-    data = archive_of(session)
+    make.source(name="Template")
+    lines = [json.loads(line) for line in gzip.decompress(archive_of(session)).splitlines()]
+    header_line, source_line, *_ = lines
+    rows = [
+        {
+            "table": "sources",
+            "row": {
+                **source_line["row"],
+                "id": n,
+                "name": f"S{n}",
+                "url": f"https://s{n}.example/feed",
+            },
+        }
+        for n in (1000, 1001)
+    ]
+    counts = {name: 0 for name in lines[-1]["end"]["counts"]} | {"sources": 2}
+    clear(session)
+    interest_before = make.interest(topic="Probe").id
     clear(session)
 
-    import_archive(sessions, io.BytesIO(data))
+    import_archive(
+        sessions, io.BytesIO(lines_to_archive([header_line, *rows, {"end": {"counts": counts}}]))
+    )
 
-    assert make.source(name="After").id > (highest or 0)
-    assert make.interest(topic="New").id is not None  # an empty table's sequence still works
+    assert make.source(name="After").id == 1002
+    assert (
+        make.interest(topic="New").id == interest_before + 1
+    )  # an empty table's sequence is left alone
 
 
 def test_refuses_a_database_with_rows(
@@ -326,3 +344,66 @@ def test_an_older_archive_without_a_column_gets_its_default(
 
     assert [s.kind for s in session.scalars(select(Source))] == ["feed", "feed"]
     assert session.scalar(select(func.count()).select_from(Interest)) == 0
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("first_seen_at", "yesterday"),
+        ("first_seen_at", 17),
+        ("state", "forgotten"),
+        ("id", "abc"),
+    ],
+)
+def test_a_bad_value_names_its_line_and_column(
+    column: str, value: Any, session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    make.article(make.source(name="Feed"), first_seen_at=NOW)
+    lines = [json.loads(line) for line in gzip.decompress(archive_of(session)).splitlines()]
+    article = next(i for i, line in enumerate(lines) if line.get("table") == "articles")
+    lines[article]["row"][column] = value
+    clear(session)
+
+    with pytest.raises(ArchiveError, match=rf"line {article + 1}: articles\.{column}"):
+        import_archive(sessions, io.BytesIO(lines_to_archive(lines)))
+
+    assert_empty(session)
+
+
+def test_a_vector_of_the_wrong_size_is_a_message(
+    session: Session, sessions: sessionmaker[Session], make: Factories
+) -> None:
+    make.article(make.source(name="Feed"), first_seen_at=NOW, embedding=[0.5] * 768)
+    lines = [json.loads(line) for line in gzip.decompress(archive_of(session)).splitlines()]
+    for line in lines:
+        if line.get("table") == "article_embeddings":
+            line["row"]["embedding"] = [0.5, 0.5, 0.5]
+    clear(session)
+
+    with pytest.raises(ArchiveError, match="does not fit the database"):
+        import_archive(sessions, io.BytesIO(lines_to_archive(lines)))
+
+    assert_empty(session)
+
+
+def test_a_json_null_stays_a_json_null(session: Session, sessions: sessionmaker[Session]) -> None:
+    """The app stores None in a JSON column as JSON null; a restore keeps it that way."""
+    session.add(
+        Change(
+            actor="user",
+            action="source.add",
+            entity_type="source",
+            before=None,
+            after={"status": "active"},
+            status=ChangeStatus.APPLIED,
+        )
+    )
+    session.flush()
+    json_null = select(func.count()).where(func.jsonb_typeof(Change.before) == "null")
+    assert session.scalar(json_null) == 1
+    data = archive_of(session)
+    clear(session)
+
+    import_archive(sessions, io.BytesIO(data))
+
+    assert session.scalar(json_null) == 1

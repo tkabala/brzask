@@ -80,9 +80,10 @@ snapshot while the API and the worker keep running:
 docker compose exec -T api brzask export - > brzask-$(date +%F).jsonl.gz
 ```
 
-`-` writes to standard output, so the file lands on the host; give a file
-name instead to write inside the container. Counts per table go to standard
-error.
+`-` writes to standard output, so the file lands on the host (the container
+has nowhere to keep it). Counts per table go to standard error. Run outside a
+container, `brzask export` without `-` writes `brzask-<date>.jsonl.gz` in the
+current directory.
 
 The first line names the format and the schema revision, each following line
 is one row (`{"table": "sources", "row": {...}}`), and the last line counts

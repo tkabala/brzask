@@ -751,3 +751,24 @@ def test_import_of_a_missing_file(cli: Invoke, tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error: cannot read" in result.stderr
+
+
+def test_export_to_a_place_it_cannot_write(cli: Invoke, tmp_path: Path) -> None:
+    result = cli("export", str(tmp_path / "missing-directory" / "a.jsonl.gz"))
+
+    assert result.exit_code == 1
+    assert "Error: cannot write" in result.stderr
+    assert "Traceback" not in result.output
+
+
+def test_export_after_a_killed_one(cli: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "a.jsonl.gz"
+    leftover = tmp_path / "a.jsonl.gz.partial"
+    leftover.write_bytes(b"half")
+
+    result = cli("export", str(path))
+
+    assert result.exit_code == 0, result.output
+    assert gzip.decompress(path.read_bytes()).startswith(b'{"format":"brzask-export"')
+    assert leftover.read_bytes() == b"half"  # not this run's file to delete
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["a.jsonl.gz", "a.jsonl.gz.partial"]

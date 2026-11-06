@@ -14,10 +14,10 @@ import uuid
 import zlib
 from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime
-from typing import Any, BinaryIO
+from typing import IO, Any
 
-from sqlalchemy import Date, DateTime, Enum, Table, Uuid, exists, func, insert, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import Date, DateTime, Enum, Integer, Table, Uuid, exists, func, insert, select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.db import migrations
@@ -81,11 +81,17 @@ def decode_row(table: Table, row: Mapping[str, Any]) -> dict[str, Any]:
         column = table.columns.get(name)
         if column is None:
             raise ArchiveError(f"{table.name}: unknown column {name}")
-        decoded[name] = None if value is None else _decode(column.type, value)
+        try:
+            decoded[name] = None if value is None else _decode(column.type, value)
+        except (ValueError, TypeError) as error:
+            raise ArchiveError(f"{table.name}.{name}: {error}") from error
     return decoded
 
 
 def _decode(kind: Any, value: Any) -> Any:
+    # bool is an int in Python; neither belongs in an integer column.
+    if isinstance(kind, Integer) and (not isinstance(value, int) or isinstance(value, bool)):
+        raise TypeError(f"expected an integer, got {value!r}")
     if isinstance(kind, DateTime):
         return datetime.fromisoformat(value)
     if isinstance(kind, Date):
@@ -123,7 +129,7 @@ def check_header(line: Mapping[str, Any]) -> str:
     return revision
 
 
-def export_archive(session: Session, out: BinaryIO, *, version: str) -> Counts:
+def export_archive(session: Session, out: IO[bytes], *, version: str) -> Counts:
     """Write every exported table to `out`; the number of rows per table.
 
     The caller owns the transaction: a repeatable-read one gives a consistent
@@ -157,7 +163,7 @@ def _write(archive: gzip.GzipFile, line: Mapping[str, Any]) -> None:
     archive.write(b"\n")
 
 
-def import_archive(sessions: sessionmaker[Session], source: BinaryIO) -> Counts:
+def import_archive(sessions: sessionmaker[Session], source: IO[bytes]) -> Counts:
     """Load an archive into an empty database at the latest migration, all or nothing.
 
     Rows keep their IDs; the ID sequences continue after the highest one. The
@@ -212,7 +218,10 @@ def _load(session: Session, lines: Iterator[tuple[int, Any]]) -> Counts:
             if TABLES.index(table) < position:
                 raise ArchiveError(f"line {number}: rows of {table.name} out of order")
             position = TABLES.index(table)
-            row = decode_row(table, line["row"])
+            try:
+                row = decode_row(table, line["row"])
+            except ArchiveError as error:
+                raise ArchiveError(f"line {number}: {error}") from error
             # One INSERT takes rows with the same columns; an older archive
             # may leave columns out.
             if table is not batch_table or (batch and batch[0].keys() != row.keys()):
@@ -227,13 +236,14 @@ def _load(session: Session, lines: Iterator[tuple[int, Any]]) -> Counts:
         for number, _ in lines:
             raise ArchiveError(f"line {number}: data after the trailer")
         session.flush()
-    except IntegrityError as error:
+    except DBAPIError as error:
+        # The database's own reason, without the statement and its parameters.
         raise ArchiveError(f"the archive does not fit the database: {error.orig}") from error
     _continue_ids(session, counts)
     return counts
 
 
-def _lines(source: BinaryIO) -> Iterator[tuple[int, Any]]:
+def _lines(source: IO[bytes]) -> Iterator[tuple[int, Any]]:
     """(line number, parsed JSON) for each line; `ArchiveError` for a damaged file."""
     number = 0
     try:
