@@ -52,6 +52,9 @@ class Auth:
     """How this process authenticates, from AUTH_* settings."""
 
     settings: AuthSettings
+    # From BASE_URL: the path prefix (`/brzask` or "") and the full public address.
+    root_path: str = ""
+    public_url: str | None = None
     throttle: auth.LoginThrottle = field(default_factory=auth.LoginThrottle)
     # One password check at a time: checking the throttle and counting a failure
     # are then one step, so parallel tries cannot all slip under the limit.

@@ -6,10 +6,15 @@ from opentelemetry.sdk.metrics import MeterProvider
 
 from brzask.api.app import create_app
 from brzask.api.metrics import prometheus_reader
-from brzask.config.settings import AuthSettings
+from brzask.config.settings import AuthSettings, ServerSettings
 from brzask.db.session import create_db_engine, session_factory
 
-INDEX = "<!doctype html><title>brzask</title>"
+INDEX = "<!doctype html><html><head><title>brzask</title></head><body></body></html>"
+
+
+def served(base: str) -> str:
+    """INDEX as the server sends it, with its base element."""
+    return INDEX.replace("<head>", f'<head><base href="{base}">')
 
 
 @pytest.fixture
@@ -23,8 +28,7 @@ def web_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
-@pytest.fixture
-def client(web_dir: Path, password_auth: AuthSettings) -> TestClient:
+def _client(web_dir: Path, auth: AuthSettings, base_url: str | None = None) -> TestClient:
     # These requests never reach the database; nothing listens on port 1.
     engine = create_db_engine("postgresql+psycopg://brzask:x@127.0.0.1:1/brzask")
     reader, registry = prometheus_reader()
@@ -32,18 +36,31 @@ def client(web_dir: Path, password_auth: AuthSettings) -> TestClient:
         session_factory(engine),
         metrics_registry=registry,
         meter_provider=MeterProvider(metric_readers=[reader]),
-        auth_settings=password_auth,
+        auth_settings=auth,
+        server=ServerSettings.model_validate({"BASE_URL": base_url}),
         web_dir=web_dir,
     )
     return TestClient(app)
+
+
+@pytest.fixture
+def client(web_dir: Path, password_auth: AuthSettings) -> TestClient:
+    return _client(web_dir, password_auth)
+
+
+@pytest.fixture
+def prefixed(web_dir: Path, password_auth: AuthSettings) -> TestClient:
+    """The app served at http://testserver/brzask/."""
+    return _client(web_dir, password_auth, "http://testserver/brzask/")
 
 
 def test_root_serves_the_app(client: TestClient) -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert response.text == INDEX
+    assert response.text == served("/")
     assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["content-type"].startswith("text/html")
 
 
 @pytest.mark.parametrize("path", ["/archive/2026-10-01", "/sources", "/search?q=rust"])
@@ -51,7 +68,7 @@ def test_app_routes_serve_the_app(client: TestClient, path: str) -> None:
     response = client.get(path)
 
     assert response.status_code == 200
-    assert response.text == INDEX
+    assert response.text == served("/")
 
 
 @pytest.mark.parametrize(
@@ -68,7 +85,7 @@ def test_installable_app_files_are_revalidated(
     response = client.get(path)
 
     assert response.status_code == 200
-    assert response.text != INDEX
+    assert response.text != served("/")
     assert response.headers["content-type"].startswith(content_type)
     assert response.headers["cache-control"] == "no-cache"
 
@@ -135,3 +152,62 @@ def test_a_directory_without_an_index_is_rejected(tmp_path: Path) -> None:
             auth_settings=AuthSettings(mode="none"),
             web_dir=tmp_path,
         )
+
+
+# --- Under a path prefix ---------------------------------------------------------
+
+
+def test_prefixed_index_gets_its_base(prefixed: TestClient) -> None:
+    response = prefixed.get("/brzask/")
+
+    assert response.status_code == 200
+    assert response.text == served("/brzask/")
+    assert response.headers["cache-control"] == "no-cache"
+
+
+def test_existing_base_element_is_replaced(web_dir: Path, password_auth: AuthSettings) -> None:
+    (web_dir / "index.html").write_text(INDEX.replace("<head>", '<head><base href="/" />'))
+
+    response = _client(web_dir, password_auth, "http://testserver/brzask/").get("/brzask/")
+
+    assert response.text == served("/brzask/")
+
+
+def test_an_index_without_a_head_is_rejected(web_dir: Path, password_auth: AuthSettings) -> None:
+    (web_dir / "index.html").write_text("<!doctype html><title>x</title>")
+
+    with pytest.raises(RuntimeError, match="<head>"):
+        _client(web_dir, password_auth)
+
+
+def test_prefixed_deep_link_serves_the_app(prefixed: TestClient) -> None:
+    response = prefixed.get("/brzask/archive/2026-10-01")
+
+    assert response.status_code == 200
+    assert response.text == served("/brzask/")
+
+
+@pytest.mark.parametrize("prefix", ["/brzask", ""])
+def test_prefix_passed_through_or_stripped(prefixed: TestClient, prefix: str) -> None:
+    # Some proxies pass /brzask/... on unchanged, others strip the prefix.
+    assert prefixed.get(f"{prefix}/api/v1/auth/session").status_code == 200
+    asset = prefixed.get(f"{prefix}/assets/index-a1b2c3.js")
+    assert asset.status_code == 200
+    assert asset.text == "console.log(1)"
+    assert prefixed.get(f"{prefix}/archive/2026-10-01").text == served("/brzask/")
+    assert prefixed.get(f"{prefix}/api/v1/nothing-here").status_code == 404
+
+
+def test_prefix_without_slash_redirects(prefixed: TestClient) -> None:
+    response = prefixed.get("/brzask?signin", follow_redirects=False)
+
+    assert response.status_code == 308
+    assert response.headers["location"] == "/brzask/?signin"
+
+
+@pytest.mark.parametrize("path", ["/healthz", "/readyz", "/metrics"])
+def test_probes_answer_without_the_prefix(prefixed: TestClient, path: str) -> None:
+    # Container healthchecks and scrapers keep their paths; /readyz is 503 here
+    # only because these tests have no database.
+    assert prefixed.get(path).status_code in (200, 503)
+    assert prefixed.get(path).headers["content-type"] != "text/html; charset=utf-8"

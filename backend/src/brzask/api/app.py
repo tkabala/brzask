@@ -7,6 +7,10 @@ and `/metrics` sit at the root: the first two end up in feed readers and
 mail, the others where
 orchestrators and scrapers expect them. The built web app, when given, takes
 every other path.
+
+With BASE_URL, everything is served under its path (e.g. `/brzask/`), and
+also without it: proxies that strip the prefix and probes that never knew
+it reach the same routes.
 """
 
 from http import HTTPStatus
@@ -39,7 +43,7 @@ from brzask.api import (
 from brzask.api.auth import Auth, require_user
 from brzask.api.clients import ApiClients
 from brzask.config import get_settings
-from brzask.config.settings import AuthSettings
+from brzask.config.settings import AuthSettings, ServerSettings
 from brzask.log import get_logger
 from brzask.services.open_rate import register_open_rate
 from brzask.telemetry import instrument_app
@@ -57,14 +61,19 @@ def create_app(
     meter_provider: MeterProvider | None = None,
     clients: ApiClients | None = None,
     auth_settings: AuthSettings | None = None,
+    server: ServerSettings | None = None,
     web_dir: Path | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
     reach outside services (embeddings, feed lookup) and `auth_settings` say who
-    may use the API; both come from the settings unless given. `web_dir` is the
-    built web app to serve at `/`; without it only the API is served."""
+    may use the API; `server` gives BASE_URL; all three come from the settings
+    unless given. `web_dir` is the built web app to serve at `/`; without it only
+    the API is served."""
+    server = server or get_settings().server
     app = FastAPI(
+        # The committed document has no servers; the client adds its own base URL.
+        root_path_in_servers=False,
         title="brzask",
         version=__version__,
         summary="Self-hosted daily news digest.",
@@ -79,7 +88,11 @@ def create_app(
     app.state.sessions = sessions
     app.state.metrics_registry = metrics_registry
     app.state.clients = clients or ApiClients()
-    app.state.auth = Auth(auth_settings or get_settings().auth)
+    app.state.auth = Auth(
+        auth_settings or get_settings().auth,
+        root_path=server.root_path,
+        public_url=server.public_url,
+    )
     if app.state.auth.mode == "none":
         log.warning(
             "AUTH_MODE=none: NO LOGIN. Anyone who can reach this server can read "
@@ -102,7 +115,9 @@ def create_app(
     app.include_router(metrics.router)
     if web_dir is not None:
         # Last, so every route above wins over a file of the same name.
-        app.mount("/", web.WebApp(web_dir), name="web")
+        app.mount("/", web.WebApp(web_dir, f"{server.root_path}/"), name="web")
+    if server.root_path:
+        app.add_middleware(web.PathPrefix, root_path=server.root_path)
 
     app.openapi = lambda: _openapi(app)  # type: ignore[method-assign]
     instrument_app(app, meter_provider)

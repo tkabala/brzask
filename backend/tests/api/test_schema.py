@@ -1,5 +1,6 @@
 """The API against its own OpenAPI document, with requests Schemathesis generates."""
 
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -8,12 +9,15 @@ import pytest
 import schemathesis
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from opentelemetry.metrics import NoOpMeterProvider
 from schemathesis.config import SchemathesisConfig
 from schemathesis.specs.openapi.schemas import OpenApiSchema
+from sqlalchemy.orm import sessionmaker
 
-from brzask.api.app import OPENAPI_URL
+from brzask.api.app import OPENAPI_URL, create_app
+from brzask.api.metrics import prometheus_reader
 from brzask.api.openapi import in_javascript_order, render
-from brzask.config.settings import AuthSettings
+from brzask.config.settings import AuthSettings, ServerSettings
 from tests.api.conftest import PASSWORD
 
 # The first entry matching an operation applies.
@@ -102,3 +106,19 @@ def test_document_keys_are_in_javascript_order() -> None:
 
     assert list(ordered) == ["403", "b", "a", "007"]
     assert list(ordered["a"]) == ["200", "401", "default"]
+
+
+def test_openapi_is_the_same_under_a_prefix() -> None:
+    _, registry = prometheus_reader()
+    app = create_app(
+        sessionmaker(),
+        metrics_registry=registry,
+        meter_provider=NoOpMeterProvider(),
+        auth_settings=AuthSettings(mode="none"),
+        server=ServerSettings.model_validate({"BASE_URL": "https://h.example/brzask/"}),
+    )
+    document = TestClient(app).get("/brzask/api/v1/openapi.json").json()
+
+    committed = json.loads((Path(__file__).parents[3] / "openapi.json").read_text())
+    assert document["paths"] == committed["paths"]
+    assert "servers" not in document
