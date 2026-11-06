@@ -54,8 +54,8 @@ worker logs `notification not sent` with the failed entry's place in
 Put one or more [Apprise URLs](https://github.com/caronc/apprise/wiki#notification-services)
 in `NOTIFY_URLS` in `.env`, separated by spaces or commas; a comma inside one
 URL, as in a list of mail recipients, stays in it. URLs carry tokens, so, like
-every secret, they can also come from a file named by
-`NOTIFY_URLS_FILE` (a Docker or Kubernetes secret).
+every secret, they can also come from a file named by `NOTIFY_URLS_FILE` (a
+Docker or Kubernetes secret).
 
 === "ntfy"
 
