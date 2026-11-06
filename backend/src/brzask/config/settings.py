@@ -431,8 +431,6 @@ class ServerSettings(SettingsGroup):
     def _plain_base_url(cls, value: HttpUrl | None) -> HttpUrl | None:
         if value is None:
             return None
-        if value.scheme not in ("http", "https"):
-            raise ValueError("BASE_URL must start with http:// or https://")
         if value.query is not None or value.fragment is not None:
             raise ValueError("BASE_URL takes no query or fragment")
         if value.username is not None or value.password is not None:

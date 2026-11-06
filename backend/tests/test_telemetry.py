@@ -342,7 +342,7 @@ def test_open_rate_collection_is_not_traced(
         register_open_rate(
             sessionmaker(engine), MeterProvider(metric_readers=[reader]).get_meter("t")
         )
-        with engine.connect() as connection:  # this one is traced, as before
+        with engine.connect() as connection:  # a query of the app itself: traced
             connection.execute(text("SELECT 1"))
         traced = len(spans.get_finished_spans())
 

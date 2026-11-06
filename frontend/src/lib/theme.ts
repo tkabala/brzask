@@ -77,12 +77,14 @@ export function followTheme(): () => void {
   }
 }
 
+function subscribe(onChange: () => void): () => void {
+  listeners.add(onChange)
+  return () => {
+    listeners.delete(onChange)
+  }
+}
+
 /** The current choice, for controls that show or change it. */
 export function useTheme(): Theme {
-  return useSyncExternalStore((onChange) => {
-    listeners.add(onChange)
-    return () => {
-      listeners.delete(onChange)
-    }
-  }, currentTheme)
+  return useSyncExternalStore(subscribe, currentTheme)
 }

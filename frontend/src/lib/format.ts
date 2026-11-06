@@ -28,7 +28,6 @@ export function seconds(start: string, end: string | null): number | null {
   return end === null ? null : Math.round((Date.parse(end) - Date.parse(start)) / 1000)
 }
 
-/** The run's LLM cost, when its stats recorded one. */
 export interface RunBudget {
   over: boolean
   skipped: string[]
@@ -48,6 +47,7 @@ export function runBudget(stats: Record<string, unknown>): RunBudget | null {
   }
 }
 
+/** The run's LLM cost, when its stats recorded one. */
 export function runCost(stats: Record<string, unknown>): number | null {
   const usage = stats.usage
   if (typeof usage !== 'object' || usage === null) return null

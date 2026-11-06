@@ -36,12 +36,10 @@ _HEAD = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
 
 def with_base(index: str, base_href: str) -> str:
     """`index` with one `<base href>` element, first in its head."""
+    index = _BASE.sub("", index)
     head = _HEAD.search(index)
     if head is None:
         raise RuntimeError(f"{INDEX} has no <head> to put the <base> element in")
-    index = _BASE.sub("", index)
-    head = _HEAD.search(index)
-    assert head is not None  # noqa: S101  (removing <base> leaves the head)
     return f'{index[: head.end()]}<base href="{base_href}">{index[head.end() :]}'
 
 
