@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from brzask import __version__
 from brzask.api.app import create_app
 from brzask.api.metrics import prometheus_reader
-from brzask.cli import common, interests, sources, tokens
+from brzask.cli import common, interests, notify, sources, tokens
 from brzask.cli.archive import export_command, import_command
 from brzask.cli.common import (
     ACTOR,
@@ -43,6 +43,7 @@ app = typer.Typer(no_args_is_help=True, help="Self-hosted daily news digest.")
 app.add_typer(sources.app, name="sources")
 app.add_typer(interests.app, name="interests")
 app.add_typer(tokens.app, name="tokens")
+app.add_typer(notify.app, name="notify")
 app.command(name="replay")(replay_command)
 app.command(name="extract-bench")(extract_bench_command)
 app.command(name="judge-bench")(judge_bench_command)

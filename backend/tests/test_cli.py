@@ -19,6 +19,7 @@ from brzask.db.models import Interest, RunKind, RunStatus, Source, SourceOrigin,
 from brzask.repositories import RunRepository
 from brzask.services import auth, pipelines
 from brzask.services.archive import TABLES
+from brzask.services.notify import TEST_MESSAGE, Message
 from brzask.services.opml import NO_FEED
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
@@ -118,7 +119,7 @@ def test_help_lists_the_commands() -> None:
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
         "extract-bench", "reembed", "tokens", "hash-password", "seed-demo", "setup",
-        "export", "import",
+        "export", "import", "notify",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
@@ -126,9 +127,51 @@ def test_help_lists_the_commands() -> None:
         "sources": ("list", "add", "mute", "enable", "import", "export", "stats"),
         "interests": ("list", "add", "edit"),
         "tokens": ("create", "list", "revoke"),
+        "notify": ("test",),
     }.items():
         output = runner.invoke(app, [group, "--help"]).stdout
         assert all(command in output for command in commands)
+
+
+# --- notify --------------------------------------------------------------------
+
+
+class RecordingNotifier:
+    def __init__(self, result: bool) -> None:
+        self.result = result
+        self.sent: list[Message] = []
+
+    def send(self, message: Message) -> bool:
+        self.sent.append(message)
+        return self.result
+
+
+def test_notify_test_without_urls() -> None:
+    result = runner.invoke(app, ["notify", "test"])
+
+    assert result.exit_code == 1
+    assert "NOTIFY_URLS is not set" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("sent", "code", "stdout", "stderr"),
+    [
+        (True, 0, "Test notification sent.", ""),
+        (False, 1, "", "notification not sent (see the log)"),
+    ],
+)
+def test_notify_test_sends_the_test_message(
+    monkeypatch: pytest.MonkeyPatch, sent: bool, code: int, stdout: str, stderr: str
+) -> None:
+    notifier = RecordingNotifier(sent)
+    monkeypatch.setattr("brzask.cli.notify.notifier_from_settings", lambda _settings: notifier)
+
+    result = runner.invoke(app, ["notify", "test"])
+
+    assert result.exit_code == code
+    assert stdout in result.stdout
+    assert stderr in result.stderr
+    assert notifier.sent == [TEST_MESSAGE]
 
 
 # --- sources -------------------------------------------------------------------
