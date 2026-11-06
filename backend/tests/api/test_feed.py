@@ -101,6 +101,12 @@ def test_empty_feed_is_valid(client: TestClient, session: Session) -> None:
     assert parsed.feed.title == "brzask"
 
 
+def test_empty_feed_says_a_fixed_date(client: TestClient, session: Session) -> None:
+    parsed = read(client, token(session))
+
+    assert parsed.feed.updated == "1970-01-01T00:00:00Z"
+
+
 @pytest.mark.parametrize("kind", ["missing", "garbage", "read", "write", "revoked"])
 def test_feed_needs_a_feed_token(client: TestClient, session: Session, kind: str) -> None:
     value: str | None

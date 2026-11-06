@@ -30,6 +30,8 @@ MEDIA_TYPE = "application/atom+xml; charset=utf-8"
 # Readers poll; they must ask every time (the ETag makes that cheap), and no
 # shared cache may keep a document reached with a token.
 CACHE_CONTROL = "private, no-cache"
+# An empty feed's `updated`: a fixed date, so its ETag holds between polls.
+NO_ENTRIES = datetime.fromtimestamp(0, UTC)
 
 FeedToken = Annotated[
     str | None,
@@ -82,7 +84,7 @@ def get_feed(
         for day in digests.recent_digests(session, FEED_DAYS)
         for article in day.articles
     ]
-    updated = max((e.published for e in entries), default=datetime.now(UTC))
+    updated = max((e.published for e in entries), default=NO_ENTRIES)
     body = atom_feed(
         entries,
         base=origin + config.root_path,
