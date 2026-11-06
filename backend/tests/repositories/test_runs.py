@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -98,3 +98,17 @@ def test_spending_ignores_values_that_are_not_numbers(session: Session, make: Fa
     today, month, unpriced = RunRepository(session).spending(NOW, NOW)
 
     assert (today, month, unpriced) == (Decimal("0.01"), Decimal("0.01"), 0)
+
+
+def test_earlier_digest_on_counts_only_earlier_real_digests(make: Factories) -> None:
+    runs = RunRepository(make.session)
+    day = {"date": "2026-10-18"}
+    make.run(NOW - timedelta(hours=1), stats=day, dry_run=True)
+    make.run(NOW - timedelta(minutes=50), stats=day, status=RunStatus.FAILED)
+    make.run(NOW - timedelta(minutes=40), stats={"date": "2026-10-17"})
+    make.run(NOW - timedelta(minutes=30), stats=day, kind=RunKind.REVIEW)
+    first = make.run(NOW, stats=day)
+    second = make.run(NOW + timedelta(minutes=5), stats=day)
+
+    assert runs.earlier_digest_on(date(2026, 10, 18), first) is False
+    assert runs.earlier_digest_on(date(2026, 10, 18), second) is True

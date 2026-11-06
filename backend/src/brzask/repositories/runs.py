@@ -2,7 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -75,6 +75,18 @@ class RunRepository:
             Run.kind == RunKind.DIGEST, Run.dry_run.is_(False), Run.started_at == started_at
         )
         return self.session.scalars(query.limit(1)).first()
+
+    def earlier_digest_on(self, day: date, run: Run) -> bool:
+        """Whether a real digest run for `day` finished ok before `run` started."""
+        query = select(Run.id).where(
+            Run.kind == RunKind.DIGEST,
+            Run.status == RunStatus.OK,
+            Run.dry_run.is_(False),
+            Run.stats["date"].astext == day.isoformat(),
+            Run.id != run.id,
+            Run.started_at <= run.started_at,
+        )
+        return self.session.scalars(query.limit(1)).first() is not None
 
     def latest(self, kind: RunKind) -> Run | None:
         return next(iter(self.recent(1, kind)), None)

@@ -130,6 +130,9 @@ class Factories:
         cost: float | None = None,
         stats: dict[str, Any] | None = None,
         kind: RunKind = RunKind.DIGEST,
+        status: RunStatus = RunStatus.OK,
+        dry_run: bool = False,
+        error: str | None = None,
     ) -> Run:
         """A finished run; `cost` fills its usage as a fully priced run reports it."""
         if stats is None:
@@ -151,7 +154,9 @@ class Factories:
                 kind=kind,
                 started_at=started_at,
                 finished_at=started_at,
-                status=RunStatus.OK,
+                status=status,
+                dry_run=dry_run,
+                error=error,
                 stats=stats,
             )
         )
