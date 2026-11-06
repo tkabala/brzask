@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 import brzask.db.models  # noqa: F401  (registers the tables)
 from brzask.cli import app
 from brzask.db.base import Base
-from brzask.db.migrations import alembic_config, current_revision, migrate
+from brzask.db.migrations import alembic_config, current_revision, known_revisions, migrate
 
 
 @pytest.fixture
@@ -163,3 +163,15 @@ def test_migrate_logs_only_meaningful_lines(
     messages = [record.getMessage() for record in caplog.records]
     assert any(message.startswith("Running upgrade") for message in messages)
     assert not any(message.startswith(("Context impl", "Will assume")) for message in messages)
+
+
+def test_known_revisions_are_the_head_and_everything_before_it() -> None:
+    known = known_revisions()
+    assert head() in known
+    first = [
+        r
+        for r in ScriptDirectory.from_config(alembic_config("postgresql://")).walk_revisions()
+        if r.down_revision is None
+    ]
+    assert first[0].revision in known
+    assert "ffffffffffff" not in known

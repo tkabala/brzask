@@ -63,6 +63,16 @@ def head_revision() -> str | None:
     return ScriptDirectory.from_config(config).get_current_head()
 
 
+@lru_cache(maxsize=1)
+def known_revisions() -> frozenset[str]:
+    """The latest revision and every revision before it."""
+    config = Config()
+    config.set_main_option("script_location", SCRIPT_LOCATION)
+    return frozenset(
+        script.revision for script in ScriptDirectory.from_config(config).walk_revisions()
+    )
+
+
 def migrate(url: str | None = None) -> None:
     """Upgrade the database to the latest revision. Safe to run repeatedly."""
     config = alembic_config(url)
