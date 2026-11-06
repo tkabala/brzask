@@ -44,6 +44,10 @@ tracer = trace.get_tracer("brzask")
 os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "http")
 
 
+# All of a request that a Sentry event keeps.
+_REQUEST_KEPT = ("method", "url", "query_string")
+
+
 def setup_telemetry(
     settings: TelemetrySettings, *, component: str, metric_readers: Sequence[MetricReader] = ()
 ) -> None:
@@ -58,6 +62,10 @@ def setup_telemetry(
             environment=settings.sentry_environment,
             release=f"brzask@{__version__}",
             send_default_pii=False,
+            # A stack frame's variables hold whatever the code was handling: the
+            # login password, the session cookie in the ASGI scope, notification
+            # URLs, API keys. Many have no shape a filter could recognise.
+            include_local_variables=False,
             traces_sample_rate=0,  # traces go to OpenTelemetry
             # Sentry copies the request's query string as it is, the feed's token included.
             before_send=_redact_event_tokens,
@@ -117,7 +125,14 @@ def _drop_notification_requests(crumb: Any, _hint: Any) -> Any:
 
 
 def _redact_event_tokens(event: Any, _hint: Any) -> Any:
-    """The Sentry event with every `token=` value in its strings replaced."""
+    """The Sentry event with every `token=` value replaced and no request headers or body.
+
+    Headers and bodies have no filter that would do: the CSRF token, the header a
+    proxy names its user in and what a reader writes all pass the SDK's own.
+    """
+    request = event.get("request")
+    if isinstance(request, dict):
+        event["request"] = {key: request[key] for key in _REQUEST_KEPT if key in request}
     return _redacted(event)
 
 

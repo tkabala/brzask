@@ -1,5 +1,6 @@
 import atexit
 import json
+import uuid
 from collections.abc import Iterator
 from typing import Any
 
@@ -18,6 +19,7 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
+from pydantic import BaseModel
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.transport import Transport
 from sqlalchemy import text
@@ -381,3 +383,78 @@ def test_sentry_gets_no_notification_urls(monkeypatch: pytest.MonkeyPatch, hook_
 
     assert events
     assert "secret-path-token" not in json.dumps(events)
+
+
+@pytest.fixture
+def sentry_envelopes(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
+    """What Sentry would receive, through the real SDK and the app's options."""
+    sent: list[str] = []
+
+    class Capture(Transport):
+        def capture_envelope(self, envelope: Envelope) -> None:
+            sent.extend(item.get_bytes().decode("utf-8", "replace") for item in envelope.items)
+
+    real_init = sentry_sdk.init
+
+    def init(**options: Any) -> None:
+        real_init(**options, transport=Capture(options))
+
+    monkeypatch.setattr(sentry_sdk, "init", init)
+    telemetry.setup_telemetry(
+        TelemetrySettings.model_validate({"SENTRY_DSN": "https://key@sentry.example/1"}),
+        component="api",
+    )
+    yield sent
+    real_init()  # no DSN: reports off again
+
+
+def test_sentry_gets_no_secrets_of_a_failed_request(sentry_envelopes: list[str]) -> None:
+    # Made at run time: a report also holds the lines of source around each frame.
+    secrets = [uuid.uuid4().hex for _ in range(7)]
+    password, note, cookie, credentials, csrf, user, header = secrets
+    app = FastAPI()
+
+    class Login(BaseModel):
+        password: str
+        note: str
+
+    @app.post("/login")
+    def login(body: Login) -> None:
+        raise RuntimeError("failed")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    client.post(
+        "/login",
+        json={"password": password, "note": note},
+        cookies={"brzask_session": cookie},
+        headers={
+            "Authorization": f"Basic {credentials}",
+            "X-CSRF-Token": csrf,
+            "Remote-User": user,
+            "X-Proxy-Secret": header,
+        },
+    )
+    sentry_sdk.flush()
+
+    report = "".join(sentry_envelopes)
+    assert "RuntimeError" in report
+    assert "/login" in report
+    for secret in secrets:
+        assert secret not in report
+
+
+def test_sentry_gets_no_local_variables(sentry_envelopes: list[str]) -> None:
+    secret = uuid.uuid4().hex
+
+    def fails(innocent_name: str) -> None:
+        raise RuntimeError(f"failed after {len(innocent_name)} characters")
+
+    try:
+        fails(f"ntfys://{secret}@ntfy.sh/topic")
+    except RuntimeError as error:
+        sentry_sdk.capture_exception(error)
+    sentry_sdk.flush()
+
+    report = "".join(sentry_envelopes)
+    assert "failed after" in report
+    assert secret not in report
