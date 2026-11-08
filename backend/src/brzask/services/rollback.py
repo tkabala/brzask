@@ -12,9 +12,15 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from brzask.db.models import Change, ChangeStatus, Source, SourceStatus
-from brzask.repositories import ChangeRepository, SourceRepository
+from brzask.db.models import Change, ChangeStatus, Interest, Source, SourceStatus
+from brzask.repositories import (
+    ChangeRepository,
+    InterestRepository,
+    SettingRepository,
+    SourceRepository,
+)
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
+from brzask.services.pause import PAUSE_KEY, paused_until
 from brzask.services.refs import MAX_ID
 
 _SUFFIX = ".rollback"
@@ -54,7 +60,7 @@ def rollback_change(
         raise ServiceError(f"change {change.id} ({change.action}) cannot be rolled back: {why}")
     try:
         undone = undo(session, change, now)
-    except (KeyError, TypeError, ValueError) as error:
+    except (AttributeError, KeyError, TypeError, ValueError) as error:
         raise ServiceError(
             f"change {change.id} cannot be rolled back: its record is incomplete"
         ) from error
@@ -123,12 +129,112 @@ def _undo_rename(session: Session, change: Change, _now: datetime) -> Undone:
     return undone
 
 
+def _undo_reject(session: Session, change: Change, now: datetime) -> Undone:
+    if change.before is None:  # discovery stored the source as rejected from the start
+        raise ServiceError(
+            f"change {change.id} created a rejected source, so there is nothing to undo; "
+            "`brzask sources enable` follows it"
+        )
+    return _undo_status(session, change, now)
+
+
+# A source's row stays when its addition is undone: articles point to it, and a
+# known URL is never proposed again. It was fetched if it was active, so it counts
+# as once enabled; a pending one never was.
+_AFTER_ADDITION = {"active": SourceStatus.MUTED, "pending": SourceStatus.REJECTED}
+
+
+def _undo_addition(session: Session, change: Change, _now: datetime) -> Undone:
+    source = _locked_source(session, change)
+    # A source added by hand logs no status; it is always active.
+    logged = _logged(change.after).get("status", SourceStatus.ACTIVE.value)
+    _require_unchanged(change, "status", logged, source.status.value)
+    return _set_status(
+        session, source, _AFTER_ADDITION[logged], f"rolled back (change {change.id})"
+    )
+
+
+def _locked_interest(session: Session, change: Change) -> Interest:
+    interest = InterestRepository(session).get_for_update(int(change.entity_id or ""))
+    if interest is None:
+        raise ConflictError(f"the interest of change {change.id} no longer exists")
+    return interest
+
+
+def _undo_interest_addition(session: Session, change: Change, _now: datetime) -> Undone:
+    interest = _locked_interest(session, change)
+    edited = [
+        field for field, value in _logged(change.after).items() if getattr(interest, field) != value
+    ]
+    if edited:
+        raise ConflictError(
+            f"change {change.id} is out of date: {', '.join(edited)} changed since; "
+            "deactivate the interest instead"
+        )
+    interest.active = False
+    session.flush()
+    return Undone(before={"active": True}, after={"active": False})
+
+
+def _undo_interest_update(session: Session, change: Change, _now: datetime) -> Undone:
+    interest = _locked_interest(session, change)
+    restored = _logged(change.before)
+    for field, value in _logged(change.after).items():
+        _require_unchanged(change, field, value, getattr(interest, field))
+    if "topic" in restored:
+        taken = InterestRepository(session).get_by_topic(restored["topic"])
+        if taken is not None and taken.id != interest.id:
+            raise ConflictError(f"interest {restored['topic']!r} already exists; rename it first")
+    undone = Undone(before={field: getattr(interest, field) for field in restored}, after=restored)
+    for field, value in restored.items():
+        setattr(interest, field, value)
+    session.flush()
+    return undone
+
+
+def _undo_pause(session: Session, change: Change, now: datetime) -> Undone:
+    logged = datetime.fromisoformat(_logged(change.after)["until"])
+    current = paused_until(session, now)
+    if current is None:
+        raise ConflictError(f"change {change.id} is out of date: that pause is no longer in effect")
+    # Compared as moments: one moment has many spellings across UTC offsets.
+    _require_unchanged(change, "the pause end", logged, current)
+    settings = SettingRepository(session)
+    previous = datetime.fromisoformat(change.before["until"]) if change.before else None
+    if previous is None or previous <= now:
+        settings.delete(PAUSE_KEY)
+        restored = None
+    else:
+        restored = previous.isoformat()
+        settings.put(PAUSE_KEY, {"until": restored})
+    return Undone(before={"until": current.isoformat()}, after={"until": restored})
+
+
+def _undo_resume(session: Session, change: Change, now: datetime) -> Undone:
+    until = datetime.fromisoformat(_logged(change.before)["until"])
+    current = paused_until(session, now)
+    if current is not None:
+        raise ConflictError(
+            f"change {change.id} is out of date: a pause until {current.isoformat()} is running"
+        )
+    if until <= now:
+        raise ConflictError(f"change {change.id} cannot be undone: that pause has ended")
+    SettingRepository(session).put(PAUSE_KEY, {"until": until.isoformat()})
+    return Undone(before={"until": None}, after={"until": until.isoformat()})
+
+
 _UNDO: dict[str, Undo] = {
     "source.mute": _undo_status,
     "source.enable": _undo_status,
     "source.dead": _undo_status,
-    "source.reject": _undo_status,
+    "source.reject": _undo_reject,
     "source.rename": _undo_rename,
+    "source.add": _undo_addition,
+    "source.propose": _undo_addition,
+    "interest.add": _undo_interest_addition,
+    "interest.update": _undo_interest_update,
+    "digest.pause": _undo_pause,
+    "digest.resume": _undo_resume,
 }
 
 _REFUSED = {
