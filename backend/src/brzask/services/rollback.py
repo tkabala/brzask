@@ -5,7 +5,7 @@ writing `before` back: an added source is muted, not deleted. An action with no
 entry is refused, so a new action stays irreversible until its undo is defined.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -35,6 +35,35 @@ class Undone:
 
 
 type Undo = Callable[[Session, Change, datetime], Undone]
+
+
+def list_changes(
+    session: Session,
+    *,
+    limit: int,
+    status: ChangeStatus | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+) -> Sequence[Change]:
+    """Newest changes first, optionally for one status or one entity."""
+    return ChangeRepository(session).find(
+        limit=limit, status=status, entity_type=entity_type, entity_id=entity_id
+    )
+
+
+def describe_change(change: Change, width: int = 60) -> str:
+    """What a change did, on one line of at most `width` characters."""
+    before, after = change.before or {}, change.after or {}
+    parts = [
+        f"{field}: {_shown(before.get(field))} → {_shown(after.get(field))}"
+        for field in dict.fromkeys([*before, *after])
+    ]
+    text = " ".join(", ".join(parts).split())
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+def _shown(value: object) -> str:
+    return "-" if value is None else str(value)
 
 
 def rollback_change(

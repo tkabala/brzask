@@ -15,8 +15,17 @@ from brzask.cli import app, common, run_cli
 from brzask.clients.feed_finder import FoundFeed
 from brzask.config import get_settings
 from brzask.config.settings import LLMSettings, Settings
-from brzask.db.models import Interest, RunKind, RunStatus, Source, SourceOrigin, SourceStatus
-from brzask.repositories import RunRepository
+from brzask.db.models import (
+    Change,
+    ChangeStatus,
+    Interest,
+    RunKind,
+    RunStatus,
+    Source,
+    SourceOrigin,
+    SourceStatus,
+)
+from brzask.repositories import ChangeRepository, RunRepository
 from brzask.services import auth, pipelines
 from brzask.services.archive import TABLES
 from brzask.services.notify import TEST_MESSAGE, Message
@@ -119,7 +128,7 @@ def test_help_lists_the_commands() -> None:
     top_level = (
         "migrate", "run", "status", "sources", "interests", "pause", "resume", "replay",
         "extract-bench", "reembed", "tokens", "hash-password", "seed-demo", "setup",
-        "export", "import", "notify",
+        "export", "import", "notify", "config",
     )  # fmt: skip
     for command in top_level:
         assert command in result.stdout
@@ -128,6 +137,7 @@ def test_help_lists_the_commands() -> None:
         "interests": ("list", "add", "edit"),
         "tokens": ("create", "list", "revoke"),
         "notify": ("test",),
+        "config": ("history", "rollback"),
     }.items():
         output = runner.invoke(app, [group, "--help"]).stdout
         assert all(command in output for command in commands)
@@ -357,6 +367,101 @@ def test_interests_edit_unknown(cli: Invoke) -> None:
 
     assert result.exit_code == 1
     assert "no interest 'Nope'" in result.stderr
+
+
+# --- config ---------------------------------------------------------------------
+
+
+def _record_move(session: Session) -> Change:
+    return ChangeRepository(session).record(
+        actor="user",
+        action="source.move",
+        entity_type="source",
+        entity_id="1",
+        status=ChangeStatus.APPLIED,
+        before={"url": "a"},
+        after={"url": "b"},
+    )
+
+
+def test_config_rollback(cli: Invoke, make: Factories, session: Session) -> None:
+    source = make.source("Keep")
+    cli("sources", "mute", "Keep")
+    change = ChangeRepository(session).find(limit=1)[0]
+
+    result = cli("config", "rollback", str(change.id), "--reason", "oops")
+
+    assert result.exit_code == 0, result.output
+    newest = ChangeRepository(session).find(limit=1)[0]
+    assert newest.reason == f"rollback of change {change.id}: oops"
+    assert result.stdout == (
+        f"Rolled back change {change.id} (source.mute on source {source.id}); "
+        f"this is change {newest.id}.\n"
+    )
+
+
+def test_config_history_lists_newest_first_with_filters(
+    cli: Invoke, make: Factories, session: Session
+) -> None:
+    first, second = make.source("First"), make.source("Second")
+    cli("sources", "mute", "First", "--reason", "noisy")
+    change = ChangeRepository(session).find(limit=1)[0]
+    cli("sources", "mute", "Second")
+    cli("config", "rollback", str(change.id))
+
+    lines = cli("config", "history").stdout.splitlines()
+    assert lines[0].split() == [
+        "ID", "WHEN", "ACTOR", "ACTION", "ENTITY", "STATUS", "CHANGE", "REASON",
+    ]  # fmt: skip
+    assert [line.split()[4] for line in lines[1:]] == [
+        "source.mute.rollback",
+        "source.mute",
+        "source.mute",
+    ]
+    assert f"source:{first.id}" in lines[3]
+    assert "status: active → muted" in lines[3]
+    assert "noisy" in lines[3]
+
+    only_second = cli("config", "history", "--entity", f"source:{second.id}")
+    assert len(only_second.stdout.splitlines()) == 2
+    reverted = cli("config", "history", "--status", "reverted")
+    assert len(reverted.stdout.splitlines()) == 2
+    assert len(cli("config", "history", "--limit", "1").stdout.splitlines()) == 2
+
+
+def test_config_history_empty(cli: Invoke) -> None:
+    assert cli("config", "history").stdout == "No changes.\n"
+
+
+@pytest.mark.parametrize("entity", ["source", "source:", ":12"])
+def test_config_history_bad_entity(cli: Invoke, entity: str) -> None:
+    result = cli("config", "history", "--entity", entity)
+
+    assert result.exit_code == 2
+    assert "expected <type>:<id>" in result.output
+
+
+def test_config_history_limit_must_be_positive(cli: Invoke) -> None:
+    assert cli("config", "history", "--limit", "0").exit_code == 2
+
+
+def test_config_rollback_refused(cli: Invoke, session: Session) -> None:
+    change = _record_move(session)
+
+    result = cli("config", "rollback", str(change.id))
+
+    assert result.exit_code == 1
+    assert result.stderr.startswith("Error:")
+    assert "redirect" in result.stderr
+    assert change.status is ChangeStatus.APPLIED
+
+
+def test_config_rollback_id_beyond_bigint(cli: Invoke) -> None:
+    result = cli("config", "rollback", "99999999999999999999")
+
+    assert result.exit_code == 1
+    assert "no change" in result.stderr
+    assert result.exception is None or isinstance(result.exception, SystemExit)
 
 
 # --- pause / resume / status ---------------------------------------------------

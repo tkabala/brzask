@@ -10,7 +10,7 @@ from brzask.repositories import ChangeRepository, SettingRepository, SourceRepos
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.interests import add_interest, edit_interest
 from brzask.services.pause import PAUSE_KEY, pause, paused_until, resume
-from brzask.services.rollback import rollback_change
+from brzask.services.rollback import describe_change, list_changes, rollback_change
 from brzask.services.sources import (
     add_source,
     change_status,
@@ -547,3 +547,40 @@ def test_malformed_until_is_refused(session: Session) -> None:
 
     with pytest.raises(ServiceError, match="incomplete"):
         rollback_change(session, change.id, NOW, actor="user")
+
+
+# --- listing ---------------------------------------------------------------------
+
+
+def test_describe_is_one_shortened_line() -> None:
+    change = Change(before={"notes": "a\nb " + "x" * 200}, after={"notes": "c"})
+
+    text = describe_change(change)
+
+    assert "\n" not in text
+    assert len(text) <= 60
+    assert text.endswith("…")
+
+
+def test_describe_with_nothing_before() -> None:
+    assert describe_change(Change(before=None, after={"name": "A"})) == "name: - → A"
+
+
+def test_describe_a_field_set_to_nothing() -> None:
+    change = Change(before={"until": "x", "note": None}, after={"until": None})
+
+    assert describe_change(change) == "until: x → -, note: - → -"
+
+
+def test_list_changes_filters(session: Session, make: Factories) -> None:
+    first, second = make.source(), make.source()
+    mute_source(session, str(first.id), actor="user")
+    original = last_change(session)
+    mute_source(session, str(second.id), actor="user")
+    rollback_change(session, original.id, NOW, actor="user")
+
+    assert [c.id for c in list_changes(session, limit=1, status=ChangeStatus.REVERTED)] == [
+        original.id
+    ]
+    only_first = list_changes(session, limit=10, entity_type="source", entity_id=str(first.id))
+    assert [c.action for c in only_first] == ["source.mute.rollback", "source.mute"]

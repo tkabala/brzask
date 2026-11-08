@@ -139,6 +139,43 @@ Changes are recorded with who made them (`actor`), what changed (`action`,
 is `proposed` while it waits for approval, then `applied` or `rejected`;
 an applied change can later be `reverted`.
 
+List changes, newest first, and undo one by its ID:
+
+```bash
+brzask config history --entity source:12
+brzask config rollback 214 --reason "muted the wrong feed"
+```
+
+A rollback marks the original change `reverted` and records a change of its
+own, named `<action>.rollback`, so the undo stays in the history. It is
+refused, with nothing written, when a field the change set has changed since;
+a later change to a different field does not block it. A rollback cannot be
+rolled back: make the change again instead.
+
+| Change | What a rollback does |
+|---|---|
+| Source muted, enabled, marked dead or rejected | Restores its status and note. Back to active also forgets past fetch failures, as enabling does. |
+| Source renamed | Restores the name, unless it is taken now |
+| Source added | Mutes an active source and rejects a pending one |
+| Interest added | Deactivates it, unless it was edited since |
+| Interest edited | Restores the edited fields, unless the old topic is taken now |
+| Digest paused | Restores the earlier pause if it is still ahead, otherwise ends the pause |
+| Digest resumed | Restores the pause if it is still ahead |
+
+An added source is muted or rejected rather than deleted: its articles point
+to it, and keeping the URL known stops discovery from proposing it again.
+
+These changes cannot be rolled back:
+
+- A moved source: the feed's permanent redirect would move it again on the
+  next fetch.
+- A source created as rejected: there is nothing to undo, and
+  `brzask sources enable` follows it.
+- API tokens: use `brzask tokens`, so that a revoked credential does not come
+  back with one command.
+- An embedding model switch: it needs the digest lock and complete vectors,
+  so it belongs to `brzask reembed`.
+
 ## Conventions
 
 - Statuses are stored as text with a CHECK constraint rather than native
