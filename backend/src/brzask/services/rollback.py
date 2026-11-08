@@ -56,7 +56,8 @@ def describe_change(change: Change, width: int = 60) -> str:
     before, after = change.before or {}, change.after or {}
     parts = [
         f"{field}: {_shown(before.get(field))} → {_shown(after.get(field))}"
-        for field in dict.fromkeys([*before, *after])
+        # Stored objects lose their key order; a long note must not hide the rest.
+        for field in sorted(dict.fromkeys([*before, *after]), key=lambda name: name == "note")
     ]
     text = " ".join(", ".join(parts).split())
     return text if len(text) <= width else text[: width - 1] + "…"

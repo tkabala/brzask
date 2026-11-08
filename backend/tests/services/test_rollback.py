@@ -584,3 +584,9 @@ def test_list_changes_filters(session: Session, make: Factories) -> None:
     ]
     only_first = list_changes(session, limit=10, entity_type="source", entity_id=str(first.id))
     assert [c.action for c in only_first] == ["source.mute.rollback", "source.mute"]
+
+
+def test_describe_shows_a_long_note_last() -> None:
+    change = Change(before={"note": "x" * 100, "status": "muted"}, after={"status": "active"})
+
+    assert describe_change(change).startswith("status: muted → active")
