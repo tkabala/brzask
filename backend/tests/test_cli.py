@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import click
 import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -448,7 +449,7 @@ def test_config_history_bad_entity(cli: Invoke, entity: str) -> None:
     result = cli("config", "history", "--entity", entity)
 
     assert result.exit_code == 2
-    assert "expected <type>:<id>" in result.output
+    assert "expected <type>:<id>" in click.unstyle(result.output)  # colored in CI
 
 
 def test_config_history_limit_must_be_positive(cli: Invoke) -> None:
