@@ -21,7 +21,7 @@ from brzask.repositories import (
 )
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.pause import PAUSE_KEY, paused_until
-from brzask.services.refs import MAX_ID
+from brzask.services.refs import MAX_ID, as_id
 
 _SUFFIX = ".rollback"
 
@@ -54,12 +54,19 @@ def list_changes(
 def describe_change(change: Change, width: int = 60) -> str:
     """What a change did, on one line of at most `width` characters."""
     before, after = change.before or {}, change.after or {}
+    # A status change logs the old note only; the new one is its reason.
+    fields = [name for name in dict.fromkeys([*before, *after]) if name != "note" or name in after]
     parts = [
         f"{field}: {_shown(before.get(field))} → {_shown(after.get(field))}"
         # Stored objects lose their key order; a long note must not hide the rest.
-        for field in sorted(dict.fromkeys([*before, *after]), key=lambda name: name == "note")
+        for field in sorted(fields, key=lambda name: name in {"note", "notes"})
     ]
-    text = " ".join(", ".join(parts).split())
+    return one_line(", ".join(parts), width)
+
+
+def one_line(text: str, width: int = 60) -> str:
+    """`text` with its whitespace collapsed, cut to `width` characters."""
+    text = " ".join(text.split())
     return text if len(text) <= width else text[: width - 1] + "…"
 
 
@@ -114,6 +121,23 @@ def _logged(fields: dict[str, Any] | None) -> dict[str, Any]:
     return fields
 
 
+def _entity_id(change: Change) -> int:
+    entity_id = as_id(change.entity_id or "")
+    if entity_id is None:
+        raise ValueError("no usable entity ID")
+    return entity_id
+
+
+def _is_text(value: object) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _require(valid: bool) -> None:
+    """Values logged long ago, or edited by hand, must fit the column they go back to."""
+    if not valid:
+        raise TypeError("a logged value has the wrong type")
+
+
 def _require_unchanged(change: Change, field: str, logged: object, current: object) -> None:
     if current != logged:
         raise ConflictError(
@@ -122,7 +146,7 @@ def _require_unchanged(change: Change, field: str, logged: object, current: obje
 
 
 def _locked_source(session: Session, change: Change) -> Source:
-    source = SourceRepository(session).get_for_update(int(change.entity_id or ""))
+    source = SourceRepository(session).get_for_update(_entity_id(change))
     if source is None:
         raise ConflictError(f"the source of change {change.id} no longer exists")
     return source
@@ -142,7 +166,9 @@ def _undo_status(session: Session, change: Change, _now: datetime) -> Undone:
     source = _locked_source(session, change)
     before, after = _logged(change.before), _logged(change.after)
     _require_unchanged(change, "status", after["status"], source.status.value)
-    return _set_status(session, source, SourceStatus(before["status"]), before.get("note"))
+    note = before.get("note")
+    _require(note is None or isinstance(note, str))
+    return _set_status(session, source, SourceStatus(before["status"]), note)
 
 
 def _undo_rename(session: Session, change: Change, _now: datetime) -> Undone:
@@ -150,6 +176,7 @@ def _undo_rename(session: Session, change: Change, _now: datetime) -> Undone:
     after = _logged(change.after)
     _require_unchanged(change, "name", after["name"], source.name)
     name = _logged(change.before)["name"]
+    _require(_is_text(name))
     taken = SourceRepository(session).get_by_name(name)
     if taken is not None and taken.id != source.id:
         raise ConflictError(f"a source named {name!r} already exists; rename it first")
@@ -184,8 +211,18 @@ def _undo_addition(session: Session, change: Change, _now: datetime) -> Undone:
     )
 
 
+_INTEREST_FIELDS: dict[str, Callable[[object], bool]] = {
+    "topic": _is_text,
+    "keywords": lambda value: (
+        isinstance(value, list) and all(isinstance(keyword, str) for keyword in value)
+    ),
+    "notes": lambda value: isinstance(value, str),
+    "active": lambda value: isinstance(value, bool),
+}
+
+
 def _locked_interest(session: Session, change: Change) -> Interest:
-    interest = InterestRepository(session).get_for_update(int(change.entity_id or ""))
+    interest = InterestRepository(session).get_for_update(_entity_id(change))
     if interest is None:
         raise ConflictError(f"the interest of change {change.id} no longer exists")
     return interest
@@ -209,6 +246,8 @@ def _undo_interest_addition(session: Session, change: Change, _now: datetime) ->
 def _undo_interest_update(session: Session, change: Change, _now: datetime) -> Undone:
     interest = _locked_interest(session, change)
     restored = _logged(change.before)
+    for field, value in restored.items():
+        _require(_INTEREST_FIELDS[field](value))
     for field, value in _logged(change.after).items():
         _require_unchanged(change, field, value, getattr(interest, field))
     if "topic" in restored:

@@ -46,7 +46,7 @@ def history(
                 else change.entity_type,
                 change.status.value,
                 rollback.describe_change(change),
-                " ".join((change.reason or "").split()),
+                rollback.one_line(change.reason or ""),
             )
             for change in rollback.list_changes(
                 session, limit=limit, status=status, entity_type=entity_type, entity_id=entity_id

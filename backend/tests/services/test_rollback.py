@@ -10,7 +10,7 @@ from brzask.repositories import ChangeRepository, SettingRepository, SourceRepos
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.interests import add_interest, edit_interest
 from brzask.services.pause import PAUSE_KEY, pause, paused_until, resume
-from brzask.services.rollback import describe_change, list_changes, rollback_change
+from brzask.services.rollback import describe_change, list_changes, one_line, rollback_change
 from brzask.services.sources import (
     add_source,
     change_status,
@@ -569,7 +569,7 @@ def test_describe_with_nothing_before() -> None:
 def test_describe_a_field_set_to_nothing() -> None:
     change = Change(before={"until": "x", "note": None}, after={"until": None})
 
-    assert describe_change(change) == "until: x → -, note: - → -"
+    assert describe_change(change) == "until: x → -"
 
 
 def test_list_changes_filters(session: Session, make: Factories) -> None:
@@ -587,6 +587,111 @@ def test_list_changes_filters(session: Session, make: Factories) -> None:
 
 
 def test_describe_shows_a_long_note_last() -> None:
-    change = Change(before={"note": "x" * 100, "status": "muted"}, after={"status": "active"})
+    change = Change(
+        before={"note": "x" * 100, "status": "muted"}, after={"note": "y", "status": "active"}
+    )
 
     assert describe_change(change).startswith("status: muted → active")
+
+
+def test_describe_shows_long_interest_notes_last() -> None:
+    change = Change(before=None, after={"notes": "n" * 100, "topic": "Rust"})
+
+    assert describe_change(change).startswith("topic: - → Rust")
+
+
+def test_a_note_only_logged_before_is_not_shown_as_cleared() -> None:
+    change = Change(before={"status": "active", "note": "x"}, after={"status": "muted"})
+
+    assert describe_change(change) == "status: active → muted"
+
+
+def test_one_line_collapses_and_shortens() -> None:
+    assert one_line("a\n  b") == "a b"
+    assert one_line("x" * 80, 10) == "x" * 9 + "…"
+
+
+# --- malformed records -----------------------------------------------------------
+
+TOO_BIG = "99999999999999999999"
+
+
+@pytest.mark.parametrize(
+    "before",
+    [{"name": 5}, {"name": {"a": 1}}, {"name": None}, {"name": ["a"]}, {"name": ""}],
+)
+def test_rename_with_a_malformed_name_is_refused(
+    session: Session, make: Factories, before: dict[str, Any]
+) -> None:
+    source = make.source("Old")
+    rename_source(session, source, "New", actor="user")
+    original = last_change(session)
+    original.before = before
+    session.flush()
+
+    with pytest.raises(ServiceError, match="incomplete"):
+        rollback_change(session, original.id, NOW, actor="user")
+
+    assert source.name == "New"
+
+
+def test_status_with_a_malformed_note_is_refused(session: Session, make: Factories) -> None:
+    source = make.source()
+    mute_source(session, str(source.id), actor="user")
+    original = last_change(session)
+    original.before = {"status": "active", "note": ["x"]}
+    session.flush()
+
+    with pytest.raises(ServiceError, match="incomplete"):
+        rollback_change(session, original.id, NOW, actor="user")
+
+    assert source.status is SourceStatus.MUTED
+
+
+def test_source_id_beyond_bigint_is_refused(session: Session, make: Factories) -> None:
+    mute_source(session, str(make.source().id), actor="user")
+    original = last_change(session)
+    original.entity_id = TOO_BIG
+    session.flush()
+
+    with pytest.raises(ServiceError, match="incomplete"):
+        rollback_change(session, original.id, NOW, actor="user")
+
+
+def test_interest_id_beyond_bigint_is_refused(session: Session) -> None:
+    interest = add_interest(session, "Postgres", actor="user")
+    edit_interest(session, str(interest.id), actor="user", notes="new")
+    original = last_change(session)
+    original.entity_id = TOO_BIG
+    session.flush()
+
+    with pytest.raises(ServiceError, match="incomplete"):
+        rollback_change(session, original.id, NOW, actor="user")
+
+
+@pytest.mark.parametrize(
+    "before",
+    [
+        {"topic": 5},
+        {"topic": None},
+        {"topic": ""},
+        {"keywords": "pg"},
+        {"keywords": [1]},
+        {"notes": None},
+        {"active": "yes"},
+        {"id": 7},
+    ],
+)
+def test_interest_update_with_malformed_values_is_refused(
+    session: Session, before: dict[str, Any]
+) -> None:
+    interest = add_interest(session, "Postgres", actor="user")
+    edit_interest(session, str(interest.id), actor="user", notes="new")
+    original = last_change(session)
+    original.before = before
+    session.flush()
+
+    with pytest.raises(ServiceError, match="incomplete"):
+        rollback_change(session, original.id, NOW, actor="user")
+
+    assert (interest.topic, interest.notes) == ("Postgres", "new")

@@ -429,6 +429,16 @@ def test_config_history_lists_newest_first_with_filters(
     assert len(cli("config", "history", "--limit", "1").stdout.splitlines()) == 2
 
 
+def test_config_history_shortens_a_long_reason(cli: Invoke, make: Factories) -> None:
+    make.source("Long")
+    cli("sources", "mute", "Long", "--reason", "first\nline " + "x" * 200)
+
+    [_, row] = cli("config", "history").stdout.splitlines()
+
+    assert row.endswith("…")
+    assert len(row.split("first line ")[1]) < 60
+
+
 def test_config_history_empty(cli: Invoke) -> None:
     assert cli("config", "history").stdout == "No changes.\n"
 
