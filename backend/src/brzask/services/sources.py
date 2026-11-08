@@ -335,6 +335,7 @@ def change_status(
     before = source.status
     if before is status:
         return False
+    before_note = source.note
     sources = SourceRepository(session)
     sources.set_status(source, status, reason)
     if status is SourceStatus.ACTIVE:
@@ -345,7 +346,7 @@ def change_status(
         entity_type="source",
         entity_id=str(source.id),
         status=ChangeStatus.APPLIED,
-        before={"status": before.value},
+        before={"status": before.value, "note": before_note},
         after={"status": status.value},
         reason=reason,
     )

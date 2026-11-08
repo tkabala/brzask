@@ -17,6 +17,10 @@ class ChangeRepository:
     def get(self, change_id: int) -> Change | None:
         return self.session.get(Change, change_id)
 
+    def get_for_update(self, change_id: int) -> Change | None:
+        """The change, locked until the transaction ends."""
+        return self.session.get(Change, change_id, with_for_update=True)
+
     def record(
         self,
         *,

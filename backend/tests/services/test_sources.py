@@ -7,6 +7,7 @@ from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.sources import (
     add_source,
+    change_status,
     default_name,
     enable_source,
     find_source,
@@ -142,8 +143,8 @@ def test_mute_then_enable(session: Session, make: Factories) -> None:
 
     changes = ChangeRepository(session).find(limit=10)
     assert [(c.action, c.before, c.after) for c in changes] == [
-        ("source.enable", {"status": "muted"}, {"status": "active"}),
-        ("source.mute", {"status": "active"}, {"status": "muted"}),
+        ("source.enable", {"status": "muted", "note": "too chatty"}, {"status": "active"}),
+        ("source.mute", {"status": "active", "note": None}, {"status": "muted"}),
     ]
     assert changes[1].reason == "too chatty"
 
@@ -379,3 +380,12 @@ def test_merging_keeps_the_articles_of_a_loaded_duplicate(
     session.expire_all()
 
     assert article.source_id == old.id
+
+
+def test_status_change_logs_the_previous_note(session: Session, make: Factories) -> None:
+    source = make.source(note="was fine")
+
+    change_status(session, source, SourceStatus.MUTED, actor="user", reason="noisy")
+
+    change = ChangeRepository(session).find(limit=1)[0]
+    assert change.before == {"status": "active", "note": "was fine"}

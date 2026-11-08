@@ -15,6 +15,10 @@ class InterestRepository:
     def get(self, interest_id: int) -> Interest | None:
         return self.session.get(Interest, interest_id)
 
+    def get_for_update(self, interest_id: int) -> Interest | None:
+        """The interest, locked until the transaction ends."""
+        return self.session.get(Interest, interest_id, with_for_update=True)
+
     def get_by_topic(self, topic: str) -> Interest | None:
         """Topics are compared ignoring case, as people type them (and unique that way)."""
         query = select(Interest).where(func.lower(Interest.topic) == func.lower(topic))

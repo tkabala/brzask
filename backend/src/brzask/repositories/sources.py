@@ -44,6 +44,10 @@ class SourceRepository:
     def get(self, source_id: int) -> Source | None:
         return self.session.get(Source, source_id)
 
+    def get_for_update(self, source_id: int) -> Source | None:
+        """The source, locked until the transaction ends."""
+        return self.session.get(Source, source_id, with_for_update=True)
+
     def get_many(self, source_ids: Collection[int]) -> dict[int, Source]:
         """Sources by ID; IDs that do not exist are left out."""
         if not source_ids:
