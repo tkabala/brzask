@@ -228,7 +228,12 @@ def add_source(
         entity_type="source",
         entity_id=str(source.id),
         status=ChangeStatus.APPLIED,
-        after={"name": source.name, "url": source.url, "kind": source.kind.value},
+        after={
+            "name": source.name,
+            "url": source.url,
+            "kind": source.kind.value,
+            "site_url": source.site_url,
+        },
     )
     return source
 

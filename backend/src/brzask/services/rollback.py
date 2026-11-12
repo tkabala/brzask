@@ -19,9 +19,15 @@ from brzask.repositories import (
     SettingRepository,
     SourceRepository,
 )
+from brzask.services.change_records import (
+    entity_id_of,
+    logged,
+    require_type,
+    require_unchanged,
+)
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.pause import PAUSE_KEY, paused_until
-from brzask.services.refs import MAX_ID, as_id
+from brzask.services.refs import MAX_ID
 
 _SUFFIX = ".rollback"
 
@@ -114,39 +120,12 @@ def rollback_change(
     )
 
 
-def _logged(fields: dict[str, Any] | None) -> dict[str, Any]:
-    """One side of a change that must have been logged; a gap reads as an incomplete record."""
-    if fields is None:
-        raise TypeError("nothing logged")
-    return fields
-
-
-def _entity_id(change: Change) -> int:
-    entity_id = as_id(change.entity_id or "")
-    if entity_id is None:
-        raise ValueError("no usable entity ID")
-    return entity_id
-
-
 def _is_text(value: object) -> bool:
     return isinstance(value, str) and bool(value)
 
 
-def _require(valid: bool) -> None:
-    """Values logged long ago, or edited by hand, must fit the column they go back to."""
-    if not valid:
-        raise TypeError("a logged value has the wrong type")
-
-
-def _require_unchanged(change: Change, field: str, logged: object, current: object) -> None:
-    if current != logged:
-        raise ConflictError(
-            f"change {change.id} is out of date: {field} is now {current!r}, not {logged!r}"
-        )
-
-
 def _locked_source(session: Session, change: Change) -> Source:
-    source = SourceRepository(session).get_for_update(_entity_id(change))
+    source = SourceRepository(session).get_for_update(entity_id_of(change))
     if source is None:
         raise ConflictError(f"the source of change {change.id} no longer exists")
     return source
@@ -164,19 +143,19 @@ def _set_status(session: Session, source: Source, status: SourceStatus, note: st
 
 def _undo_status(session: Session, change: Change, _now: datetime) -> Undone:
     source = _locked_source(session, change)
-    before, after = _logged(change.before), _logged(change.after)
-    _require_unchanged(change, "status", after["status"], source.status.value)
+    before, after = logged(change.before), logged(change.after)
+    require_unchanged(change, "status", after["status"], source.status.value)
     note = before.get("note")
-    _require(note is None or isinstance(note, str))
+    require_type(note is None or isinstance(note, str))
     return _set_status(session, source, SourceStatus(before["status"]), note)
 
 
 def _undo_rename(session: Session, change: Change, _now: datetime) -> Undone:
     source = _locked_source(session, change)
-    after = _logged(change.after)
-    _require_unchanged(change, "name", after["name"], source.name)
-    name = _logged(change.before)["name"]
-    _require(_is_text(name))
+    after = logged(change.after)
+    require_unchanged(change, "name", after["name"], source.name)
+    name = logged(change.before)["name"]
+    require_type(_is_text(name))
     taken = SourceRepository(session).get_by_name(name)
     if taken is not None and taken.id != source.id:
         raise ConflictError(f"a source named {name!r} already exists; rename it first")
@@ -188,9 +167,9 @@ def _undo_rename(session: Session, change: Change, _now: datetime) -> Undone:
 
 def _undo_note(session: Session, change: Change, _now: datetime) -> Undone:
     source = _locked_source(session, change)
-    _require_unchanged(change, "note", _logged(change.after)["note"], source.note)
-    note = _logged(change.before)["note"]
-    _require(note is None or _is_text(note))
+    require_unchanged(change, "note", logged(change.after)["note"], source.note)
+    note = logged(change.before)["note"]
+    require_type(note is None or _is_text(note))
     undone = Undone(before={"note": source.note}, after={"note": note})
     source.note = note
     session.flush()
@@ -215,10 +194,10 @@ _AFTER_ADDITION = {"active": SourceStatus.MUTED, "pending": SourceStatus.REJECTE
 def _undo_addition(session: Session, change: Change, _now: datetime) -> Undone:
     source = _locked_source(session, change)
     # A source added by hand logs no status; it is always active.
-    logged = _logged(change.after).get("status", SourceStatus.ACTIVE.value)
-    _require_unchanged(change, "status", logged, source.status.value)
+    status = logged(change.after).get("status", SourceStatus.ACTIVE.value)
+    require_unchanged(change, "status", status, source.status.value)
     return _set_status(
-        session, source, _AFTER_ADDITION[logged], f"rolled back (change {change.id})"
+        session, source, _AFTER_ADDITION[status], f"rolled back (change {change.id})"
     )
 
 
@@ -233,7 +212,7 @@ _INTEREST_FIELDS: dict[str, Callable[[object], bool]] = {
 
 
 def _locked_interest(session: Session, change: Change) -> Interest:
-    interest = InterestRepository(session).get_for_update(_entity_id(change))
+    interest = InterestRepository(session).get_for_update(entity_id_of(change))
     if interest is None:
         raise ConflictError(f"the interest of change {change.id} no longer exists")
     return interest
@@ -242,7 +221,7 @@ def _locked_interest(session: Session, change: Change) -> Interest:
 def _undo_interest_addition(session: Session, change: Change, _now: datetime) -> Undone:
     interest = _locked_interest(session, change)
     edited = [
-        field for field, value in _logged(change.after).items() if getattr(interest, field) != value
+        field for field, value in logged(change.after).items() if getattr(interest, field) != value
     ]
     if edited:
         raise ConflictError(
@@ -256,11 +235,11 @@ def _undo_interest_addition(session: Session, change: Change, _now: datetime) ->
 
 def _undo_interest_update(session: Session, change: Change, _now: datetime) -> Undone:
     interest = _locked_interest(session, change)
-    restored = _logged(change.before)
+    restored = logged(change.before)
     for field, value in restored.items():
-        _require(_INTEREST_FIELDS[field](value))
-    for field, value in _logged(change.after).items():
-        _require_unchanged(change, field, value, getattr(interest, field))
+        require_type(_INTEREST_FIELDS[field](value))
+    for field, value in logged(change.after).items():
+        require_unchanged(change, field, value, getattr(interest, field))
     if "topic" in restored:
         taken = InterestRepository(session).get_by_topic(restored["topic"])
         if taken is not None and taken.id != interest.id:
@@ -273,12 +252,12 @@ def _undo_interest_update(session: Session, change: Change, _now: datetime) -> U
 
 
 def _undo_pause(session: Session, change: Change, now: datetime) -> Undone:
-    logged = datetime.fromisoformat(_logged(change.after)["until"])
+    until = datetime.fromisoformat(logged(change.after)["until"])
     current = paused_until(session, now)
     if current is None:
         raise ConflictError(f"change {change.id} is out of date: that pause is no longer in effect")
     # Compared as moments: one moment has many spellings across UTC offsets.
-    _require_unchanged(change, "the pause end", logged, current)
+    require_unchanged(change, "the pause end", until, current)
     settings = SettingRepository(session)
     previous = datetime.fromisoformat(change.before["until"]) if change.before else None
     if previous is None or previous <= now:
@@ -291,7 +270,7 @@ def _undo_pause(session: Session, change: Change, now: datetime) -> Undone:
 
 
 def _undo_resume(session: Session, change: Change, now: datetime) -> Undone:
-    until = datetime.fromisoformat(_logged(change.before)["until"])
+    until = datetime.fromisoformat(logged(change.before)["until"])
     current = paused_until(session, now)
     if current is not None:
         raise ConflictError(

@@ -71,6 +71,15 @@ def test_add_source_records_the_change(session: Session) -> None:
     )
 
 
+def test_add_source_logs_the_site(session: Session) -> None:
+    """Approving a proposed addition adds the source from what was logged."""
+    add_source(session, "https://a.example/feed", actor="user", site_url="https://a.example/")
+
+    [change] = ChangeRepository(session).find(limit=5)
+    assert change.after is not None
+    assert change.after["site_url"] == "https://a.example/"
+
+
 def test_add_source_rejects_known_urls_and_names(session: Session, make: Factories) -> None:
     make.source("Known", url="https://known.example/feed", status=SourceStatus.REJECTED)
 
