@@ -9,6 +9,7 @@ from brzask.clients.feed_finder import (
     FoundFeed,
     alternate_feeds,
     common_feed_urls,
+    without_feeds,
     youtube_channel_id,
 )
 from brzask.clients.feeds import FeedFetcher
@@ -442,3 +443,30 @@ def test_youtube_feed_url_is_checked_and_kept() -> None:
 
     assert found is not None
     assert found.url == YOUTUBE_FEED
+
+
+# --- Sites without feeds -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.reddit.com/r/LocalLLaMA/.rss",
+        "https://old.reddit.com/r/LocalLLaMA/",
+        "reddit.com/r/LocalLLaMA/comments/abc123/a_post/",
+        "https://redd.it/abc123",
+    ],
+)
+def test_reddit_is_not_asked_for_a_feed(url: str) -> None:
+    web = Web({"https://www.reddit.com/r/LocalLLaMA/.rss": feed()})
+
+    assert web.finder().find(url) is None
+    assert web.requested == []
+    assert without_feeds(url) == "Reddit no longer serves feeds"
+
+
+@pytest.mark.parametrize(
+    "url", ["https://notreddit.com/feed", "https://reddit.com.example/feed", "not a url"]
+)
+def test_other_sites_may_have_feeds(url: str) -> None:
+    assert without_feeds(url) is None

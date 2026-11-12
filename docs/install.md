@@ -95,6 +95,14 @@ docker compose exec worker brzask notify test  # check NOTIFY_URLS
 
 To hear when the digest is ready or a run fails, see [Notifications](notifications.md).
 
+A source is found from any page of a site: the page itself when it is a feed,
+the feeds it links to, then the usual feed locations. GitHub repositories
+resolve to their release notes and YouTube channels to their video feed.
+Reddit cannot be followed: it stopped serving RSS on 2026-11-13 and its API
+accepts no new apps, so Reddit links are refused when adding sources.
+Subreddits added earlier fail to fetch and the weekly source review marks them
+dead after two weeks; mute them right away with `brzask sources mute`.
+
 ## Bringing your feeds
 
 Feed readers export their subscriptions as an OPML file. Import it on the

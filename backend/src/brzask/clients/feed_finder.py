@@ -51,6 +51,11 @@ _YOUTUBE_ID_IN_PAGE = (
 # EU visitors are redirected to a consent page instead of the channel; this
 # cookie answers it (checked from an EU address: CONSENT=YES+1 no longer does).
 YOUTUBE_CONSENT = {"Cookie": "SOCS=CAI"}
+# Sites that serve no feeds, with what the reader is told. Reddit stopped
+# serving RSS on 2026-11-13 and accepts no new apps for its API, so a
+# subreddit cannot be followed at all.
+_REDDIT = "Reddit no longer serves feeds"
+WITHOUT_FEEDS = {"reddit.com": _REDDIT, "redd.it": _REDDIT}
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +79,9 @@ class FeedFinder:
         page = with_scheme(url)
         host = host_of(page)
         if not host:
+            return None
+        if reason := without_feeds(page):
+            log.info("site serves no feeds", url=page, reason=reason)
             return None
         # Only github.com itself has repositories; gist., docs. and other subdomains are sites.
         if host == "github.com":
@@ -256,6 +264,15 @@ def is_comment_feed(entries: Sequence[FeedEntry]) -> bool:
     gives it away too, but in the site's language.
     """
     return bool(entries) and all("#comment" in entry.link for entry in entries)
+
+
+def without_feeds(url: str) -> str | None:
+    """Why the site of `url` cannot be followed, or None when it may have a feed."""
+    host = host_of(with_scheme(url))
+    return next(
+        (reason for domain, reason in WITHOUT_FEEDS.items() if host and host_matches(host, domain)),
+        None,
+    )
 
 
 def youtube_channel_id(html: str) -> str | None:

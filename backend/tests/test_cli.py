@@ -282,6 +282,13 @@ def test_sources_add_without_a_feed(cli: Invoke, finder: FakeFinder) -> None:
     assert "no RSS or Atom feed found for https://nofeed.example/" in result.stderr
 
 
+def test_sources_add_says_why_reddit_cannot_be_followed(cli: Invoke) -> None:
+    result = cli("sources", "add", "https://www.reddit.com/r/LocalLLaMA/")
+
+    assert result.exit_code == 1
+    assert "Reddit no longer serves feeds: https://www.reddit.com/r/LocalLLaMA/" in result.stderr
+
+
 def test_a_known_url_is_reported_without_a_lookup(
     cli: Invoke, finder: FakeFinder, make: Factories
 ) -> None:

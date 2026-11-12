@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
-from brzask.clients.feed_finder import FoundFeed
+from brzask.clients.feed_finder import FoundFeed, without_feeds
 from brzask.db.models import ChangeStatus, Source, SourceKind, SourceOrigin, SourceStatus
 from brzask.log import get_logger
 from brzask.repositories import ChangeRepository, SourceRepository
@@ -176,6 +176,8 @@ def ensure_unknown(session: Session, url: str) -> None:
 
 def find_feed(finder: SiteFeedFinder, url: str) -> FoundFeed:
     """The feed of the site `url` belongs to; `url` may be the feed itself or any page."""
+    if reason := without_feeds(url):
+        raise NotFoundError(f"{reason}: {url}")
     found = finder.find(url)
     if found is None:
         raise NotFoundError(f"no RSS or Atom feed found for {url}")
