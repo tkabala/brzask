@@ -165,7 +165,8 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         ] = None,
     ) -> models.DedupDecisions:
         """What deduplication dropped in a digest run: repeats of earlier days and same-day
-        copies of one story, with similarity and, for grey-zone pairs, the judge's probability."""
+        copies of one story, with similarity and, for grey-zone pairs, the judge's probability.
+        A day finds its real run; a dry run is found only by its run_id."""
         with sessions.begin() as session, service_errors():
             run = _digest_run(session, day, run_id)
             stats = run.stats.get("deduplication") or {}
@@ -304,7 +305,8 @@ def _digest_run(session: Session, day: date | None, run_id: uuid.UUID | None) ->
             raise ToolError(f"run {run_id} is a {run.kind.value} run, not a digest run")
         return run
     for run in RunRepository(session).recent(DIGEST_RUNS_SEARCHED, RunKind.DIGEST):
-        if run.status is not RunStatus.OK or "deduplication" not in run.stats:
+        # A dry run's picks were never shown; ask for one by its run_id.
+        if run.status is not RunStatus.OK or run.dry_run or "deduplication" not in run.stats:
             continue
         if day is None or run.stats.get("date") == day.isoformat():
             return run

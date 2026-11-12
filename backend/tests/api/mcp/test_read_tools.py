@@ -259,3 +259,23 @@ async def test_list_changes(
     )
     assert change["external"]["reason"] == "never opened"
     assert "source:12" in error_text(bad)
+
+
+async def test_dedup_decisions_skip_dry_runs_unless_asked_for(
+    connect: Connect, read_token: str, make: Factories
+) -> None:
+    dedup = {"same_day_method": "judge", "drops": []}
+    real = make.run(SEEN, stats={"date": "2026-11-10", "deduplication": dedup})
+    dry = make.run(
+        datetime(2026, 11, 11, 20, tzinfo=UTC),
+        stats={"date": "2026-11-10", "deduplication": dedup},
+        dry_run=True,
+    )
+
+    async with connect(read_token) as client:
+        latest = data(await client.call_tool("dedup_decisions", {}))
+        by_day = data(await client.call_tool("dedup_decisions", {"day": "2026-11-10"}))
+        by_id = data(await client.call_tool("dedup_decisions", {"run_id": str(dry.id)}))
+
+    assert latest["run_id"] == by_day["run_id"] == str(real.id)
+    assert by_id["run_id"] == str(dry.id)
