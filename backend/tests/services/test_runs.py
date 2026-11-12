@@ -1,9 +1,11 @@
+import threading
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from structlog.testing import capture_logs
 
@@ -13,7 +15,14 @@ from brzask.repositories import RunRepository
 from brzask.services.errors import ServiceError
 from brzask.services.notify import Message
 from brzask.services.run_metrics import RunInstruments
-from brzask.services.runs import Pipeline, RunContext, SkipRunError, run_pipeline
+from brzask.services.runs import (
+    Pipeline,
+    RunContext,
+    SkipRunError,
+    pipeline_lock,
+    run_pipeline,
+    sweep_abandoned,
+)
 from tests.factories import Factories
 
 
@@ -291,3 +300,75 @@ def test_digest_run_notifies_once_per_day(sessions: sessionmaker[Session]) -> No
 
     [(message, _)] = notifier.sent
     assert message.title == "brzask: today's 2 are ready"
+
+
+def test_run_pipeline_uses_the_given_run_id(sessions: sessionmaker[Session]) -> None:
+    run_id = uuid.uuid4()
+
+    run = run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed}, run_id=run_id)
+
+    assert run.id == run_id
+
+
+def test_started_is_set_once_the_row_exists(sessions: sessionmaker[Session]) -> None:
+    started = threading.Event()
+    seen: list[tuple[bool, RunStatus | None]] = []
+
+    def look(context: RunContext) -> None:
+        with context.sessions() as other:
+            run = RunRepository(other).get(context.run_id)
+            seen.append((started.is_set(), run.status if run else None))
+
+    run_pipeline(sessions, RunKind.VISITED, pipelines={RunKind.VISITED: look}, started=started)
+
+    assert seen == [(True, RunStatus.RUNNING)]
+
+
+NOW = datetime(2026, 11, 12, 12, tzinfo=UTC)
+
+
+def running_row(session: Session, kind: RunKind) -> uuid.UUID:
+    run_id = uuid.uuid4()
+    RunRepository(session).start(run_id, kind, datetime(2026, 11, 12, 7, tzinfo=UTC), dry_run=False)
+    session.flush()
+    return run_id
+
+
+def test_sweep_fails_a_running_row_whose_lock_is_free(
+    sessions: sessionmaker[Session], session: Session
+) -> None:
+    run_id = running_row(session, RunKind.DIGEST)
+    session.commit()
+
+    swept = sweep_abandoned(sessions, NOW)
+
+    assert swept == [run_id]
+    session.expire_all()
+    run = RunRepository(session).get(run_id)
+    assert run is not None
+    assert run.status is RunStatus.FAILED
+    assert run.error == "abandoned (the process running it stopped)"
+    assert run.finished_at == NOW
+
+
+def test_sweep_keeps_a_running_row_whose_lock_is_held(
+    sessions: sessionmaker[Session], session: Session, db_engine: Engine
+) -> None:
+    run_id = running_row(session, RunKind.DIGEST)
+    session.commit()
+
+    with pipeline_lock(db_engine, RunKind.DIGEST) as acquired:
+        assert acquired
+        swept = sweep_abandoned(sessions, NOW)
+
+    assert swept == []
+    session.expire_all()
+    run = RunRepository(session).get(run_id)
+    assert run is not None
+    assert run.status is RunStatus.RUNNING
+
+
+def test_sweep_ignores_finished_runs(sessions: sessionmaker[Session], session: Session) -> None:
+    run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed})
+
+    assert sweep_abandoned(sessions, NOW) == []

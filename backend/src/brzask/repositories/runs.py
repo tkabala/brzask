@@ -44,6 +44,11 @@ class RunRepository:
         run.error = error
         self.session.flush()
 
+    def running(self, kind: RunKind) -> Sequence[Run]:
+        return self.session.scalars(
+            select(Run).where(Run.kind == kind, Run.status == RunStatus.RUNNING)
+        ).all()
+
     def recent(self, limit: int, kind: RunKind | None = None) -> Sequence[Run]:
         """Newest runs first, of every kind or only `kind`."""
         query = select(Run).order_by(Run.started_at.desc()).limit(limit)

@@ -2,6 +2,7 @@ import os
 import signal
 import threading
 import time
+import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from datetime import time as clock
@@ -16,8 +17,9 @@ from brzask.config.settings import Schedule, SchedulerSettings
 from brzask.db.migrations import migrate
 from brzask.db.models import Run, RunKind, RunStatus
 from brzask.db.session import create_db_engine, session_factory
+from brzask.repositories import RunRepository
 from brzask.services.runs import RunContext, run_pipeline
-from brzask.worker import Job, build_scheduler, jobs, run_job, serve, trigger
+from brzask.worker import Job, build_scheduler, jobs, run_job, run_worker, serve, trigger
 
 WARSAW = ZoneInfo("Europe/Warsaw")
 
@@ -185,3 +187,20 @@ def test_a_lost_lock_connection_does_not_fail_a_finished_run(own_database: Engin
 
     assert run.status is RunStatus.OK
     assert run_pipeline(sessions, RunKind.DIGEST, pipelines=pipelines).status is RunStatus.OK
+
+
+def test_the_worker_closes_runs_left_running_before_it_starts(
+    own_database: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sessions: sessionmaker[Session] = session_factory(own_database)
+    orphan = uuid.uuid4()
+    with sessions.begin() as session:
+        RunRepository(session).start(orphan, RunKind.DIGEST, datetime(2026, 11, 12, 7, tzinfo=UTC))
+    monkeypatch.setattr("brzask.worker.serve", lambda _scheduler: None)
+
+    run_worker(SchedulerSettings(), sessions)
+
+    with sessions() as session:
+        run = RunRepository(session).get(orphan)
+        assert run is not None
+        assert run.status is RunStatus.FAILED

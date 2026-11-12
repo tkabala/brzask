@@ -15,6 +15,7 @@ import signal
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import FrameType
 from zoneinfo import ZoneInfo
 
@@ -26,7 +27,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.config.settings import Schedule, SchedulerSettings
 from brzask.db.models import RunKind
 from brzask.log import get_logger
-from brzask.services.runs import run_pipeline
+from brzask.services.runs import run_pipeline, sweep_abandoned
 
 log = get_logger(__name__)
 
@@ -113,6 +114,7 @@ def run_worker(settings: SchedulerSettings, sessions: sessionmaker[Session]) -> 
     """Run the schedule until SIGTERM or SIGINT."""
     # The schedule is logged below; APScheduler's own lines about adding jobs only repeat it.
     logging.getLogger("apscheduler.scheduler").setLevel(logging.WARNING)
+    sweep_abandoned(sessions, datetime.now(UTC))
     scheduler = build_scheduler(settings, lambda kind: run_pipeline(sessions, kind))
     for job in scheduler.get_jobs():
         log.info("scheduled", job=job.name, trigger=str(job.trigger))

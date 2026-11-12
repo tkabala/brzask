@@ -10,6 +10,7 @@ a command-line run never run the same pipeline at once: the second one is
 recorded as skipped.
 """
 
+import threading
 import time
 import uuid
 import zlib
@@ -136,8 +137,13 @@ def run_pipeline(
     pipelines: Mapping[RunKind, Pipeline] | None = None,
     instruments: RunInstruments | None = None,
     notifier: Notifier | Literal[_Default.FROM_SETTINGS] | None = FROM_SETTINGS,
+    run_id: uuid.UUID | None = None,
+    started: threading.Event | None = None,
 ) -> Run:
     """Run one pipeline and return its finished run row.
+
+    `run_id` lets a caller that starts the run in the background know its ID
+    beforehand; `started` is set once the run's row is committed.
 
     `pipelines` defaults to `brzask.services.pipelines.PIPELINES`, and the
     run's metrics go to `instruments` (the global meter provider's unless
@@ -156,7 +162,7 @@ def run_pipeline(
     if pipeline is None:
         raise ServiceError(f"the {kind.value} pipeline is not available")
 
-    run_id = uuid.uuid4()
+    run_id = run_id or uuid.uuid4()
     lock = pipeline_lock(session_bind(sessions), kind)
     span = tracer.start_as_current_span(
         f"pipeline {kind.value}",
@@ -178,6 +184,8 @@ def run_pipeline(
         )
         with sessions.begin() as session:
             RunRepository(session).start(run_id, kind, context.started_at, dry_run=dry_run)
+        if started is not None:
+            started.set()
         if not acquired:
             context.stats["reason"] = f"another {kind.value} run is in progress"
             return _finish(context, RunStatus.SKIPPED)
@@ -198,6 +206,40 @@ def run_pipeline(
         run = _finish(context, RunStatus.OK)
         _notify(context, notifier)
         return run
+
+
+ABANDONED = "abandoned (the process running it stopped)"
+
+
+def sweep_abandoned(sessions: sessionmaker[Session], now: datetime) -> list[uuid.UUID]:
+    """Fail the runs still marked running whose process is gone; return their IDs.
+
+    A process killed outright (SIGKILL, a container stopped past its grace
+    period) cannot close its run. Its advisory lock went with its connection,
+    so a running row whose pipeline lock is free has no process behind it. The
+    lock is held while the rows are closed, so a new run cannot start between
+    the check and the update.
+    """
+    swept: list[uuid.UUID] = []
+    for kind in RunKind:
+        with pipeline_lock(session_bind(sessions), kind) as acquired:
+            if not acquired:
+                continue
+            with sessions.begin() as session:
+                runs = RunRepository(session)
+                for run in runs.running(kind):
+                    runs.finish(
+                        run,
+                        RunStatus.FAILED,
+                        now,
+                        stats=run.stats,
+                        timings=run.timings,
+                        error=ABANDONED,
+                    )
+                    swept.append(run.id)
+    if swept:
+        log.warning("abandoned runs closed", runs=[str(run_id) for run_id in swept])
+    return swept
 
 
 def session_bind(sessions: sessionmaker[Session]) -> Engine | Connection:
