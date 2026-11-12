@@ -356,6 +356,13 @@ class ArticleRepository:
     def latest_digest_date(self) -> date | None:
         return self.session.scalar(select(func.max(Article.digest_date)))
 
+    def titles_by_link(self, links: Iterable[str]) -> dict[str, str]:
+        """Each known link's title, in the digest language when it was in a digest."""
+        query = select(Article.link, func.coalesce(Article.digest_title, Article.title)).where(
+            Article.link.in_(list(links))
+        )
+        return {link: title for link, title in self.session.execute(query)}
+
     def shown_and_opened(
         self, first: date, last: date, by: Literal["source", "topic"]
     ) -> list[tuple[str | None, int, int]]:

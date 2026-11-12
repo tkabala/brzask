@@ -5,7 +5,6 @@ from http import HTTPStatus
 
 from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, Field
-from sqlalchemy.orm import Session
 
 from brzask.api import problems
 from brzask.api.auth import Actor
@@ -47,10 +46,6 @@ class NewPause(BaseModel):
 
 @router.get("/status", summary="Counts, the pause and the last runs")
 def read_status(session: DbSession) -> StatusOut:
-    return status_out(session)
-
-
-def status_out(session: Session) -> StatusOut:
     current = get_status(session, datetime.now(UTC), get_settings().embedding.model)
     articles = current.articles
     return StatusOut(
