@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from brzask.cli.common import ACTOR, local, table, unit_of_work
-from brzask.db.models import ChangeStatus
+from brzask.db.models import Change, ChangeStatus
 from brzask.services import proposals, rollback
 
 app = typer.Typer(
@@ -88,10 +88,7 @@ def approve(change_id: ChangeId) -> None:
     """Apply a proposed change; refused if what it changes was edited since."""
     with unit_of_work() as session:
         change = proposals.approve(session, change_id, datetime.now(UTC))
-        message = (
-            f"Approved change {change.id} ({change.action} on {change.entity_type} "
-            f"{change.entity_id})."
-        )
+        message = f"Approved change {change.id} ({change.action} on {_target(change)})."
     typer.echo(message)
 
 
@@ -100,8 +97,12 @@ def reject(change_id: ChangeId) -> None:
     """Turn a proposed change down."""
     with unit_of_work() as session:
         change = proposals.reject(session, change_id, datetime.now(UTC))
-        message = (
-            f"Rejected change {change.id} ({change.action} on {change.entity_type} "
-            f"{change.entity_id})."
-        )
+        message = f"Rejected change {change.id} ({change.action} on {_target(change)})."
     typer.echo(message)
+
+
+def _target(change: Change) -> str:
+    """`source 12`; an addition rejected before it had an ID shows its type alone."""
+    if change.entity_id is None:
+        return change.entity_type
+    return f"{change.entity_type} {change.entity_id}"

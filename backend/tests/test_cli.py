@@ -35,7 +35,7 @@ from brzask.services.notify import TEST_MESSAGE, Message
 from brzask.services.opml import NO_FEED
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
-from brzask.services.sources import change_status, set_note
+from brzask.services.sources import add_source, change_status, set_note
 from tests.factories import Factories
 from tests.services.digest.fakes import FakeEmbedder
 from tests.services.test_replay import FakeModel
@@ -431,6 +431,18 @@ def test_config_approve_and_reject(cli: Invoke, make: Factories, session: Sessio
     assert f"change {muted.id} is applied" in again.stderr
     session.expire_all()
     assert session.get_one(Source, source.id).status is SourceStatus.MUTED
+
+
+def test_config_reject_an_addition(cli: Invoke, session: Session) -> None:
+    added = proposals.propose(
+        session, lambda: add_source(session, "https://blog.example/feed", actor="agent:x")
+    )
+    assert added is not None
+    session.commit()
+
+    rejected = cli("config", "reject", str(added.id))
+
+    assert rejected.stdout == f"Rejected change {added.id} (source.add on source).\n"
 
 
 def test_config_history_lists_newest_first_with_filters(
