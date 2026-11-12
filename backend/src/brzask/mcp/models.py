@@ -396,3 +396,7 @@ class ChangeItem(BaseModel):
 
 class ChangeList(BaseModel):
     changes: list[ChangeItem]
+
+
+class PauseState(BaseModel):
+    until: datetime | None = Field(description="No digest is built before this; null: not paused.")

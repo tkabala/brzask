@@ -96,7 +96,7 @@ class McpDeps:
 def build_mcp(deps: McpDeps) -> MCPServer[Any]:
     """The server with every tool, ready for `McpEndpoint`."""
     # Imported here: the tool modules import this one.
-    from brzask.mcp import tools_read
+    from brzask.mcp import tools_read, tools_write
 
     root = logging.getLogger()
     handlers, level = root.handlers[:], root.level
@@ -105,6 +105,7 @@ def build_mcp(deps: McpDeps) -> MCPServer[Any]:
     # yet; brzask's (structlog, JSON or console) stays the only one.
     root.handlers[:], root.level = handlers, level
     tools_read.register(server, deps)
+    tools_write.register(server, deps)
     server.streamable_http_app(
         streamable_http_path="/",
         stateless_http=True,

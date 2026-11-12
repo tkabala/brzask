@@ -12,6 +12,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.types import CallToolResult
 from sqlalchemy.orm import Session
 
+from brzask.config.settings import AuthSettings
 from brzask.db.models import TokenScope
 from brzask.services.tokens import create_token
 
@@ -21,6 +22,12 @@ type Connect = Callable[[str | None], AbstractAsyncContextManager[Client]]
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.fixture
+def auth_settings(password_auth: AuthSettings) -> AuthSettings:
+    """With a login, so tokens decide what a call may do (no login lets everything through)."""
+    return password_auth
 
 
 def http_client(app: FastAPI, token: str | None) -> httpx2.AsyncClient:

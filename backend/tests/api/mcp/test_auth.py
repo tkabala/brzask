@@ -27,11 +27,6 @@ INITIALIZE = {
 ACCEPT = {"Accept": "application/json, text/event-stream"}
 
 
-@pytest.fixture
-def auth_settings(password_auth: AuthSettings) -> AuthSettings:
-    return password_auth
-
-
 async def post(app: FastAPI, token: str | None, path: str = "/mcp", **kwargs: object) -> object:
     async with http_client(app, token) as http:
         return await http.post(path, json=INITIALIZE, headers=ACCEPT, **kwargs)  # type: ignore[arg-type]
