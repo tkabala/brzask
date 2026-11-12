@@ -26,11 +26,17 @@ export interface ChangedField {
   after: string
 }
 
-/** Each field the change sets, as it was and as it would be; `-` for nothing. */
+/**
+ * Each field the change sets, as it was and as it would be; `-` for nothing.
+ *
+ * `before` may hold more: a mute keeps the note it saw, so approving can tell
+ * whether the source was edited since, but sets the note to its reason. A
+ * change that only ends something (a resume) shows what it ends.
+ */
 export function changedFields(change: ChangeOut): ChangedField[] {
   const before = change.before ?? {}
   const after = change.after ?? {}
-  const names = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+  const names = Object.keys(Object.keys(after).length > 0 ? after : before)
   return names.map((name) => ({ name, before: shown(before[name]), after: shown(after[name]) }))
 }
 

@@ -20,6 +20,10 @@ describe('changes', () => {
 
     const card = await screen.findByRole('article', { name: `Mute ${String(mute?.entity)}` })
     expect(within(card).getByText('claude')).toBeInTheDocument()
+    // Right under the page's h1, for screen readers' outline.
+    expect(
+      within(card).getByRole('heading', { level: 2, name: `Mute ${String(mute?.entity)}` }),
+    ).toBeInTheDocument()
     expect(within(card).getByText(String(mute?.reason))).toBeInTheDocument()
     await user.click(within(card).getByRole('button', { name: 'Approve' }))
 

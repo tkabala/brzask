@@ -61,9 +61,9 @@ function ChangeItem({ change, busy, error, onApprove, onReject }: ItemProps) {
 
   return (
     <article className="grid gap-2 py-3" aria-labelledby={titleId}>
-      <h3 id={titleId} className="font-medium">
+      <h2 id={titleId} className="font-medium">
         {title}
-      </h3>
+      </h2>
       <p className="text-xs text-muted-foreground">
         {t('changes.by')} <span className="font-medium">{agentName(change.actor)}</span>
         {' · '}

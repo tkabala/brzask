@@ -27,15 +27,12 @@ describe('describing a change', () => {
     expect(actionKey('source.move')).toBeNull()
   })
 
-  it('lists every field it changes, before and after', () => {
+  it('lists the fields it sets, not the ones it only checks', () => {
     expect(
       changedFields(
         change({ before: { status: 'active', note: 'fine' }, after: { status: 'muted' } }),
       ),
-    ).toEqual([
-      { name: 'status', before: 'active', after: 'muted' },
-      { name: 'note', before: 'fine', after: '-' },
-    ])
+    ).toEqual([{ name: 'status', before: 'active', after: 'muted' }])
   })
 
   it('shows an addition with nothing before', () => {
@@ -52,6 +49,12 @@ describe('describing a change', () => {
       { name: 'notes', before: '-', after: '-' },
       { name: 'active', before: '-', after: 'true' },
     ])
+  })
+
+  it('shows what a resume ends', () => {
+    expect(
+      changedFields(change({ action: 'digest.resume', before: { until: '2026-11-20T07:00:00Z' } })),
+    ).toEqual([{ name: 'until', before: '2026-11-20T07:00:00Z', after: '-' }])
   })
 
   it('names the agent without its prefix', () => {
