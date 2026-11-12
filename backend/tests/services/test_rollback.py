@@ -18,6 +18,7 @@ from brzask.services.sources import (
     mute_source,
     propose_source,
     rename_source,
+    set_note,
 )
 from tests.factories import Factories
 
@@ -695,3 +696,32 @@ def test_interest_update_with_malformed_values_is_refused(
         rollback_change(session, original.id, NOW, actor="user")
 
     assert (interest.topic, interest.notes) == ("Postgres", "new")
+
+
+# --- note ------------------------------------------------------------------------
+
+
+def test_rolling_back_a_note(session: Session, make: Factories) -> None:
+    source = make.source("Blog")
+    set_note(session, source, "first", actor="user")
+    set_note(session, source, "second", actor="user")
+    original = last_change(session)
+
+    new = rollback_change(session, original.id, NOW, actor="user")
+
+    assert source.note == "first"
+    assert (new.action, new.before, new.after) == (
+        "source.note.rollback",
+        {"note": "second"},
+        {"note": "first"},
+    )
+
+
+def test_note_rollback_refused_after_another_note(session: Session, make: Factories) -> None:
+    source = make.source("Blog")
+    set_note(session, source, "first", actor="user")
+    original = last_change(session)
+    set_note(session, source, "second", actor="user")
+
+    with pytest.raises(ConflictError, match="note is now 'second'"):
+        rollback_change(session, original.id, NOW, actor="user")

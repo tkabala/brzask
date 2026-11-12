@@ -16,6 +16,7 @@ from brzask.services.sources import (
     mute_source,
     name_from_feed,
     propose_source,
+    set_note,
     unique_name,
 )
 from tests.factories import Factories
@@ -389,3 +390,34 @@ def test_status_change_logs_the_previous_note(session: Session, make: Factories)
 
     change = ChangeRepository(session).find(limit=1)[0]
     assert change.before == {"status": "active", "note": "was fine"}
+
+
+def test_set_note_records_the_change(session: Session, make: Factories) -> None:
+    source = make.source("Blog", note="old")
+
+    assert set_note(session, source, "  checked by hand  ", actor="agent:claude")
+
+    assert source.note == "checked by hand"
+    change = ChangeRepository(session).find(limit=1)[0]
+    assert (change.action, change.actor, change.before, change.after) == (
+        "source.note",
+        "agent:claude",
+        {"note": "old"},
+        {"note": "checked by hand"},
+    )
+
+
+def test_an_empty_note_clears_it(session: Session, make: Factories) -> None:
+    source = make.source("Blog", note="old")
+
+    assert set_note(session, source, "  ", actor="user")
+
+    assert source.note is None
+
+
+def test_an_unchanged_note_records_nothing(session: Session, make: Factories) -> None:
+    source = make.source("Blog", note="same")
+
+    assert not set_note(session, source, "same", actor="user")
+
+    assert ChangeRepository(session).find(limit=1) == []

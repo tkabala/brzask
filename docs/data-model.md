@@ -156,6 +156,7 @@ rolled back: make the change again instead.
 |---|---|
 | Source muted, enabled, marked dead or rejected | Restores its status and note. Back to active also forgets past fetch failures, as enabling does. |
 | Source renamed | Restores the name, unless it is taken now |
+| Source note changed | Restores the earlier note |
 | Source added | Mutes an active source and rejects a pending one |
 | Interest added | Deactivates it, unless it was edited since |
 | Interest edited | Restores the edited fields, unless the old topic is taken now |

@@ -260,6 +260,26 @@ def rename_source(session: Session, source: Source, name: str, *, actor: str) ->
     return True
 
 
+def set_note(session: Session, source: Source, note: str | None, *, actor: str) -> bool:
+    """Replace a source's note; blank clears it. False when it already had that note."""
+    note = (note or "").strip() or None
+    if note == source.note:
+        return False
+    before = source.note
+    source.note = note
+    session.flush()
+    ChangeRepository(session).record(
+        actor=actor,
+        action="source.note",
+        entity_type="source",
+        entity_id=str(source.id),
+        status=ChangeStatus.APPLIED,
+        before={"note": before},
+        after={"note": note},
+    )
+    return True
+
+
 def move_source(session: Session, source: Source, url: str, *, actor: str) -> bool:
     """Point a source at the URL its feed moved to for good. False when nothing changed.
 

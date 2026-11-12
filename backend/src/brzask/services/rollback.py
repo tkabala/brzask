@@ -186,6 +186,17 @@ def _undo_rename(session: Session, change: Change, _now: datetime) -> Undone:
     return undone
 
 
+def _undo_note(session: Session, change: Change, _now: datetime) -> Undone:
+    source = _locked_source(session, change)
+    _require_unchanged(change, "note", _logged(change.after)["note"], source.note)
+    note = _logged(change.before)["note"]
+    _require(note is None or _is_text(note))
+    undone = Undone(before={"note": source.note}, after={"note": note})
+    source.note = note
+    session.flush()
+    return undone
+
+
 def _undo_reject(session: Session, change: Change, now: datetime) -> Undone:
     if change.before is None:  # discovery stored the source as rejected from the start
         raise ServiceError(
@@ -298,6 +309,7 @@ _UNDO: dict[str, Undo] = {
     "source.dead": _undo_status,
     "source.reject": _undo_reject,
     "source.rename": _undo_rename,
+    "source.note": _undo_note,
     "source.add": _undo_addition,
     "source.propose": _undo_addition,
     "interest.add": _undo_interest_addition,
