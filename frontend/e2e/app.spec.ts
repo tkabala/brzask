@@ -18,6 +18,7 @@ const SCREENS = [
   ['/search', 'Search'],
   ['/sources', 'Sources'],
   ['/interests', 'Interests'],
+  ['/changes', 'Changes'],
   ['/status', 'Status'],
 ] as const
 

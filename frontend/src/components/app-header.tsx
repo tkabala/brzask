@@ -1,8 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import { logoutMutation } from '@/client/@tanstack/react-query.gen'
+import { listChangesOptions, logoutMutation } from '@/client/@tanstack/react-query.gen'
 import type { SessionOut } from '@/client/types.gen'
 import { Button } from '@/components/ui/button'
 import { LANGUAGES } from '@/i18n'
@@ -16,6 +16,7 @@ const NAV = [
   ['/search', 'search'],
   ['/sources', 'sources'],
   ['/interests', 'interests'],
+  ['/changes', 'changes'],
   ['/status', 'status'],
 ] as const
 
@@ -23,6 +24,8 @@ export function AppHeader({ session }: { session: SessionOut }) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const theme = useTheme()
+  // Only a count: when it cannot be read (offline, an error) the link shows none.
+  const waiting = useQuery(listChangesOptions()).data?.length ?? 0
   const logout = useMutation({
     ...logoutMutation(),
     // Offline the request fails at once instead of waiting: the saved copy
@@ -52,6 +55,14 @@ export function AppHeader({ session }: { session: SessionOut }) {
               className="text-muted-foreground [&.active]:text-foreground"
             >
               {t(`app.nav.${key}`)}
+              {key === 'changes' && waiting > 0 ? (
+                <span
+                  className="ml-1 rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
+                  aria-label={t('changes.waiting', { count: waiting })}
+                >
+                  {waiting}
+                </span>
+              ) : null}
             </Link>
           ))}
         </nav>

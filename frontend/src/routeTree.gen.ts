@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChangesRouteImport } from './routes/changes'
 import { Route as InterestsRouteImport } from './routes/interests'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SourcesRouteImport } from './routes/sources'
@@ -20,6 +21,11 @@ import { Route as ArchiveDayRouteImport } from './routes/archive/$day'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangesRoute = ChangesRouteImport.update({
+  id: '/changes',
+  path: '/changes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InterestsRoute = InterestsRouteImport.update({
@@ -55,6 +61,7 @@ const ArchiveDayRoute = ArchiveDayRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/changes': typeof ChangesRoute
   '/interests': typeof InterestsRoute
   '/search': typeof SearchRoute
   '/sources': typeof SourcesRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/changes': typeof ChangesRoute
   '/interests': typeof InterestsRoute
   '/search': typeof SearchRoute
   '/sources': typeof SourcesRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/changes': typeof ChangesRoute
   '/interests': typeof InterestsRoute
   '/search': typeof SearchRoute
   '/sources': typeof SourcesRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/changes'
     | '/interests'
     | '/search'
     | '/sources'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/changes'
     | '/interests'
     | '/search'
     | '/sources'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/changes'
     | '/interests'
     | '/search'
     | '/sources'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChangesRoute: typeof ChangesRoute
   InterestsRoute: typeof InterestsRoute
   SearchRoute: typeof SearchRoute
   SourcesRoute: typeof SourcesRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/changes': {
+      id: '/changes'
+      path: '/changes'
+      fullPath: '/changes'
+      preLoaderRoute: typeof ChangesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/interests': {
@@ -177,6 +197,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChangesRoute: ChangesRoute,
   InterestsRoute: InterestsRoute,
   SearchRoute: SearchRoute,
   SourcesRoute: SourcesRoute,

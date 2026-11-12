@@ -5,6 +5,7 @@
  */
 import type {
   ArticleOut,
+  ChangeOut,
   DigestDayOut,
   DigestOut,
   InterestOut,
@@ -181,3 +182,55 @@ export const status: StatusOut = {
   embedding_model: EMBEDDING_MODEL,
   embeddings: { [EMBEDDING_MODEL]: allArticles.length },
 }
+
+const proposedAt = '2026-11-12T07:40:00Z'
+const proposedBy = 'agent:claude'
+const mutedSource = must(sources[1], 'second source')
+const renamedSource = must(sources[2], 'third source')
+const editedInterest = must(interests[0], 'first interest')
+
+/** Changes an agent proposed with a propose token, waiting for approval. */
+export const proposals: ChangeOut[] = [
+  {
+    id: 101,
+    created_at: proposedAt,
+    actor: proposedBy,
+    action: 'source.mute',
+    entity_type: 'source',
+    entity_id: String(mutedSource.id),
+    entity: mutedSource.name,
+    before: { status: 'active', note: mutedSource.note },
+    after: { status: 'muted' },
+    reason: 'Opened 0 of its last 40 articles.',
+    status: 'proposed',
+    decided_at: null,
+  },
+  {
+    id: 102,
+    created_at: proposedAt,
+    actor: proposedBy,
+    action: 'source.rename',
+    entity_type: 'source',
+    entity_id: String(renamedSource.id),
+    entity: renamedSource.name,
+    before: { name: renamedSource.name },
+    after: { name: `${renamedSource.name} (releases)` },
+    reason: null,
+    status: 'proposed',
+    decided_at: null,
+  },
+  {
+    id: 103,
+    created_at: proposedAt,
+    actor: proposedBy,
+    action: 'interest.update',
+    entity_type: 'interest',
+    entity_id: String(editedInterest.id),
+    entity: editedInterest.topic,
+    before: { notes: editedInterest.notes },
+    after: { notes: `${editedInterest.notes}; skip: conference recaps` },
+    reason: 'Three conference recaps were shown this week and none was opened.',
+    status: 'proposed',
+    decided_at: null,
+  },
+]

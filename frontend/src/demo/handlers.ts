@@ -54,6 +54,7 @@ function fresh() {
     interests: demo.interests,
     runs: demo.runs,
     status: demo.status,
+    changes: demo.proposals,
   })
 }
 
@@ -283,6 +284,23 @@ export const handlers = [
     )
     return HttpResponse.json(interest)
   }),
+
+  // --- Proposed changes -----------------------------------------------------------
+  http.get(`${API}/changes`, () =>
+    HttpResponse.json(db.changes.filter((c) => c.status === 'proposed')),
+  ),
+  ...(['approve', 'reject'] as const).map((decision) =>
+    http.post(`${API}/changes/:id/${decision}`, ({ params }) => {
+      const change = db.changes.find((c) => String(c.id) === params.id)
+      if (!change) return problem(404, 'Not Found', `no change ${String(params.id)}`)
+      if (change.status !== 'proposed') {
+        return problem(409, 'Conflict', `change ${String(change.id)} is ${change.status}`)
+      }
+      change.status = decision === 'approve' ? 'applied' : 'rejected'
+      change.decided_at = new Date().toISOString()
+      return HttpResponse.json(change)
+    }),
+  ),
 
   // --- Runs, status, pause ------------------------------------------------------
   http.get(`${API}/runs`, ({ request }) => page(db.runs, new URL(request.url))),
