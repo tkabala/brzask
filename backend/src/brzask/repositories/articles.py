@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from itertools import batched
+from typing import Literal
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -354,6 +355,20 @@ class ArticleRepository:
 
     def latest_digest_date(self) -> date | None:
         return self.session.scalar(select(func.max(Article.digest_date)))
+
+    def shown_and_opened(
+        self, first: date, last: date, by: Literal["source", "topic"]
+    ) -> list[tuple[str | None, int, int]]:
+        """(source name or topic, shown, opened) over the digests of `first`..`last`."""
+        key = Source.name if by == "source" else Article.topic
+        query = (
+            select(key, func.count(), func.count(Article.opened_at))
+            .select_from(Article)
+            .outerjoin(Source, Article.source_id == Source.id)
+            .where(Article.digest_date.between(first, last))
+            .group_by(key)
+        )
+        return [(name, shown, opened) for name, shown, opened in self.session.execute(query)]
 
     def digest_days(self, limit: int, before: date | None = None) -> list[DigestDay]:
         """Days with a digest, newest first; `before` continues a previous page."""
