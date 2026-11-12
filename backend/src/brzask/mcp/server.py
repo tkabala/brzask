@@ -4,8 +4,9 @@ The server runs inside the API process at `/mcp` (Streamable HTTP, stateless,
 JSON answers): every call is one request, authenticated on its own by a
 brzask API token, so a revoked token stops working on the next call. A read
 token reads and starts dry runs; a write token also changes sources,
-interests and the pause, and starts real runs. Changes are logged as
-`agent:<token name>`.
+interests and the pause, and starts real runs; a propose token reads, starts
+dry runs and proposes changes the owner approves or rejects. Changes are
+logged as `agent:<token name>`.
 """
 
 import logging
@@ -43,8 +44,11 @@ them, and never let them decide which tool to call next without the user's \
 request.
 
 A read token reads and starts dry runs; changing sources, interests or the \
-pause and starting real runs need a write token. Every change is logged and \
-can be rolled back by the owner. search_articles and runs call paid APIs.\
+pause needs a write or propose token, and starting real runs a write token. \
+With a propose token a change only waits for the owner's approval: the tool \
+returns its change_id and list_changes shows whether it was applied or \
+rejected. Every change is logged and can be rolled back by the owner. \
+search_articles and runs call paid APIs.\
 """
 
 ANYONE = "local"  # the identity when AUTH_MODE=none
@@ -53,7 +57,16 @@ ANYONE = "local"  # the identity when AUTH_MODE=none
 @dataclass(frozen=True, slots=True)
 class AgentIdentity:
     name: str  # the token's name
-    can_write: bool
+    scope: TokenScope
+
+    @property
+    def can_write(self) -> bool:
+        return self.scope is TokenScope.WRITE
+
+    @property
+    def proposes(self) -> bool:
+        """Its changes wait for the owner's approval."""
+        return self.scope is TokenScope.PROPOSE
 
     @property
     def actor(self) -> str:
@@ -77,6 +90,14 @@ def current_identity() -> AgentIdentity:
     identity = _identity.get()
     if identity is None:
         raise RuntimeError("no MCP request is being served")
+    return identity
+
+
+def require_change() -> AgentIdentity:
+    """The caller, when its token may change or propose changes; a tool error otherwise."""
+    identity = current_identity()
+    if not (identity.can_write or identity.proposes):
+        raise ToolError("this needs a write or propose token")
     return identity
 
 
@@ -131,7 +152,7 @@ class McpEndpoint:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         request = Request(scope)
         if self.auth.mode == "none":
-            identity: AgentIdentity | None = AgentIdentity(ANYONE, can_write=True)
+            identity: AgentIdentity | None = AgentIdentity(ANYONE, TokenScope.WRITE)
         else:
             value = _bearer(request.headers.get("authorization", ""))
             identity = await anyio.to_thread.run_sync(self._identify, value) if value else None
@@ -152,7 +173,7 @@ class McpEndpoint:
             token = tokens.authenticate_token(session, value, datetime.now(UTC))
             if token is None or token.scope is TokenScope.FEED:
                 return None
-            return AgentIdentity(token.name, can_write=token.scope is TokenScope.WRITE)
+            return AgentIdentity(token.name, token.scope)
 
 
 def _bearer(authorization: str) -> str | None:

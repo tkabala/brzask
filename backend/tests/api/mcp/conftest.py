@@ -65,6 +65,11 @@ def write_token(session: Session) -> str:
     return create_token(session, "claude", TokenScope.WRITE, actor="test")[1]
 
 
+@pytest.fixture
+def propose_token(session: Session) -> str:
+    return create_token(session, "helper", TokenScope.PROPOSE, actor="test")[1]
+
+
 def error_text(result: CallToolResult) -> str:
     assert result.is_error, result
     text = result.content[0]

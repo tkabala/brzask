@@ -1,23 +1,27 @@
-"""Tools that change sources, interests and the pause; each needs a write token.
+"""Tools that change sources, interests and the pause; each needs a write or propose token.
 
 Every change goes through the same services as the CLI and the web app, so
 it is logged in the change log as `agent:<token name>` and can be rolled
-back with `brzask config rollback`.
+back with `brzask config rollback`. With a propose token the same write is
+only proposed: it is validated and logged as `proposed`, and the owner
+applies or rejects it.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import AwareDatetime, Field
 from sqlalchemy.orm import Session
 
 from brzask.clients.feed_finder import with_scheme
-from brzask.db.models import Source, SourceOrigin, SourceStatus
+from brzask.db.models import Interest, Source, SourceOrigin, SourceStatus
 from brzask.mcp import models
 from brzask.mcp.errors import service_errors
-from brzask.mcp.server import McpDeps, require_write
-from brzask.services import interests, sources
+from brzask.mcp.server import McpDeps, require_change
+from brzask.services import interests, proposals, sources
 from brzask.services import pause as pausing
 from brzask.services.errors import ConflictError
 
@@ -38,9 +42,13 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
             bool,
             Field(description="Read it from the next digest on; otherwise it waits for the owner."),
         ] = False,
-    ) -> models.SourceItem:
-        """Find the site's RSS or Atom feed and add it, pending the owner's decision by default."""
-        actor = require_write().actor
+    ) -> models.SourceItem | models.ProposalItem:
+        """Find the site's RSS or Atom feed and add it, pending the owner's decision by default.
+
+        Active with a propose token, the addition is proposed instead.
+        """
+        identity = require_change()
+        actor = identity.actor
         with service_errors():
             with sessions.begin() as session:
                 # Before any request to the site, as the finder will read the URL.
@@ -49,6 +57,18 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
             with deps.clients.feed_finder() as finder:
                 found = sources.find_feed(finder, url)
             with sessions.begin() as session:
+                if active and identity.proposes:
+                    return _proposal(
+                        session,
+                        lambda: sources.add_source(
+                            session,
+                            found.url,
+                            actor=actor,
+                            name=name,
+                            title=found.title,
+                            site_url=found.site_url,
+                        ),
+                    )
                 if active:
                     source: Source | None = sources.add_source(
                         session,
@@ -78,35 +98,58 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         reason: Annotated[
             str | None, Field(max_length=500, description="Kept as its note.")
         ] = None,
-    ) -> models.SourceItem:
+    ) -> models.SourceItem | models.ProposalItem:
         """Read a source again (active), stop reading it (muted) or turn a pending one down."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
             found = sources.find_source(session, source)
-            sources.change_status(session, found, SourceStatus(status), actor=actor, reason=reason)
+
+            def write() -> object:
+                return sources.change_status(
+                    session, found, SourceStatus(status), actor=actor, reason=reason
+                )
+
+            if identity.proposes:
+                return _proposal(session, write)
+            write()
             return _out(session, found)
 
     @server.tool()
     def rename_source(
         source: SourceRef, name: Annotated[str, Field(min_length=1, max_length=200)]
-    ) -> models.SourceItem:
+    ) -> models.SourceItem | models.ProposalItem:
         """Give a source another name, unique ignoring case."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
             found = sources.find_source(session, source)
-            sources.rename_source(session, found, name, actor=actor)
+
+            def write() -> object:
+                return sources.rename_source(session, found, name, actor=actor)
+
+            if identity.proposes:
+                return _proposal(session, write)
+            write()
             return _out(session, found)
 
     @server.tool()
     def set_source_note(
         source: SourceRef,
         note: Annotated[str | None, Field(max_length=2000, description="Empty or null clears it.")],
-    ) -> models.SourceItem:
+    ) -> models.SourceItem | models.ProposalItem:
         """Replace a source's note, e.g. why it is kept although rarely opened."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
             found = sources.find_source(session, source)
-            sources.set_note(session, found, note, actor=actor)
+
+            def write() -> object:
+                return sources.set_note(session, found, note, actor=actor)
+
+            if identity.proposes:
+                return _proposal(session, write)
+            write()
             return _out(session, found)
 
     @server.tool()
@@ -116,14 +159,20 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         notes: Annotated[
             str, Field(max_length=4000, description="What the owner wants, in words.")
         ] = "",
-    ) -> models.InterestItem:
+    ) -> models.InterestItem | models.ProposalItem:
         """Add an interest the ranking and source discovery should follow."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
-            added = interests.add_interest(
-                session, topic, actor=actor, keywords=keywords, notes=notes
-            )
-            return models.InterestItem.of(added)
+
+            def write() -> Interest:
+                return interests.add_interest(
+                    session, topic, actor=actor, keywords=keywords, notes=notes
+                )
+
+            if identity.proposes:
+                return _proposal(session, write)
+            return models.InterestItem.of(write())
 
     @server.tool()
     def edit_interest(
@@ -132,38 +181,66 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         keywords: Annotated[list[str] | None, Field(max_length=50)] = None,
         notes: Annotated[str | None, Field(max_length=4000)] = None,
         active: bool | None = None,
-    ) -> models.InterestItem:
+    ) -> models.InterestItem | models.ProposalItem:
         """Change the given fields of an interest; inactive ones are ignored by the pipelines."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
-            edited = interests.edit_interest(
-                session,
-                interest,
-                actor=actor,
-                topic=topic,
-                keywords=keywords,
-                notes=notes,
-                active=active,
-            )
-            return models.InterestItem.of(edited)
+
+            def write() -> Interest:
+                return interests.edit_interest(
+                    session,
+                    interest,
+                    actor=actor,
+                    topic=topic,
+                    keywords=keywords,
+                    notes=notes,
+                    active=active,
+                )
+
+            if identity.proposes:
+                return _proposal(session, write)
+            return models.InterestItem.of(write())
 
     @server.tool()
     def pause(
         until: Annotated[AwareDatetime, Field(description="When digests start again.")],
-    ) -> models.PauseState:
+    ) -> models.PauseState | models.ProposalItem:
         """Build no digest until `until`, e.g. for a holiday; replaces a pause already set."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
-            pausing.pause(session, until, datetime.now(UTC), actor=actor)
+
+            def write() -> None:
+                pausing.pause(session, until, datetime.now(UTC), actor=actor)
+
+            if identity.proposes:
+                return _proposal(session, write)
+            write()
             return models.PauseState(until=until)
 
     @server.tool()
-    def resume() -> models.PauseState:
+    def resume() -> models.PauseState | models.ProposalItem:
         """End a pause now; nothing happens when the digest is not paused."""
-        actor = require_write().actor
+        identity = require_change()
+        actor = identity.actor
         with sessions.begin() as session, service_errors():
-            pausing.resume(session, datetime.now(UTC), actor=actor)
+
+            def write() -> object:
+                return pausing.resume(session, datetime.now(UTC), actor=actor)
+
+            if identity.proposes:
+                return _proposal(session, write)
+            write()
             return models.PauseState(until=None)
+
+
+def _proposal(session: Session, write: Callable[[], object]) -> models.ProposalItem:
+    """Propose what `write` would change; the owner approves or rejects it."""
+    change = proposals.propose(session, write)
+    if change is None:
+        raise ToolError("nothing to change: it is already so")
+    return models.ProposalItem(change_id=change.id, action=change.action)
 
 
 def _out(session: Session, source: Source) -> models.SourceItem:

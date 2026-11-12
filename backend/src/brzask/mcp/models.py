@@ -9,7 +9,7 @@ Everything else is written by brzask or the owner.
 
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -398,6 +398,15 @@ class ChangeItem(BaseModel):
 
 class ChangeList(BaseModel):
     changes: list[ChangeItem]
+
+
+class ProposalItem(BaseModel):
+    """A change that waits for the owner's approval; nothing has changed yet."""
+
+    change_id: int
+    action: str
+    status: Literal["proposed"] = "proposed"
+    message: str = "waits for the owner's approval; follow it with list_changes"
 
 
 class PauseState(BaseModel):

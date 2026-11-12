@@ -71,6 +71,12 @@ def write_token(sessions: sessionmaker[Session]) -> str:
 
 
 @pytest.fixture
+def propose_token(sessions: sessionmaker[Session]) -> str:
+    with sessions.begin() as session:
+        return create_token(session, "helper", TokenScope.PROPOSE, actor="test")[1]
+
+
+@pytest.fixture
 def pipelines() -> dict[RunKind, Pipeline]:
     release.clear()
     return {RunKind.DIGEST: quick, RunKind.REVIEW: blocking}
@@ -133,6 +139,17 @@ async def test_a_real_or_forced_run_needs_a_write_token(
     await until(lambda: status_of(sessions, started["run_id"]) is RunStatus.OK)
     with sessions() as session:
         assert [r.dry_run for r in RunRepository(session).recent(5)] == [False]
+
+
+async def test_a_propose_token_starts_only_dry_runs(
+    connect: Connect, propose_token: str, sessions: sessionmaker[Session]
+) -> None:
+    async with connect(propose_token) as client:
+        real = await client.call_tool("start_run", {"kind": "digest", "dry_run": False})
+        started = data(await client.call_tool("start_run", {"kind": "digest"}))
+
+    assert "this needs a write token" in error_text(real)
+    await until(lambda: status_of(sessions, started["run_id"]) is RunStatus.OK)
 
 
 async def test_a_second_run_of_the_same_kind_is_skipped(

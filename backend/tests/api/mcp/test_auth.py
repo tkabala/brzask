@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from brzask.config.settings import AuthSettings
 from brzask.db.models import TokenScope
 from brzask.mcp.content import cap
-from brzask.mcp.server import AgentIdentity, identity_scope, require_write
+from brzask.mcp.server import AgentIdentity, identity_scope, require_change, require_write
 from brzask.services.tokens import create_token, revoke_token
 from tests.api.mcp.conftest import Connect, data, error_text, http_client
 
@@ -92,14 +92,26 @@ async def test_without_login_every_call_is_local_and_may_write(connect: Connect)
 
 def test_require_write_refuses_a_read_identity() -> None:
     with (
-        identity_scope(AgentIdentity("reader", can_write=False)),
+        identity_scope(AgentIdentity("reader", TokenScope.READ)),
         pytest.raises(Exception, match="this needs a write token"),
     ):
         require_write()
 
 
+def test_require_change_takes_write_and_propose_tokens() -> None:
+    with identity_scope(AgentIdentity("helper", TokenScope.PROPOSE)):
+        assert require_change().proposes
+        with pytest.raises(Exception, match="this needs a write token"):
+            require_write()
+    with (
+        identity_scope(AgentIdentity("reader", TokenScope.READ)),
+        pytest.raises(Exception, match="this needs a write or propose token"),
+    ):
+        require_change()
+
+
 def test_require_write_gives_the_actor() -> None:
-    with identity_scope(AgentIdentity("claude", can_write=True)):
+    with identity_scope(AgentIdentity("claude", TokenScope.WRITE)):
         assert require_write().actor == "agent:claude"
 
 
