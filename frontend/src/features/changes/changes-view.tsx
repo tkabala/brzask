@@ -11,12 +11,15 @@ interface Props {
   changes: ChangeOut[]
   onApprove: (change: ChangeOut) => void
   onReject: (change: ChangeOut) => void
-  busyId?: number | null
+  /** Changes whose decision is on its way. */
+  busyIds?: ReadonlySet<number>
   /** What the server answered when deciding a change failed, by change ID. */
   errors?: Record<number, unknown>
 }
 
-export function ChangesView({ changes, onApprove, onReject, busyId = null, errors = {} }: Props) {
+const NONE: ReadonlySet<number> = new Set()
+
+export function ChangesView({ changes, onApprove, onReject, busyIds = NONE, errors = {} }: Props) {
   const { t } = useTranslation()
   return (
     <section>
@@ -30,7 +33,7 @@ export function ChangesView({ changes, onApprove, onReject, busyId = null, error
             <li key={change.id}>
               <ChangeItem
                 change={change}
-                busy={busyId === change.id}
+                busy={busyIds.has(change.id)}
                 error={errors[change.id]}
                 onApprove={onApprove}
                 onReject={onReject}

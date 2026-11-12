@@ -57,6 +57,55 @@ describe('changes', () => {
     ).toBeInTheDocument()
   })
 
+  it('keeps a decision busy while another one settles', async () => {
+    const answers = new Map<string, (response: Response) => void>()
+    const api = loggedInApi({
+      'POST /api/v1/changes/:id/approve': (request) =>
+        new Promise<Response>((resolve) => {
+          answers.set(new URL(request.url).pathname.split('/')[4] ?? '', resolve)
+        }),
+    })
+    const user = userEvent.setup()
+    renderApp('/changes')
+
+    const first = await screen.findByRole('article', { name: `Mute ${String(mute?.entity)}` })
+    const second = screen.getByRole('article', { name: `Rename ${String(rename?.entity)}` })
+    await user.click(within(first).getByRole('button', { name: 'Approve' }))
+    await user.click(within(second).getByRole('button', { name: 'Approve' }))
+    await vi.waitFor(() => {
+      expect(answers.size).toBe(2)
+    })
+
+    const lists = api.sent('GET /api/v1/changes').length
+    answers.get(String(mute?.id))?.(json({ ...mute, status: 'applied' }))
+    // The first decision has settled once the list was asked for again.
+    await vi.waitFor(() => {
+      expect(api.sent('GET /api/v1/changes').length).toBeGreaterThan(lists)
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(within(second).getByRole('button', { name: 'Approve' })).toBeDisabled()
+    answers.get(String(rename?.id))?.(json({ ...rename, status: 'applied' }))
+  })
+
+  it('shows sources as they are after an approval', async () => {
+    const api = loggedInApi({})
+    const user = userEvent.setup()
+    renderApp('/sources')
+    await user.click(await screen.findByRole('link', { name: /Changes/ }))
+    const card = await screen.findByRole('article', { name: `Mute ${String(mute?.entity)}` })
+    await user.click(within(card).getByRole('button', { name: 'Approve' }))
+    await vi.waitFor(() => {
+      expect(api.sent(`POST /api/v1/changes/${String(mute?.id)}/approve`)).toHaveLength(1)
+    })
+    const before = api.sent('GET /api/v1/sources').length
+
+    await user.click(screen.getByRole('link', { name: 'Sources' }))
+
+    await vi.waitFor(() => {
+      expect(api.sent('GET /api/v1/sources').length).toBeGreaterThan(before)
+    })
+  })
+
   it('says when nothing waits', async () => {
     loggedInApi({ 'GET /api/v1/changes': () => json([]) })
     renderApp('/changes')

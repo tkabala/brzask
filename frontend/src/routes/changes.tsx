@@ -18,13 +18,13 @@ export const Route = createFileRoute('/changes')({
 
 function ChangesPage() {
   const queryClient = useQueryClient()
-  const [busyId, setBusyId] = useState<number | null>(null)
+  const [busyIds, setBusyIds] = useState<ReadonlySet<number>>(new Set())
   const [errors, setErrors] = useState<Record<number, unknown>>({})
   // The same query as the count in the header, so a decision updates both.
   const changes = useQuery(listChangesOptions())
   const handlers = {
     onMutate: ({ path }: { path: { change_id: number } }) => {
-      setBusyId(path.change_id)
+      setBusyIds((current) => new Set(current).add(path.change_id))
       setErrors((current) =>
         Object.fromEntries(Object.entries(current).filter(([id]) => id !== String(path.change_id))),
       )
@@ -32,9 +32,22 @@ function ChangesPage() {
     onError: (error: unknown, { path }: { path: { change_id: number } }) => {
       setErrors((current) => ({ ...current, [path.change_id]: error }))
     },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: [{ _id: 'listChanges' }] })
-      setBusyId(null)
+    onSettled: async (
+      _data: unknown,
+      _error: unknown,
+      { path }: { path: { change_id: number } },
+    ) => {
+      // An approval changes sources, interests or the pause: their pages must not show the old state.
+      await Promise.all(
+        ['listChanges', 'listSources', 'listInterests', 'readStatus'].map((_id) =>
+          queryClient.invalidateQueries({ queryKey: [{ _id }] }),
+        ),
+      )
+      setBusyIds((current) => {
+        const next = new Set(current)
+        next.delete(path.change_id)
+        return next
+      })
     },
   }
   const approve = useMutation({ ...approveChangeMutation(), ...handlers })
@@ -50,7 +63,7 @@ function ChangesPage() {
   return (
     <ChangesView
       changes={changes.data}
-      busyId={busyId}
+      busyIds={busyIds}
       errors={errors}
       onApprove={decide(approve)}
       onReject={decide(reject)}
