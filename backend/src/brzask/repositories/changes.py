@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Change, ChangeStatus
@@ -136,8 +136,14 @@ class ChangeRepository:
         self.session.flush()
         return proposal
 
-    def count(self, status: ChangeStatus) -> int:
-        return self.session.scalar(select(func.count()).where(Change.status == status)) or 0
+    def proposed(self) -> Sequence[Change]:
+        """Changes waiting for a decision, oldest first."""
+        query = (
+            select(Change)
+            .where(Change.status == ChangeStatus.PROPOSED)
+            .order_by(Change.created_at, Change.id)
+        )
+        return self.session.scalars(query).all()
 
     def set_status(self, change: Change, status: ChangeStatus, decided_at: datetime) -> None:
         change.status = status

@@ -473,14 +473,13 @@ def test_a_change_with_nothing_left_to_do_is_refused(session: Session, make: Fac
 # --- listing -----------------------------------------------------------------------
 
 
-def test_listing_and_counting_proposals(session: Session, make: Factories) -> None:
+def test_listing_proposals(session: Session, make: Factories) -> None:
     source = make.source("Plain")
     first = proposed(session, lambda: rename_source(session, source, "Better", actor=AGENT))
     second = proposed(session, lambda: set_note(session, source, "x", actor=AGENT))
     change_status(session, source, SourceStatus.MUTED, actor="user")
 
     assert [change.id for change in proposals.list_proposals(session)] == [first.id, second.id]
-    assert proposals.count_proposals(session) == 2
 
 
 def test_entity_label(session: Session, make: Factories) -> None:

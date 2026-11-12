@@ -6,9 +6,20 @@ a record with gaps and a change whose fields were edited since.
 
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from brzask.db.models import Change
-from brzask.services.errors import ConflictError
-from brzask.services.refs import as_id
+from brzask.repositories import ChangeRepository
+from brzask.services.errors import ConflictError, NotFoundError
+from brzask.services.refs import MAX_ID, as_id
+
+
+def locked_change(session: Session, change_id: int) -> Change:
+    """The change, locked until the transaction ends, so two decisions on it queue up."""
+    change = ChangeRepository(session).get_for_update(change_id) if change_id <= MAX_ID else None
+    if change is None:
+        raise NotFoundError(f"no change {change_id}")
+    return change
 
 
 def logged(fields: dict[str, Any] | None) -> dict[str, Any]:

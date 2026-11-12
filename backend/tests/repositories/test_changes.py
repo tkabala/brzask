@@ -11,8 +11,8 @@ from brzask.repositories.changes import RecordedChange, capturing, filling
 NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
 
 
-def record(changes: ChangeRepository, entity_id: str, status: ChangeStatus) -> None:
-    changes.record(
+def record(changes: ChangeRepository, entity_id: str, status: ChangeStatus) -> Change:
+    return changes.record(
         actor="pipeline:review",
         action="source.mute",
         entity_type="source",
@@ -170,10 +170,10 @@ def test_filling_refuses_a_second_record(session: Session) -> None:
             record(changes, "4", ChangeStatus.APPLIED)
 
 
-def test_count_by_status(session: Session) -> None:
+def test_proposed_oldest_first(session: Session) -> None:
     changes = ChangeRepository(session)
-    record(changes, "1", ChangeStatus.PROPOSED)
-    record(changes, "2", ChangeStatus.PROPOSED)
+    first = record(changes, "1", ChangeStatus.PROPOSED)
+    second = record(changes, "2", ChangeStatus.PROPOSED)
     record(changes, "3", ChangeStatus.APPLIED)
 
-    assert changes.count(ChangeStatus.PROPOSED) == 2
+    assert [change.id for change in changes.proposed()] == [first.id, second.id]

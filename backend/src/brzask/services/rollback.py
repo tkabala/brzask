@@ -21,13 +21,13 @@ from brzask.repositories import (
 )
 from brzask.services.change_records import (
     entity_id_of,
+    locked_change,
     logged,
     require_type,
     require_unchanged,
 )
-from brzask.services.errors import ConflictError, NotFoundError, ServiceError
+from brzask.services.errors import ConflictError, ServiceError
 from brzask.services.pause import PAUSE_KEY, paused_until
-from brzask.services.refs import MAX_ID
 
 _SUFFIX = ".rollback"
 
@@ -88,9 +88,7 @@ def rollback_change(
     Refused, with nothing written, when a field the change set has changed since.
     """
     changes = ChangeRepository(session)
-    change = changes.get_for_update(change_id) if change_id <= MAX_ID else None
-    if change is None:
-        raise NotFoundError(f"no change {change_id}")
+    change = locked_change(session, change_id)
     if change.action.endswith(_SUFFIX):
         raise ServiceError(f"change {change.id} is a rollback; make the change again instead")
     if change.status is not ChangeStatus.APPLIED:

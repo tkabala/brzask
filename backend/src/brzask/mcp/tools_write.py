@@ -57,20 +57,9 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
             with deps.clients.feed_finder() as finder:
                 found = sources.find_feed(finder, url)
             with sessions.begin() as session:
-                if active and identity.proposes:
-                    return _proposal(
-                        session,
-                        lambda: sources.add_source(
-                            session,
-                            found.url,
-                            actor=actor,
-                            name=name,
-                            title=found.title,
-                            site_url=found.site_url,
-                        ),
-                    )
-                if active:
-                    source: Source | None = sources.add_source(
+
+                def write() -> Source:
+                    return sources.add_source(
                         session,
                         found.url,
                         actor=actor,
@@ -78,6 +67,11 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
                         title=found.title,
                         site_url=found.site_url,
                     )
+
+                if active and identity.proposes:
+                    return _proposal(session, write)
+                if active:
+                    source: Source | None = write()
                 else:
                     source = sources.propose_source(
                         session,

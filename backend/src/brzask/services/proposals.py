@@ -11,7 +11,6 @@ from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Change, ChangeStatus, Interest, Source, SourceStatus
@@ -19,9 +18,15 @@ from brzask.repositories import ChangeRepository, InterestRepository, SourceRepo
 from brzask.repositories.changes import capturing, filling
 from brzask.services import interests, sources
 from brzask.services import pause as pausing
-from brzask.services.change_records import entity_id_of, logged, require_type, require_unchanged
-from brzask.services.errors import ConflictError, NotFoundError, ServiceError
-from brzask.services.refs import MAX_ID
+from brzask.services.change_records import (
+    entity_id_of,
+    locked_change,
+    logged,
+    require_type,
+    require_unchanged,
+)
+from brzask.services.errors import ConflictError, ServiceError
+from brzask.services.refs import as_id
 
 # Additions have no entity until they are approved.
 _ADDITIONS = frozenset({"source.add", "interest.add"})
@@ -58,16 +63,7 @@ def propose(session: Session, write: Callable[[], object]) -> Change | None:
 
 def list_proposals(session: Session) -> Sequence[Change]:
     """Changes waiting for a decision, oldest first."""
-    query = (
-        select(Change)
-        .where(Change.status == ChangeStatus.PROPOSED)
-        .order_by(Change.created_at, Change.id)
-    )
-    return session.scalars(query).all()
-
-
-def count_proposals(session: Session) -> int:
-    return ChangeRepository(session).count(ChangeStatus.PROPOSED)
+    return ChangeRepository(session).proposed()
 
 
 def entity_label(session: Session, change: Change) -> str | None:
@@ -75,12 +71,12 @@ def entity_label(session: Session, change: Change) -> str | None:
     if change.entity_type == "source":
         if change.entity_id is None:
             return _text((change.after or {}).get("name"))
-        source = session.get(Source, _id(change.entity_id))
+        source = _get(session, Source, change.entity_id)
         return source.name if source else None
     if change.entity_type == "interest":
         if change.entity_id is None:
             return _text((change.after or {}).get("topic"))
-        interest = session.get(Interest, _id(change.entity_id))
+        interest = _get(session, Interest, change.entity_id)
         return interest.topic if interest else None
     return None
 
@@ -112,9 +108,7 @@ def reject(session: Session, change_id: int, now: datetime) -> Change:
 
 
 def _proposal(session: Session, change_id: int, decision: str) -> Change:
-    change = ChangeRepository(session).get_for_update(change_id) if change_id <= MAX_ID else None
-    if change is None:
-        raise NotFoundError(f"no change {change_id}")
+    change = locked_change(session, change_id)
     if change.status is not ChangeStatus.PROPOSED:
         raise ConflictError(
             f"change {change.id} is {change.status.value}; only a proposed change can be {decision}"
@@ -122,8 +116,9 @@ def _proposal(session: Session, change_id: int, decision: str) -> Change:
     return change
 
 
-def _id(value: str) -> int:
-    return int(value) if value.isdigit() and int(value) <= MAX_ID else 0
+def _get[T: (Source, Interest)](session: Session, model: type[T], entity_id: str) -> T | None:
+    row_id = as_id(entity_id)
+    return session.get(model, row_id) if row_id is not None else None
 
 
 def _text(value: object) -> str | None:
