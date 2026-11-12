@@ -117,10 +117,10 @@ async def test_source_status_rename_and_note(
         noted = data(await client.call_tool("set_source_note", {"source": ref, "note": "ok"}))
         bad = await client.call_tool("set_source_status", {"source": ref, "status": "dead"})
 
-    assert (muted["status"], muted["note"]) == ("muted", "never read")
+    assert (muted["status"], muted["external"]["note"]) == ("muted", "never read")
     assert "already exists" in error_text(taken)
     assert renamed["external"]["name"] == "New"
-    assert noted["note"] == "ok"
+    assert noted["external"]["note"] == "ok"
     assert bad.is_error
     actions = [c.action for c in ChangeRepository(session).find(limit=3)]
     assert actions == ["source.note", "source.rename", "source.mute"]

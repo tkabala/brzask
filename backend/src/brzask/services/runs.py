@@ -218,25 +218,30 @@ def sweep_abandoned(sessions: sessionmaker[Session], now: datetime) -> list[uuid
     period) cannot close its run. Its advisory lock went with its connection,
     so a running row whose pipeline lock is free has no process behind it. The
     lock is held while the rows are closed, so a new run cannot start between
-    the check and the update.
+    the check and the update. A database error is logged, not raised.
     """
     swept: list[uuid.UUID] = []
-    for kind in RunKind:
-        with pipeline_lock(session_bind(sessions), kind) as acquired:
-            if not acquired:
-                continue
-            with sessions.begin() as session:
-                runs = RunRepository(session)
-                for run in runs.running(kind):
-                    runs.finish(
-                        run,
-                        RunStatus.FAILED,
-                        now,
-                        stats=run.stats,
-                        timings=run.timings,
-                        error=ABANDONED,
-                    )
-                    swept.append(run.id)
+    try:
+        for kind in RunKind:
+            with pipeline_lock(session_bind(sessions), kind) as acquired:
+                if not acquired:
+                    continue
+                with sessions.begin() as session:
+                    runs = RunRepository(session)
+                    for run in runs.running(kind):
+                        runs.finish(
+                            run,
+                            RunStatus.FAILED,
+                            now,
+                            stats=run.stats,
+                            timings=run.timings,
+                            error=ABANDONED,
+                        )
+                        swept.append(run.id)
+    except SQLAlchemyError as error:
+        # Housekeeping only: a database that is not up yet must not stop the
+        # process from starting; the next start checks again.
+        log.warning("abandoned runs not checked", error=str(error))
     if swept:
         log.warning("abandoned runs closed", runs=[str(run_id) for run_id in swept])
     return swept

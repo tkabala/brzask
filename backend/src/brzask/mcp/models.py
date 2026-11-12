@@ -2,7 +2,8 @@
 
 Fields under `external` hold text that third parties wrote, or that a model
 wrote while reading it: titles, summaries, article text, source names (most
-come from feed titles), run stats and change details (which carry them).
+come from feed titles), source notes (pipelines quote titles in them), run
+stats and change details (which carry them).
 Everything else is written by brzask or the owner.
 """
 
@@ -141,6 +142,9 @@ class SearchResults(BaseModel):
 
 class SourceExternal(BaseModel):
     name: str
+    note: str | None = Field(
+        description="Why it has its status; pipelines quote titles of what they found in it."
+    )
 
 
 class SourceItem(BaseModel):
@@ -151,7 +155,6 @@ class SourceItem(BaseModel):
     status: SourceStatus
     origin: SourceOrigin
     origin_detail: str | None
-    note: str | None = Field(description="Why it has its status.")
     created_at: datetime
     health: SourceHealth
     activity: SourceActivity = Field(description="Articles first seen in the last 30 days.")
@@ -167,7 +170,6 @@ class SourceItem(BaseModel):
             status=source.status,
             origin=source.origin,
             origin_detail=source.origin_detail,
-            note=source.note,
             created_at=source.created_at,
             health=SourceHealth(
                 fetched_at=source.fetched_at,
@@ -183,7 +185,7 @@ class SourceItem(BaseModel):
                 shown=stats.shown if stats else 0,
                 opened=stats.opened if stats else 0,
             ),
-            external=SourceExternal(name=source.name),
+            external=SourceExternal(name=source.name, note=source.note),
         )
 
 

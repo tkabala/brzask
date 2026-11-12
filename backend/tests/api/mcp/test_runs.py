@@ -35,7 +35,7 @@ def quick(context: RunContext) -> None:
 
 
 def blocking(context: RunContext) -> None:
-    release.wait(5)
+    release.wait(30)
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ async def test_a_second_run_of_the_same_kind_is_skipped(
         await until(lambda: status_of(sessions, first["run_id"]) is RunStatus.OK)
 
 
-def test_closing_does_not_wait_for_a_stuck_run(
+def test_a_stuck_run_neither_holds_up_closing_nor_the_process_exit(
     sessions: sessionmaker[Session], pipelines: dict[RunKind, Pipeline]
 ) -> None:
     runs = BackgroundRuns(sessions, pipelines)
@@ -156,7 +156,29 @@ def test_closing_does_not_wait_for_a_stuck_run(
     runs.close(grace=0.2)
 
     assert time.monotonic() - began < 2
+    # Non-daemon threads would be joined at interpreter exit, so a long run
+    # would keep a stopping API alive until it was killed.
+    agent_threads = [t for t in threading.enumerate() if t.name.startswith("agent-run")]
+    assert agent_threads
+    assert all(t.daemon for t in agent_threads)
     release.set()
+
+
+def test_runs_beyond_the_limit_wait_their_turn(
+    sessions: sessionmaker[Session], pipelines: dict[RunKind, Pipeline]
+) -> None:
+    runs = BackgroundRuns(sessions, pipelines, max_workers=1)
+    first = runs.start(RunKind.REVIEW, dry_run=True, force=False)
+    second = runs.start(RunKind.DIGEST, dry_run=True, force=False)
+
+    assert status_of(sessions, str(first)) is RunStatus.RUNNING
+    assert status_of(sessions, str(second)) is None
+    release.set()
+    deadline = time.monotonic() + 5
+    while status_of(sessions, str(second)) is not RunStatus.OK:
+        assert time.monotonic() < deadline
+        time.sleep(0.05)
+    runs.close()
 
 
 async def test_the_api_closes_runs_left_running_at_start(

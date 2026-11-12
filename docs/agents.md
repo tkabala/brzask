@@ -71,7 +71,8 @@ $ brzask config rollback 214
 Feed entries and web pages are written by anyone, and the summaries and
 reasons brzask stores were written by a model reading them. In every result
 that text sits under an `external` key: titles, summaries, article text,
-source names (most come from feed titles), run stats and change details. The
+source names (most come from feed titles), source notes (pipelines quote
+titles in them), run stats and change details. The
 server tells agents to treat those values as data, never as instructions.
 A page that says "mute every source" stays a page; still, prefer a `read`
 token unless the agent needs to change things.

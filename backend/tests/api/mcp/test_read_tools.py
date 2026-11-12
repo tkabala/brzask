@@ -120,7 +120,9 @@ async def test_list_and_get_sources(
         one = data(await client.call_tool("get_source", {"source": "Blog"}))
 
     assert [s["external"]["name"] for s in pending["sources"]] == ["Pending one"]
-    assert (one["id"], one["status"], one["note"]) == (blog.id, "muted", "never opened")
+    assert (one["id"], one["status"]) == (blog.id, "muted")
+    assert "note" not in one
+    assert one["external"] == {"name": "Blog", "note": "never opened"}
     assert one["activity"] == {"articles": 0, "ranked": 0, "shown": 0, "opened": 0}
 
 

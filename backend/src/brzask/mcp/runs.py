@@ -3,20 +3,19 @@
 A run takes minutes, longer than a tool call should, so it runs in a thread
 and the agent follows it with `get_run`. It is the same `run_pipeline` as
 the worker's and the CLI's, advisory lock included: a second run of the
-same pipeline is recorded as skipped. If the API stops mid-run, the next
-start of the API or the worker closes the row (`sweep_abandoned`).
+same pipeline is recorded as skipped. The threads are daemons, so a run
+never keeps a stopping API alive; its row is then closed by the next start
+of the API or the worker (`sweep_abandoned`).
 """
 
+import contextvars
 import threading
 import time
 import uuid
 from collections.abc import Mapping
-from concurrent.futures import Future
-from contextlib import suppress
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.db.models import RunKind
 from brzask.log import get_logger
 from brzask.services.runs import Pipeline, run_pipeline
@@ -36,54 +35,58 @@ class BackgroundRuns:
     ) -> None:
         self.sessions = sessions
         self.pipelines = pipelines
-        self._executor = ContextThreadPoolExecutor(max_workers, thread_name_prefix="agent-run")
-        self._futures: set[Future[None]] = set()
+        self._slots = threading.BoundedSemaphore(max_workers)
+        self._threads: set[threading.Thread] = set()
         self._lock = threading.Lock()
+        self._closed = threading.Event()
 
     def start(self, kind: RunKind, *, dry_run: bool, force: bool) -> uuid.UUID:
         """Start a run and return its ID once its row exists (or after a few seconds)."""
         run_id = uuid.uuid4()
         started = threading.Event()
-        future = self._executor.submit(self._run, kind, run_id, started, dry_run, force)
+        # The caller's context (trace, log fields) goes with the run.
+        context = contextvars.copy_context()
+        thread = threading.Thread(
+            target=context.run,
+            args=(self._run, kind, run_id, started, dry_run, force),
+            name=f"agent-run-{kind.value}",
+            daemon=True,
+        )
         with self._lock:
-            self._futures.add(future)
-        future.add_done_callback(self._forget)
+            self._threads.add(thread)
+        thread.start()
         started.wait(STARTED_WAIT)
         return run_id
 
     def close(self, grace: float = 5.0) -> None:
-        """Stop taking runs; give running ones `grace` seconds, then leave them."""
+        """Start nothing new; give running runs `grace` seconds, then leave them."""
+        self._closed.set()
         deadline = time.monotonic() + grace
         with self._lock:
-            futures = list(self._futures)
-        for future in futures:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            # A timeout, or the run's own error, which its row already holds.
-            with suppress(Exception):
-                future.result(timeout=remaining)
-        self._executor.shutdown(wait=False, cancel_futures=True)
+            threads = list(self._threads)
+        for thread in threads:
+            thread.join(max(0.0, deadline - time.monotonic()))
 
     def _run(
         self, kind: RunKind, run_id: uuid.UUID, started: threading.Event, dry_run: bool, force: bool
     ) -> None:
         try:
-            run_pipeline(
-                self.sessions,
-                kind,
-                dry_run=dry_run,
-                force=force,
-                pipelines=self.pipelines,
-                run_id=run_id,
-                started=started,
-            )
+            with self._slots:
+                if self._closed.is_set():
+                    return
+                run_pipeline(
+                    self.sessions,
+                    kind,
+                    dry_run=dry_run,
+                    force=force,
+                    pipelines=self.pipelines,
+                    run_id=run_id,
+                    started=started,
+                )
         except Exception:
             # Recorded on the run's row already; nobody is waiting for it here.
             log.warning("agent run failed", run_id=str(run_id), kind=kind.value)
         finally:
             started.set()
-
-    def _forget(self, future: Future[None]) -> None:
-        with self._lock:
-            self._futures.discard(future)
+            with self._lock:
+                self._threads.discard(threading.current_thread())

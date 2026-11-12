@@ -11,6 +11,7 @@ from structlog.testing import capture_logs
 
 from brzask.clients.usage import CallUsage
 from brzask.db.models import RunKind, RunStatus
+from brzask.db.session import create_db_engine, session_factory
 from brzask.repositories import RunRepository
 from brzask.services.errors import ServiceError
 from brzask.services.notify import Message
@@ -372,3 +373,14 @@ def test_sweep_ignores_finished_runs(sessions: sessionmaker[Session], session: S
     run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed})
 
     assert sweep_abandoned(sessions, NOW) == []
+
+
+def test_sweep_survives_an_unreachable_database() -> None:
+    engine = create_db_engine("postgresql+psycopg://brzask:x@127.0.0.1:1/brzask")
+    try:
+        with capture_logs() as logs:
+            assert sweep_abandoned(session_factory(engine), NOW) == []
+    finally:
+        engine.dispose()
+
+    assert any(log["event"] == "abandoned runs not checked" for log in logs)
