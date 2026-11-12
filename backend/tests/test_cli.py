@@ -17,6 +17,7 @@ from brzask.clients.feed_finder import FoundFeed
 from brzask.config import get_settings
 from brzask.config.settings import LLMSettings, Settings
 from brzask.db.models import (
+    ApiToken,
     Change,
     ChangeStatus,
     Interest,
@@ -25,6 +26,7 @@ from brzask.db.models import (
     Source,
     SourceOrigin,
     SourceStatus,
+    TokenScope,
 )
 from brzask.repositories import ChangeRepository, RunRepository
 from brzask.services import auth, pipelines
@@ -727,6 +729,14 @@ def test_tokens_create_list_revoke(cli: Invoke) -> None:
     missing = cli("tokens", "revoke", "nope")
     assert missing.exit_code == 1
     assert "no token 'nope'" in missing.stderr
+
+
+def test_tokens_create_propose(cli: Invoke, session: Session) -> None:
+    created = cli("tokens", "create", "agent", "--scope", "propose")
+
+    assert created.exit_code == 0, created.output
+    token = session.scalars(select(ApiToken).where(ApiToken.name == "agent")).one()
+    assert token.scope is TokenScope.PROPOSE
 
 
 def test_tokens_default_to_read(cli: Invoke) -> None:

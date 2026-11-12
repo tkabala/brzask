@@ -49,6 +49,19 @@ def test_read_token_reads_but_cannot_change(
         assert response.json()["detail"] == "This token may only read."
 
 
+def test_propose_token_is_read_only_on_the_api(
+    client: TestClient, session: Session, make: Factories
+) -> None:
+    """Proposals come only over MCP; the REST API takes such a token as a read token."""
+    source = make.source()
+    headers = bearer(session, TokenScope.PROPOSE)
+
+    assert client.get("/api/v1/sources", headers=headers).status_code == 200
+    response = client.patch(f"/api/v1/sources/{source.id}", json={"name": "x"}, headers=headers)
+    assert response.status_code == 403
+    assert response.json()["detail"] == "This token may only read."
+
+
 def test_feed_token_does_not_open_the_api(client: TestClient, session: Session) -> None:
     headers = bearer(session, TokenScope.FEED)
 

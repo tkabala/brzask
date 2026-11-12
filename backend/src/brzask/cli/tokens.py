@@ -23,7 +23,10 @@ def create(
         typer.Option(
             "--scope",
             "-s",
-            help="read: only reading; write: also changes; feed: only the digest feed, in its URL.",
+            help=(
+                "read: only reading; write: also changes; propose: changes over MCP wait "
+                "for your approval; feed: only the digest feed, in its URL."
+            ),
         ),
     ] = TokenScope.READ,
 ) -> None:

@@ -293,6 +293,7 @@ class Change(Base):
 class TokenScope(StrEnum):
     READ = "read"
     WRITE = "write"
+    PROPOSE = "propose"  # changes wait for the owner's approval
     FEED = "feed"  # only the digest feed, carried in its URL
 
 
