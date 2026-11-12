@@ -30,6 +30,7 @@ from brzask.api.auth import Auth
 from brzask.api.clients import ApiClients
 from brzask.api.problems import problem_response
 from brzask.db.models import TokenScope
+from brzask.mcp.runs import BackgroundRuns
 from brzask.services import tokens
 
 INSTRUCTIONS = """\
@@ -91,12 +92,13 @@ def require_write() -> AgentIdentity:
 class McpDeps:
     sessions: sessionmaker[Session]
     clients: ApiClients
+    runs: BackgroundRuns
 
 
 def build_mcp(deps: McpDeps) -> MCPServer[Any]:
     """The server with every tool, ready for `McpEndpoint`."""
     # Imported here: the tool modules import this one.
-    from brzask.mcp import tools_read, tools_write
+    from brzask.mcp import tools_read, tools_runs, tools_write
 
     root = logging.getLogger()
     handlers, level = root.handlers[:], root.level
@@ -106,6 +108,7 @@ def build_mcp(deps: McpDeps) -> MCPServer[Any]:
     root.handlers[:], root.level = handlers, level
     tools_read.register(server, deps)
     tools_write.register(server, deps)
+    tools_runs.register(server, deps)
     server.streamable_http_app(
         streamable_http_path="/",
         stateless_http=True,

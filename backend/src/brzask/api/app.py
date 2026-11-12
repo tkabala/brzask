@@ -13,12 +13,14 @@ also without it: proxies that strip the prefix and probes that never knew
 it reach the same routes.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
+import anyio.to_thread
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.metrics import MeterProvider
@@ -47,9 +49,12 @@ from brzask.api.auth import Auth, require_user
 from brzask.api.clients import ApiClients
 from brzask.config import get_settings
 from brzask.config.settings import AuthSettings, ServerSettings
+from brzask.db.models import RunKind
 from brzask.log import get_logger
+from brzask.mcp.runs import BackgroundRuns
 from brzask.mcp.server import McpDeps, McpEndpoint, build_mcp
 from brzask.services.open_rate import register_open_rate
+from brzask.services.runs import Pipeline, sweep_abandoned
 from brzask.telemetry import instrument_app
 
 log = get_logger(__name__)
@@ -67,21 +72,27 @@ def create_app(
     auth_settings: AuthSettings | None = None,
     server: ServerSettings | None = None,
     web_dir: Path | None = None,
+    pipelines: Mapping[RunKind, Pipeline] | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
     reach outside services (embeddings, feed lookup) and `auth_settings` say who
     may use the API; `server` gives BASE_URL; all three come from the settings
     unless given. `web_dir` is the built web app to serve at `/`; without it only
-    the API is served."""
+    the API is served. `pipelines` replaces the real ones for runs agents start."""
     server = server or get_settings().server
     clients = clients or ApiClients()
-    mcp = build_mcp(McpDeps(sessions, clients))
+    agent_runs = BackgroundRuns(sessions, pipelines)
+    mcp = build_mcp(McpDeps(sessions, clients, agent_runs))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        async with mcp.session_manager.run():
-            yield
+        await anyio.to_thread.run_sync(sweep_abandoned, sessions, datetime.now(UTC))
+        try:
+            async with mcp.session_manager.run():
+                yield
+        finally:
+            await anyio.to_thread.run_sync(agent_runs.close)
 
     app = FastAPI(
         lifespan=lifespan,
