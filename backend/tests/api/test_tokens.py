@@ -9,7 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from brzask.config.settings import AuthSettings
-from brzask.db.models import ApiToken, Change, TokenScope
+from brzask.db.models import ApiToken, Change, SourceStatus, TokenScope
+from brzask.services import proposals
+from brzask.services.sources import change_status
 from brzask.services.tokens import create_token, revoke_token
 from tests.factories import Factories
 
@@ -60,6 +62,23 @@ def test_propose_token_is_read_only_on_the_api(
     response = client.patch(f"/api/v1/sources/{source.id}", json={"name": "x"}, headers=headers)
     assert response.status_code == 403
     assert response.json()["detail"] == "This token may only read."
+
+
+def test_only_a_write_token_decides_proposals(
+    client: TestClient, session: Session, make: Factories
+) -> None:
+    source = make.source()
+    change = proposals.propose(
+        session, lambda: change_status(session, source, SourceStatus.MUTED, actor="agent:x")
+    )
+    assert change is not None
+    url = f"/api/v1/changes/{change.id}/approve"
+
+    read = client.post(url, headers=bearer(session, TokenScope.READ))
+    propose = client.post(url, headers=bearer(session, TokenScope.PROPOSE))
+    listed = client.get("/api/v1/changes", headers=bearer(session, TokenScope.PROPOSE, "agent"))
+
+    assert (read.status_code, propose.status_code, listed.status_code) == (403, 403, 200)
 
 
 def test_feed_token_does_not_open_the_api(client: TestClient, session: Session) -> None:

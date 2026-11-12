@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addInterest, addSource, changeInterest, changeSource, deletePause, exportSources, getArticle, getArticleRanking, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, search, setPause } from '../sdk.gen';
-import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
+import { addInterest, addSource, approveChange, changeInterest, changeSource, deletePause, exportSources, getArticle, getArticleRanking, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listChanges, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, rejectChange, search, setPause } from '../sdk.gen';
+import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -438,6 +438,62 @@ export const changeInterestMutation = (options?: Partial<Options<ChangeInterestD
     const mutationOptions: UseMutationOptions<ChangeInterestResponse, ChangeInterestError, Options<ChangeInterestData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await changeInterest({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listChangesQueryKey = (options?: Options<ListChangesData>) => createQueryKey('listChanges', options);
+
+/**
+ * Changes waiting for approval
+ *
+ * Oldest first; an agent with a propose token makes them.
+ */
+export const listChangesOptions = (options?: Options<ListChangesData>) => queryOptions<ListChangesResponse, ListChangesError, ListChangesResponse, ReturnType<typeof listChangesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listChanges({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listChangesQueryKey(options)
+});
+
+/**
+ * Apply a proposed change
+ *
+ * Refused when what it changes was edited since it was proposed.
+ */
+export const approveChangeMutation = (options?: Partial<Options<ApproveChangeData>>): UseMutationOptions<ApproveChangeResponse, ApproveChangeError, Options<ApproveChangeData>> => {
+    const mutationOptions: UseMutationOptions<ApproveChangeResponse, ApproveChangeError, Options<ApproveChangeData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await approveChange({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Turn a proposed change down
+ */
+export const rejectChangeMutation = (options?: Partial<Options<RejectChangeData>>): UseMutationOptions<RejectChangeResponse, RejectChangeError, Options<RejectChangeData>> => {
+    const mutationOptions: UseMutationOptions<RejectChangeResponse, RejectChangeError, Options<RejectChangeData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await rejectChange({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

@@ -21,6 +21,34 @@ export const zArticleState = z.enum([
 ]);
 
 /**
+ * ChangeStatus
+ */
+export const zChangeStatus = z.enum([
+    'proposed',
+    'applied',
+    'rejected',
+    'reverted'
+]);
+
+/**
+ * ChangeOut
+ */
+export const zChangeOut = z.object({
+    id: z.int(),
+    created_at: z.iso.datetime(),
+    actor: z.string(),
+    action: z.string(),
+    entity_type: z.string(),
+    entity_id: z.string().nullable(),
+    entity: z.string().nullable(),
+    before: z.record(z.string(), z.unknown()).nullable(),
+    after: z.record(z.string(), z.unknown()).nullable(),
+    reason: z.string().nullable(),
+    status: zChangeStatus,
+    decided_at: z.iso.datetime().nullable()
+});
+
+/**
  * Credentials
  */
 export const zCredentials = z.object({
@@ -549,6 +577,35 @@ export const zChangeInterestPath = z.object({
  * Successful Response
  */
 export const zChangeInterestResponse = zInterestOut;
+
+export const zListChangesQuery = z.object({
+    status: z.literal('proposed').optional().default('proposed')
+});
+
+/**
+ * Response List Changes
+ *
+ * Successful Response
+ */
+export const zListChangesResponse = z.array(zChangeOut);
+
+export const zApproveChangePath = z.object({
+    change_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zApproveChangeResponse = zChangeOut;
+
+export const zRejectChangePath = z.object({
+    change_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRejectChangeResponse = zChangeOut;
 
 export const zListRunsQuery = z.object({
     kind: zRunKind.nullish(),

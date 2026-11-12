@@ -7,9 +7,11 @@ import typer
 
 from brzask.cli.common import ACTOR, local, table, unit_of_work
 from brzask.db.models import ChangeStatus
-from brzask.services import rollback
+from brzask.services import proposals, rollback
 
-app = typer.Typer(no_args_is_help=True, help="See recorded changes and undo one.")
+app = typer.Typer(
+    no_args_is_help=True, help="See recorded changes, decide proposed ones and undo one."
+)
 
 
 def _entity(value: str | None) -> tuple[str | None, str | None]:
@@ -74,5 +76,32 @@ def rollback_command(
         message = (
             f"Rolled back change {change_id} ({original} on {new.entity_type} {new.entity_id}); "
             f"this is change {new.id}."
+        )
+    typer.echo(message)
+
+
+ChangeId = Annotated[int, typer.Argument(help="ID from `brzask config history --status proposed`.")]
+
+
+@app.command()
+def approve(change_id: ChangeId) -> None:
+    """Apply a proposed change; refused if what it changes was edited since."""
+    with unit_of_work() as session:
+        change = proposals.approve(session, change_id, datetime.now(UTC))
+        message = (
+            f"Approved change {change.id} ({change.action} on {change.entity_type} "
+            f"{change.entity_id})."
+        )
+    typer.echo(message)
+
+
+@app.command()
+def reject(change_id: ChangeId) -> None:
+    """Turn a proposed change down."""
+    with unit_of_work() as session:
+        change = proposals.reject(session, change_id, datetime.now(UTC))
+        message = (
+            f"Rejected change {change.id} ({change.action} on {change.entity_type} "
+            f"{change.entity_id})."
         )
     typer.echo(message)

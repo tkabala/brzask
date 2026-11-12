@@ -29,12 +29,13 @@ from brzask.db.models import (
     TokenScope,
 )
 from brzask.repositories import ChangeRepository, RunRepository
-from brzask.services import auth, pipelines
+from brzask.services import auth, pipelines, proposals
 from brzask.services.archive import TABLES
 from brzask.services.notify import TEST_MESSAGE, Message
 from brzask.services.opml import NO_FEED
 from brzask.services.pause import paused_until
 from brzask.services.runs import RunContext, SkipRunError
+from brzask.services.sources import change_status, set_note
 from tests.factories import Factories
 from tests.services.digest.fakes import FakeEmbedder
 from tests.services.test_replay import FakeModel
@@ -408,6 +409,28 @@ def test_config_rollback(cli: Invoke, make: Factories, session: Session) -> None
         f"Rolled back change {change.id} (source.mute on source {source.id}); "
         f"this is change {newest.id}.\n"
     )
+
+
+def test_config_approve_and_reject(cli: Invoke, make: Factories, session: Session) -> None:
+    source = make.source("Blog")
+    muted = proposals.propose(
+        session, lambda: change_status(session, source, SourceStatus.MUTED, actor="agent:x")
+    )
+    noted = proposals.propose(session, lambda: set_note(session, source, "x", actor="agent:x"))
+    assert muted is not None and noted is not None
+    session.commit()
+
+    approved = cli("config", "approve", str(muted.id))
+    rejected = cli("config", "reject", str(noted.id))
+    again = cli("config", "approve", str(muted.id))
+
+    assert approved.exit_code == 0, approved.output
+    assert approved.stdout == f"Approved change {muted.id} (source.mute on source {source.id}).\n"
+    assert rejected.stdout == f"Rejected change {noted.id} (source.note on source {source.id}).\n"
+    assert again.exit_code == 1
+    assert f"change {muted.id} is applied" in again.stderr
+    session.expire_all()
+    assert session.get_one(Source, source.id).status is SourceStatus.MUTED
 
 
 def test_config_history_lists_newest_first_with_filters(

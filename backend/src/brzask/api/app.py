@@ -32,6 +32,7 @@ from brzask import __version__
 from brzask.api import (
     articles,
     auth,
+    changes,
     digests,
     feed,
     health,
@@ -129,7 +130,7 @@ def create_app(
         dependencies=[Depends(require_user)],
         responses=problems.responses(HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
     )
-    for module in (digests, articles, search, sources, interests, runs, status):
+    for module in (digests, articles, search, sources, interests, changes, runs, status):
         api.include_router(module.router)
     app.include_router(api)
     app.include_router(auth.router, prefix=API_PREFIX)

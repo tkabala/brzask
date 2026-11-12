@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
+import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -277,6 +277,49 @@ export const changeInterest = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Changes waiting for approval
+ *
+ * Oldest first; an agent with a propose token makes them.
+ */
+export const listChanges = <ThrowOnError extends boolean = false>(options?: Options<ListChangesData, ThrowOnError>): RequestResult<ListChangesResponses, ListChangesErrors, ThrowOnError> => (options?.client ?? client).get<ListChangesResponses, ListChangesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/changes',
+    ...options
+});
+
+/**
+ * Apply a proposed change
+ *
+ * Refused when what it changes was edited since it was proposed.
+ */
+export const approveChange = <ThrowOnError extends boolean = false>(options: Options<ApproveChangeData, ThrowOnError>): RequestResult<ApproveChangeResponses, ApproveChangeErrors, ThrowOnError> => (options.client ?? client).post<ApproveChangeResponses, ApproveChangeErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/changes/{change_id}/approve',
+    ...options
+});
+
+/**
+ * Turn a proposed change down
+ */
+export const rejectChange = <ThrowOnError extends boolean = false>(options: Options<RejectChangeData, ThrowOnError>): RequestResult<RejectChangeResponses, RejectChangeErrors, ThrowOnError> => (options.client ?? client).post<RejectChangeResponses, RejectChangeErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/changes/{change_id}/reject',
+    ...options
 });
 
 /**

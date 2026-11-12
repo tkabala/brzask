@@ -15,9 +15,10 @@ from brzask.api.app import create_app
 from brzask.api.auth import CSRF_HEADER
 from brzask.api.metrics import prometheus_reader
 from brzask.config.settings import AuthSettings, ServerSettings
-from brzask.db.models import LoginSession
-from brzask.services import auth
+from brzask.db.models import LoginSession, SourceStatus
+from brzask.services import auth, proposals
 from brzask.services.auth import FAILURES_PER_CLIENT, link_signature
+from brzask.services.sources import change_status
 from tests.api.conftest import PASSWORD, SECRET
 from tests.factories import Factories
 
@@ -129,6 +130,24 @@ def test_changes_need_the_csrf_token(client: TestClient, make: Factories) -> Non
     assert (missing.status_code, wrong.status_code, right.status_code) == (403, 403, 200)
     assert "X-CSRF-Token" in missing.json()["detail"]
     assert client.get("/api/v1/status").status_code == 200  # reads need none
+
+
+def test_deciding_a_proposal_needs_the_csrf_token(
+    client: TestClient, session: Session, make: Factories
+) -> None:
+    source = make.source()
+    change = proposals.propose(
+        session, lambda: change_status(session, source, SourceStatus.MUTED, actor="agent:x")
+    )
+    assert change is not None
+    session.commit()
+    csrf = log_in(client)
+    url = f"/api/v1/changes/{change.id}/reject"
+
+    missing = client.post(url)
+    right = client.post(url, headers={"X-CSRF-Token": csrf})
+
+    assert (missing.status_code, right.status_code) == (403, 200)
 
 
 def test_logout_ends_the_session_everywhere(client: TestClient) -> None:

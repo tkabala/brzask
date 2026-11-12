@@ -107,6 +107,78 @@ export type ArticleOut = {
 export type ArticleState = 'seen' | 'shown' | 'repeat';
 
 /**
+ * ChangeOut
+ */
+export type ChangeOut = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Actor
+     *
+     * Who made or proposed it, e.g. 'agent:<token name>'.
+     */
+    actor: string;
+    /**
+     * Action
+     *
+     * e.g. 'source.mute', 'interest.update'.
+     */
+    action: string;
+    /**
+     * Entity Type
+     */
+    entity_type: string;
+    /**
+     * Entity Id
+     *
+     * Empty for an addition not yet approved.
+     */
+    entity_id: string | null;
+    /**
+     * Entity
+     *
+     * The source's name or the interest's topic.
+     */
+    entity: string | null;
+    /**
+     * Before
+     *
+     * The fields it changes, as they were.
+     */
+    before: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * After
+     *
+     * The fields it changes, as it sets them.
+     */
+    after: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Reason
+     */
+    reason: string | null;
+    status: ChangeStatus;
+    /**
+     * Decided At
+     */
+    decided_at: string | null;
+};
+
+/**
+ * ChangeStatus
+ */
+export type ChangeStatus = 'proposed' | 'applied' | 'rejected' | 'reverted';
+
+/**
  * Credentials
  */
 export type Credentials = {
@@ -1595,6 +1667,144 @@ export type ChangeInterestResponses = {
 };
 
 export type ChangeInterestResponse = ChangeInterestResponses[keyof ChangeInterestResponses];
+
+export type ListChangesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Status
+         *
+         * Only proposed changes can be listed here.
+         */
+        status?: 'proposed';
+    };
+    url: '/api/v1/changes';
+};
+
+export type ListChangesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ListChangesError = ListChangesErrors[keyof ListChangesErrors];
+
+export type ListChangesResponses = {
+    /**
+     * Response List Changes
+     *
+     * Successful Response
+     */
+    200: Array<ChangeOut>;
+};
+
+export type ListChangesResponse = ListChangesResponses[keyof ListChangesResponses];
+
+export type ApproveChangeData = {
+    body?: never;
+    path: {
+        /**
+         * Change Id
+         */
+        change_id: number;
+    };
+    query?: never;
+    url: '/api/v1/changes/{change_id}/approve';
+};
+
+export type ApproveChangeErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ApproveChangeError = ApproveChangeErrors[keyof ApproveChangeErrors];
+
+export type ApproveChangeResponses = {
+    /**
+     * Successful Response
+     */
+    200: ChangeOut;
+};
+
+export type ApproveChangeResponse = ApproveChangeResponses[keyof ApproveChangeResponses];
+
+export type RejectChangeData = {
+    body?: never;
+    path: {
+        /**
+         * Change Id
+         */
+        change_id: number;
+    };
+    query?: never;
+    url: '/api/v1/changes/{change_id}/reject';
+};
+
+export type RejectChangeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type RejectChangeError = RejectChangeErrors[keyof RejectChangeErrors];
+
+export type RejectChangeResponses = {
+    /**
+     * Successful Response
+     */
+    200: ChangeOut;
+};
+
+export type RejectChangeResponse = RejectChangeResponses[keyof RejectChangeResponses];
 
 export type ListRunsData = {
     body?: never;
