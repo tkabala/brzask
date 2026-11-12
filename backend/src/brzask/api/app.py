@@ -13,6 +13,8 @@ also without it: proxies that strip the prefix and probes that never knew
 it reach the same routes.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -22,6 +24,7 @@ from fastapi.openapi.utils import get_openapi
 from opentelemetry.metrics import MeterProvider
 from prometheus_client import CollectorRegistry
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.routing import Route
 
 from brzask import __version__
 from brzask.api import (
@@ -45,6 +48,7 @@ from brzask.api.clients import ApiClients
 from brzask.config import get_settings
 from brzask.config.settings import AuthSettings, ServerSettings
 from brzask.log import get_logger
+from brzask.mcp.server import McpDeps, McpEndpoint, build_mcp
 from brzask.services.open_rate import register_open_rate
 from brzask.telemetry import instrument_app
 
@@ -71,7 +75,16 @@ def create_app(
     unless given. `web_dir` is the built web app to serve at `/`; without it only
     the API is served."""
     server = server or get_settings().server
+    clients = clients or ApiClients()
+    mcp = build_mcp(McpDeps(sessions, clients))
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        async with mcp.session_manager.run():
+            yield
+
     app = FastAPI(
+        lifespan=lifespan,
         # The committed document has no servers; the client adds its own base URL.
         root_path_in_servers=False,
         title="brzask",
@@ -87,7 +100,7 @@ def create_app(
     )
     app.state.sessions = sessions
     app.state.metrics_registry = metrics_registry
-    app.state.clients = clients or ApiClients()
+    app.state.clients = clients
     app.state.auth = Auth(
         auth_settings or get_settings().auth,
         root_path=server.root_path,
@@ -113,6 +126,15 @@ def create_app(
     app.include_router(feed.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
+    # An exact route: a mount would answer `/mcp` with a redirect to `/mcp/`.
+    app.router.routes.append(
+        Route(
+            "/mcp",
+            McpEndpoint(mcp, app.state.auth, sessions),
+            methods=["GET", "POST", "DELETE"],
+            include_in_schema=False,
+        )
+    )
     if web_dir is not None:
         # Last, so every route above wins over a file of the same name.
         app.mount("/", web.WebApp(web_dir, f"{server.root_path}/"), name="web")
