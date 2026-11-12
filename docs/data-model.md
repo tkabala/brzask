@@ -130,11 +130,16 @@ instead of deleting its articles, so digest history and opens are kept.
 Every pipeline run (`digest`, `review`, `visited`, `discovery`) writes one row.
 Its `id` is the same as the `run_id` in the logs, so a failed run can be traced
 from the status page to its log lines. `status` is `running`, `ok`, `skipped`
-(paused, or today's digest already exists) or `failed`.
+(paused, or today's digest already exists) or `failed`. A process stopped
+outright cannot close its run; the next start of the API or the worker marks
+such a row `failed` with the error `abandoned (the process running it
+stopped)`, once the pipeline's lock shows nothing runs it.
 
 ## Change log
 
-Changes are recorded with who made them (`actor`), what changed (`action`,
+Changes are recorded with who made them (`actor`: `user` for the command
+line and a password login, `user:<name>` behind a proxy, `token:<name>`,
+`agent:<name>` through [MCP](agents.md), `pipeline:<kind>`), what changed (`action`,
 `entity_type`, `entity_id`, `before`, `after`) and why (`reason`). A change
 is `proposed` while it waits for approval, then `applied` or `rejected`;
 an applied change can later be `reverted`.

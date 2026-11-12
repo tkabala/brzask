@@ -16,7 +16,7 @@ flowchart TB
     readers["Hosted readers<br/>Jina, Firecrawl (optional)"]
 
     reader -- "web app" --> brzask
-    agent -- "HTTP API" --> brzask
+    agent -- "HTTP API, MCP" --> brzask
     brzask -- "fetches feeds and pages" --> feeds
     brzask -- "ranks, selects, embeds, judges" --> models
     brzask -- "discovers sources" --> search

@@ -13,6 +13,7 @@ listens on 0.0.0.0.
 | `/api/v1/docs` | Interactive documentation |
 | `/open?id=` | Redirects to an article and records that it was opened |
 | `/feed?token=` | The digest of the last seven days as Atom, for feed readers ([Feed](feed.md)) |
+| `/mcp` | Tools for AI agents over MCP, with an API token ([Agents](agents.md)) |
 | `/healthz` | Liveness: the process answers |
 | `/readyz` | Readiness: the database answers and is fully migrated |
 | `/metrics` | Prometheus metrics |
@@ -83,7 +84,8 @@ $ curl -H "Authorization: Bearer brz_..." https://brzask.example/api/v1/status
   wrong token answers 401 even when a session cookie or a proxy's user comes
   along. Any other `Authorization` header, such as the credentials an
   authenticating proxy passes on, is ignored.
-- The change log records what a token changed as `token:<name>`, a user
+- The change log records what a token changed as `token:<name>` (through
+  [MCP](agents.md): `agent:<name>`), a user
   behind a proxy as `user:<name>`, and a password session as `user`.
 
 ### Behind an authenticating proxy

@@ -147,7 +147,8 @@ prefer not to trust any header.
 `/feed` and `/open` are reached by feed readers and mail clients, which cannot
 log in to a proxy. Both carry their own credential, a feed token or a
 signature, so a proxy that asks for a login (basic auth, single sign-on) must
-let these two paths through:
+let these two paths through. So must `/mcp`, where [agents](agents.md) send
+their API token in `Authorization`:
 
 ```nginx
 location = /feed {
@@ -159,14 +160,14 @@ location = /feed {
     # No login ran here: drop a user name the client may have sent itself.
     proxy_set_header Remote-User "";
 }
-# The same block again for location = /open. Under a path:
-# location = /brzask/feed and location = /brzask/open.
+# The same block again for location = /open and location = /mcp. Under a
+# path: location = /brzask/feed, /brzask/open and /brzask/mcp.
 ```
 
 ```caddyfile
 news.example.com {
-    # Under a path: @public path /brzask/feed /brzask/open
-    @public path /feed /open
+    # Under a path: @public path /brzask/feed /brzask/open /brzask/mcp
+    @public path /feed /open /mcp
     handle @public {
         # No login ran here: drop a user name the client may have sent itself.
         reverse_proxy 127.0.0.1:8000 {
@@ -186,12 +187,12 @@ scheme `https` when a trusted proxy sends `X-Forwarded-Proto: https`. Proxies lo
 feed token ends up in their access log; brzask's own log shows
 `token=REDACTED`.
 
-With Traefik, a second router for the two paths, without the login
+With Traefik, a second router for these paths, without the login
 middleware, wins over the main one by its longer rule:
 
 ```yaml
       traefik.http.routers.brzask-public.rule: >-
-        Host(`home.example`) && (Path(`/brzask/feed`) || Path(`/brzask/open`))
+        Host(`home.example`) && (Path(`/brzask/feed`) || Path(`/brzask/open`) || Path(`/brzask/mcp`))
       traefik.http.routers.brzask-public.entrypoints: websecure
       traefik.http.routers.brzask-public.tls.certresolver: letsencrypt
       # No login ran here: drop a user name the client may have sent itself.
