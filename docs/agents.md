@@ -9,7 +9,9 @@ start a dry run, with the same rules and the same change log as the web app.
 ## Connect
 
 Create a token. A `read` token reads and starts dry runs; a `write` token may
-also change sources, interests and the pause, and start real runs.
+also change sources, interests and the pause, and start real runs. A
+`propose` token reads and starts dry runs like a read token, and its changes
+[wait for your approval](#approving-changes).
 
 ```console
 $ docker compose exec api brzask tokens create claude --scope read
@@ -47,10 +49,10 @@ only on a machine nobody else can reach.
 | `list_runs`, `get_run` | read | Pipeline runs and what each did |
 | `list_interests`, `get_status`, `list_changes` | read | Interests, counts and last runs, the change log |
 | `start_run` | read for a dry run, write otherwise | Starts a pipeline in the background; follow it with `get_run` |
-| `add_source` | write | Finds a site's feed and proposes it (or adds it as active) |
-| `set_source_status`, `rename_source`, `set_source_note` | write | Read a source again, mute it, reject a pending one; rename; note why |
-| `add_interest`, `edit_interest` | write | Interests the ranking and discovery follow |
-| `pause`, `resume` | write | No digest until a given time |
+| `add_source` | write or propose | Finds a site's feed and proposes it (or adds it as active) |
+| `set_source_status`, `rename_source`, `set_source_note` | write or propose | Read a source again, mute it, reject a pending one; rename; note why |
+| `add_interest`, `edit_interest` | write or propose | Interests the ranking and discovery follow |
+| `pause`, `resume` | write or propose | No digest until a given time |
 
 Settings, API keys and tokens are out of reach. Nothing is deleted: a
 source is muted or rejected, which keeps its articles and stops it from being
@@ -66,6 +68,32 @@ $ brzask config history --limit 20
 $ brzask config rollback 214
 ```
 
+## Approving changes
+
+With a `propose` token an agent's change does not happen: it is checked as
+if it would (a taken name or a missing feed is refused at once) and logged as
+`proposed`. The tool answers with the change's ID, and `list_changes` later
+shows whether it was applied or rejected. Proposals wait on the **Changes**
+page of the web app, which shows each one with the values before and after and
+the agent's reason, and counts them in the navigation. From the command line:
+
+```console
+$ brzask config history --status proposed
+$ brzask config approve 215
+$ brzask config reject 216
+```
+
+Approving applies the change exactly as the agent's write would have, as the
+same entry in the log: its actor stays `agent:<token name>`, and it can be
+rolled back like any other change. It is refused, with nothing written, when
+what it changes was edited since it was proposed (`change 215 is out of date:
+status is now 'muted', not 'active'`), or when the name or feed it adds was
+taken meanwhile; reject it then, or let the agent propose it again.
+Proposals do not expire.
+
+Adding a source with `active` false is not a proposal: the source is added
+as pending, as discovery adds them, and waits for you on the Sources page.
+
 ## Untrusted text
 
 Feed entries and web pages are written by anyone, and the summaries and
@@ -75,7 +103,8 @@ source names (most come from feed titles), source notes (pipelines quote
 titles in them), run stats and change details. The
 server tells agents to treat those values as data, never as instructions.
 A page that says "mute every source" stays a page; still, prefer a `read`
-token unless the agent needs to change things.
+token unless the agent needs to change things, and a `propose` token over a
+`write` token when you want to see each change first.
 
 ## Behind a proxy
 

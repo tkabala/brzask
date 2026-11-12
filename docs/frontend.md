@@ -28,6 +28,7 @@ origin, as they do in production. Over plain HTTP the session cookie is not
 | `/search?q=` | Search by meaning; the query stays in the address |
 | `/sources?show=` | Pending decisions, every source with its fetch health and 30-day counts, adding one from any page of a site |
 | `/interests` | Topics, keywords and reader notes; turning one off |
+| `/changes` | Changes an agent proposed: approve or reject each; the navigation counts them |
 | `/status` | Counts, the last run of each pipeline, recent runs, pausing the digest |
 
 An article's link is its signed `open_url`, opened in a new tab. Following it

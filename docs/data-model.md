@@ -142,7 +142,15 @@ line and a password login, `user:<name>` behind a proxy, `token:<name>`,
 `agent:<name>` through [MCP](agents.md), `pipeline:<kind>`), what changed (`action`,
 `entity_type`, `entity_id`, `before`, `after`) and why (`reason`). A change
 is `proposed` while it waits for approval, then `applied` or `rejected`;
-an applied change can later be `reverted`.
+an applied change can later be `reverted`. `decided_at` is when the status
+last changed.
+
+An agent with a `propose` token only proposes ([Approving
+changes](agents.md#approving-changes)). Its proposal is logged with the
+values the change would set and the ones it saw; an addition has no
+`entity_id` yet. Approving turns that same row into `applied`, with what was
+actually set and the new entity's ID, so one change stays one row. Approval
+is refused while any field in `before` differs from the current value.
 
 List changes, newest first, and undo one by its ID:
 

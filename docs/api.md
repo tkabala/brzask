@@ -72,7 +72,9 @@ $ curl -H "Authorization: Bearer brz_..." https://brzask.example/api/v1/status
 ```
 
 - **`read`** (the default) may only read (`GET`, `HEAD`); anything else
-  answers 403. **`write`** may also change things. **`feed`** opens only
+  answers 403. **`write`** may also change things. **`propose`** is for
+  [agents](agents.md#approving-changes): over MCP its changes wait for
+  approval, and the API takes it as a read token. **`feed`** opens only
   [the feed](feed.md), carried in its URL; the API answers it 401.
 - The token is printed once. Only its SHA-256 is stored, with its first 12
   characters, which `brzask tokens list` shows next to its scope, when it was
