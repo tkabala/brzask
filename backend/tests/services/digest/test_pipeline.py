@@ -59,7 +59,7 @@ class FakeModel:
             return {"ranking": list(range(1, 41))}, Completion("{}", usage)
         if self.selection is not None:
             return self.selection, Completion("{}", usage)
-        links = re.findall(r"^\d+\. \[.*?\]\((\S+)\)$", prompt, re.MULTILINE)
+        links = re.findall(r"^   Link: (\S+)$", prompt, re.MULTILINE)
         articles = [
             {"link": link, "title": f"T {link}", "summary": "S", "whyItMatters": "W", "topic": "X"}
             for link in links[:DIGEST_SIZE]

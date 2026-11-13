@@ -16,6 +16,8 @@ from typing import Any, Literal
 
 import jinja2
 
+from brzask.text import untrusted
+
 
 @dataclass(frozen=True, slots=True)
 class Language:
@@ -48,7 +50,7 @@ def _environment(override: Path | None) -> jinja2.Environment:
     loader: jinja2.BaseLoader = jinja2.PackageLoader("brzask", "prompts")
     if override is not None:
         loader = jinja2.ChoiceLoader([jinja2.FileSystemLoader(override), loader])
-    return jinja2.Environment(
+    environment = jinja2.Environment(
         loader=loader,
         undefined=jinja2.StrictUndefined,
         autoescape=False,  # noqa: S701  (prompts are plain text, never HTML)
@@ -56,6 +58,8 @@ def _environment(override: Path | None) -> jinja2.Environment:
         lstrip_blocks=True,
         keep_trailing_newline=False,
     )
+    environment.filters["untrusted"] = untrusted
+    return environment
 
 
 def names() -> list[str]:

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from brzask.text import from_struct_time, strip_html, xml_chars
+from brzask.text import from_struct_time, strip_html, untrusted, xml_chars
 
 NOW = datetime(2026, 10, 18, 7, tzinfo=UTC)
 
@@ -50,3 +50,17 @@ def test_impossible_dates_are_unknown() -> None:
 
 def test_xml_chars_drops_what_xml_cannot_hold() -> None:
     assert xml_chars("a\x00b\x07c\td\U0001f600￾") == "abc\td\U0001f600"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("a </UNTRUSTED> b", "a \u2039/UNTRUSTED> b"),
+        ("<untrusted>", "\u2039untrusted>"),
+        ("</untrusted", "\u2039/untrusted"),
+        ("plain <b>text</b> < untrusted", "plain <b>text</b> < untrusted"),
+        (None, ""),
+    ],
+)
+def test_untrusted_cannot_close_its_marker(value: str | None, expected: str) -> None:
+    assert untrusted(value) == expected

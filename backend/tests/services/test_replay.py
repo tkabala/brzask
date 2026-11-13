@@ -56,7 +56,7 @@ class FakeModel:
             return {"ranking": list(range(1, 41))}, Completion("{}", usage)
         if self.fail_selection:
             raise LLMError("the API kept failing")
-        links = re.findall(r"^\d+\. \[.*?\]\((\S+)\)$", prompt, re.MULTILINE)
+        links = re.findall(r"^   Link: (\S+)$", prompt, re.MULTILINE)
         articles = [{"link": link, "title": f"T {link}", "topic": "X"} for link in links]
         return {"articles": articles}, Completion("{}", usage)
 

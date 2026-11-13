@@ -50,3 +50,16 @@ def from_struct_time(value: time.struct_time | None, now: datetime) -> datetime 
     except (OverflowError, ValueError, OSError):
         return None
     return None if moment > now + MAX_FUTURE else moment
+
+
+_MARKER = re.compile(r"<(/?untrusted)", re.IGNORECASE)
+
+
+def untrusted(value: str | None) -> str:
+    """Text for inside `<untrusted>` marks in a prompt, unable to close them.
+
+    Prompts mark what third parties wrote; a `</untrusted>` in that text
+    becomes `\u2039/untrusted>` (a single angle quotation mark), so the text
+    cannot pretend to end its mark.
+    """
+    return _MARKER.sub("\u2039\\1", value or "")
