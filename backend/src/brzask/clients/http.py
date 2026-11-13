@@ -3,7 +3,7 @@ and, for URLs third parties name, which addresses may be reached."""
 
 import socket
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from ipaddress import IPv4Address, IPv6Address, ip_address
+from ipaddress import IPv4Address, IPv6Address, IPv6Network, ip_address
 
 import httpcore2
 import httpx2
@@ -30,6 +30,8 @@ Resolver = Callable[[str, int], list[str]]
 
 # Ends every refusal; httpx2 keeps only the message of a connection error.
 NOT_PUBLIC = "is not public (ALLOWED_PRIVATE_NETWORKS)"
+# The well-known NAT64 prefix (RFC 6052): IPv4 addresses written as IPv6 ones.
+_NAT64 = IPv6Network("64:ff9b::/96")
 
 
 def new_client(timeout: httpx2.Timeout) -> httpx2.Client:
@@ -43,6 +45,10 @@ def is_allowed(address: IPv4Address | IPv6Address, allowed: Sequence[Network]) -
     address, or one in a network the owner allowed."""
     if isinstance(address, IPv6Address) and address.ipv4_mapped is not None:
         address = address.ipv4_mapped
+    elif isinstance(address, IPv6Address) and address in _NAT64:
+        # A NAT64 gateway connects to the IPv4 address in the last 32 bits,
+        # which may be private although the IPv6 one counts as global.
+        address = IPv4Address(int(address) & 0xFFFFFFFF)
     return address.is_global or any(address in network for network in allowed)
 
 
