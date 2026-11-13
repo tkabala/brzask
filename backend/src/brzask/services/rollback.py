@@ -57,6 +57,12 @@ def list_changes(
     )
 
 
+def split_entity(value: str) -> tuple[str, str] | None:
+    """`source:12` as ("source", "12"); None when either part is missing."""
+    entity_type, _, entity_id = value.partition(":")
+    return (entity_type, entity_id) if entity_type and entity_id else None
+
+
 def describe_change(change: Change, width: int = 60) -> str:
     """What a change did, on one line of at most `width` characters."""
     before, after = change.before or {}, change.after or {}
@@ -143,6 +149,8 @@ def _undo_status(session: Session, change: Change, _now: datetime) -> Undone:
     source = _locked_source(session, change)
     before, after = logged(change.before), logged(change.after)
     require_unchanged(change, "status", after["status"], source.status.value)
+    # A status change sets the note to its reason; a note edited since is kept.
+    require_unchanged(change, "note", change.reason, source.note)
     note = before.get("note")
     require_type(note is None or isinstance(note, str))
     return _set_status(session, source, SourceStatus(before["status"]), note)

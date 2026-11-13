@@ -10,7 +10,13 @@ from brzask.repositories import ChangeRepository, SettingRepository, SourceRepos
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
 from brzask.services.interests import add_interest, edit_interest
 from brzask.services.pause import PAUSE_KEY, pause, paused_until, resume
-from brzask.services.rollback import describe_change, list_changes, one_line, rollback_change
+from brzask.services.rollback import (
+    describe_change,
+    list_changes,
+    one_line,
+    rollback_change,
+    split_entity,
+)
 from brzask.services.sources import (
     add_source,
     change_status,
@@ -127,6 +133,19 @@ def test_stale_status_is_refused(session: Session, make: Factories) -> None:
 
     assert original.status is ChangeStatus.APPLIED
     assert change_count(session) == count
+
+
+def test_a_note_edited_since_a_status_change_is_kept(session: Session, make: Factories) -> None:
+    source = make.source(note="was fine")
+    mute_source(session, str(source.id), actor="user", reason="noisy")
+    original = last_change(session)
+    set_note(session, source, "keep for the release notes", actor="user")
+
+    with pytest.raises(ConflictError, match="note"):
+        rollback_change(session, original.id, NOW, actor="user")
+
+    assert (source.status, source.note) == (SourceStatus.MUTED, "keep for the release notes")
+    assert original.status is ChangeStatus.APPLIED
 
 
 # --- rename ----------------------------------------------------------------------
@@ -725,3 +744,17 @@ def test_note_rollback_refused_after_another_note(session: Session, make: Factor
 
     with pytest.raises(ConflictError, match="note is now 'second'"):
         rollback_change(session, original.id, NOW, actor="user")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("source:12", ("source", "12")),
+        ("setting:pause", ("setting", "pause")),
+        ("source:", None),
+        (":12", None),
+        ("source", None),
+    ],
+)
+def test_split_entity(value: str, expected: tuple[str, str] | None) -> None:
+    assert split_entity(value) == expected

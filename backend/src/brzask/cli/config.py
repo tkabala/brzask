@@ -17,10 +17,10 @@ app = typer.Typer(
 def _entity(value: str | None) -> tuple[str | None, str | None]:
     if value is None:
         return None, None
-    entity_type, _, entity_id = value.partition(":")
-    if not entity_type or not entity_id:
+    entity = rollback.split_entity(value)
+    if entity is None:
         raise typer.BadParameter("expected <type>:<id>, e.g. source:12")
-    return entity_type, entity_id
+    return entity
 
 
 @app.command()
