@@ -1,0 +1,16 @@
+{
+  "name": "brzask",
+  "description": "Skills for agents connected to a brzask instance over MCP: weekly tune-up, why fewer than 7 today, onboarding, explain a pick.",
+  "author": {
+    "name": "Tomasz Kabala"
+  },
+  "repository": "https://github.com/tkabala/brzask",
+  "homepage": "https://github.com/tkabala/brzask/blob/main/docs/agents.md",
+  "license": "MIT",
+  "keywords": [
+    "rss",
+    "news",
+    "digest",
+    "mcp"
+  ]
+}

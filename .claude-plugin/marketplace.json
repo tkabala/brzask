@@ -1,0 +1,14 @@
+{
+  "name": "brzask",
+  "owner": {
+    "name": "Tomasz Kabala"
+  },
+  "description": "Agent skills for brzask, a self-hosted daily news digest.",
+  "plugins": [
+    {
+      "name": "brzask",
+      "source": "./",
+      "description": "Skills for agents connected to a brzask instance over MCP: weekly tune-up, why fewer than 7 today, onboarding, explain a pick."
+    }
+  ]
+}
