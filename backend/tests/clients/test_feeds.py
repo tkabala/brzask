@@ -449,7 +449,7 @@ def test_a_refused_address_is_a_permanent_fetch_error() -> None:
     assert result.error is not None
     assert "address 127.0.0.1 is not public (ALLOWED_PRIVATE_NETWORKS)" in result.error
     # It will not start working by itself: the owner has to allow the network.
-    assert result.temporary is False
+    assert (result.temporary, result.refused) == (False, True)
 
 
 def test_an_allowed_network_is_fetched() -> None:

@@ -92,6 +92,8 @@ class FeedResult:
     # The final URL when every redirect on the way was permanent (301, 308): the
     # feed has moved for good, e.g. a GitHub repository moved to another owner.
     moved_to: str | None = None
+    # The host's address is not one a third-party URL may reach (`public_client`).
+    refused: bool = False
 
 
 class FeedFetcher:
@@ -170,6 +172,7 @@ class FeedFetcher:
                 f"{type(error).__name__}: {error}",
                 log_failure,
                 temporary=is_temporary(error),
+                refused=is_refused_address(error),
             )
 
         # The final URL resolves relative links; the content type helps detect the encoding.
@@ -197,11 +200,14 @@ class FeedFetcher:
         log_failure: bool,
         *,
         temporary: bool = False,
+        refused: bool = False,
         details: Mapping[str, Any] | None = None,
     ) -> FeedResult:
         if log_failure:
             log.warning("feed failed", url=url, error=error, temporary=temporary, **(details or {}))
-        return FeedResult(url, FetchStatus.FAILED, error=error, temporary=temporary)
+        return FeedResult(
+            url, FetchStatus.FAILED, error=error, temporary=temporary, refused=refused
+        )
 
 
 PERMANENT_REDIRECTS = frozenset({301, 308})
