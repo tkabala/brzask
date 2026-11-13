@@ -49,6 +49,7 @@ only on a machine nobody else can reach.
 | `list_runs`, `get_run` | read | Pipeline runs and what each did |
 | `list_interests`, `get_status`, `list_changes` | read | Interests, counts and last runs, the change log |
 | `start_run` | read for a dry run, write otherwise | Starts a pipeline in the background; follow it with `get_run` |
+| `start_replay` | read | Chooses the last days' digests again, as set up and without some sources, to check a mute before proposing it; follow it with `get_run` |
 | `add_source` | write or propose | Finds a site's feed and proposes it (or adds it as active) |
 | `set_source_status`, `rename_source`, `set_source_note` | write or propose | Read a source again, mute it, reject a pending one; rename; note why |
 | `add_interest`, `edit_interest` | write or propose | Interests the ranking and discovery follow |
@@ -57,8 +58,9 @@ only on a machine nobody else can reach.
 Settings, API keys and tokens are out of reach. Nothing is deleted: a
 source is muted or rejected, which keeps its articles and stops it from being
 proposed again. A dry run writes nothing but still calls the paid model APIs,
-a few cents for a digest; runs count towards the
-[spending limits](configuration.md#spending-limits).
+a few cents for a digest, and a replay of 14 days about $0.10; runs and
+replays count towards the [spending limits](configuration.md#spending-limits),
+and a replay is refused once a limit is reached.
 
 Every change is logged as `agent:<token name>` and can be undone like any
 other ([Data model](data-model.md#change-log)):
@@ -93,6 +95,43 @@ Proposals do not expire.
 
 Adding a source with `active` false is not a proposal: the source is added
 as pending, as discovery adds them, and waits for you on the Sources page.
+
+## Skills
+
+The repository ships [skills](https://agentskills.io) for agents: written
+procedures that tell an agent which tools to call, in what order, and what to
+report.
+
+| Skill | Ask for it with | Token |
+|---|---|---|
+| `weekly-tune-up` | "do the weekly tune-up" | `propose` |
+| `empty-digest` | "why only 5 today?" | `read` |
+| `onboarding` | "set up my interests" | `propose` or `write` |
+| `explain-pick` | "why was this picked?" | `read` |
+
+The **weekly tune-up** looks at what was shown and opened over the week and
+the month, picks sources that were shown often and never opened (or have
+been failing for a week), and checks them with `start_replay`: it proposes
+a mute only when replaying the last 14 days without the source loses no
+opened article. It may also suggest up to three new sites on the topics you
+open. **Empty digest** walks today's digest run stage by stage (pause, pool,
+ranking, deduplication, selection, spending limit) and names the one that
+left the digest short. **Onboarding** asks what you want to read and drafts
+the interests with you; nothing is saved before you agree. **Explain pick**
+tells how an article got into the digest: how many it competed with, its
+rank, what deduplication left and the interest it was picked for.
+
+With Claude Code, add the repository as a plugin marketplace and install the
+plugin:
+
+```console
+$ claude plugin marketplace add tkabala/brzask
+$ claude plugin install brzask@brzask
+```
+
+Other agents read the same files: copy the folders under
+[`skills/`](https://github.com/tkabala/brzask/tree/main/skills) into the
+agent's skills directory. The skills need the MCP server added as above.
 
 ## Untrusted text
 

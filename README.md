@@ -41,7 +41,7 @@ flowchart LR
 
 Every day the worker fetches your sources and builds a pool from fresh entries and a week of carry-over, taken in turn from each source so one chatty feed cannot fill it. An LLM ranks the whole pool against your interests and what you opened recently; the top 15 are read in full and embedded. Repeats of articles shown in the last 7 days are dropped, as are same-day duplicates (two outlets reporting one story), and the final 7 are chosen with a short reason each. Links go through brzask, so opening one is the only feedback it needs.
 
-Around the daily digest, weekly jobs review the sources (muting those that publish a lot and are never opened), propose sites you reached through aggregators, and search the web for new sources on your interests. An AI agent can read and adjust all of this through an MCP server at `/mcp`, with an API token and the same change log ([agents](docs/agents.md)).
+Around the daily digest, weekly jobs review the sources (muting those that publish a lot and are never opened), propose sites you reached through aggregators, and search the web for new sources on your interests. An AI agent can read and adjust all of this through an MCP server at `/mcp`, with an API token and the same change log; the repository ships agent skills for a weekly tune-up, a short digest, onboarding and explaining a pick ([agents](docs/agents.md)).
 
 ## Quickstart
 

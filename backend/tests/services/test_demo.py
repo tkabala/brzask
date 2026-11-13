@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy.orm import Session
 
-from brzask.db.models import RunKind, RunStatus, SourceStatus
+from brzask.db.models import PIPELINE_KINDS, RunStatus, SourceStatus
 from brzask.repositories import (
     ArticleRepository,
     InterestRepository,
@@ -76,7 +76,7 @@ def test_seeds_the_plan(session: Session) -> None:
     assert failing == {"Slow Tech News": 3, "Old Dispatch": 25}
     assert [i.active for i in InterestRepository(session).find()].count(False) == 1
     runs = RunRepository(session)
-    for kind in RunKind:
+    for kind in PIPELINE_KINDS:
         latest = runs.latest(kind)
         assert latest is not None
         assert latest.status is RunStatus.OK
