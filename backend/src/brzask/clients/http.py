@@ -64,7 +64,7 @@ class PublicOnlyBackend(httpcore2.SyncBackend):
     """Connects only to addresses `is_allowed` accepts.
 
     The host is resolved once, every address it resolves to is checked, and
-    the connection goes to a checked address, so a DNS answer that changes
+    the connection goes to the checked addresses only, so a DNS answer that changes
     between the check and the connection cannot lead elsewhere. TLS still
     verifies the host name.
     """
@@ -90,7 +90,13 @@ class PublicOnlyBackend(httpcore2.SyncBackend):
         for address in addresses:
             if not is_allowed(ip_address(address), self.allowed):
                 raise httpcore2.ConnectError(f"address {address} {NOT_PUBLIC}")
-        return super().connect_tcp(addresses[0], port, timeout, local_address, socket_options)
+        # Like a connection by name: each address in turn, until one answers.
+        for address in addresses[:-1]:
+            try:
+                return super().connect_tcp(address, port, timeout, local_address, socket_options)
+            except (httpcore2.ConnectError, httpcore2.ConnectTimeout):
+                continue
+        return super().connect_tcp(addresses[-1], port, timeout, local_address, socket_options)
 
 
 class _PublicTransport(httpx2.HTTPTransport):

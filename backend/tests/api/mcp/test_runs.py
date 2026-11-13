@@ -357,3 +357,23 @@ async def test_a_run_records_the_agent_that_started_it(
         run = data(await client.call_tool("get_run", {"run_id": started["run_id"]}))
 
     assert run["started_by"] == "agent:reader"
+
+
+async def test_runs_waiting_for_a_slot_count_towards_the_daily_number(
+    connect: Connect,
+    read_token: str,
+    sessions: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENT_RUNS_PER_DAY", "3")
+    async with connect(read_token) as client:
+        # A replay of 13 days and a review hold both slots until released.
+        data(await client.call_tool("start_replay", {"days": 13}))
+        data(await client.call_tool("start_run", {"kind": "review"}))
+        queued = await client.call_tool("start_run", {"kind": "digest"})
+        refused = await client.call_tool("start_run", {"kind": "digest"})
+        release.set()
+
+    assert not queued.is_error
+    assert "agents started 3 runs today" in error_text(refused)
+    await until(lambda: len(RunRepository(sessions()).recent(5)) == 3, seconds=10)

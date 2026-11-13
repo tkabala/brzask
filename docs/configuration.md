@@ -61,7 +61,7 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ALLOWED_PRIVATE_NETWORKS` | (none) | Comma-separated private networks (e.g. 192.168.1.0/24) that feeds and article pages may be fetched from. Every other non-public address (loopback, LAN, link-local, cloud metadata) is refused. |
+| `ALLOWED_PRIVATE_NETWORKS` | (none) | Comma-separated private networks (e.g. 192.168.1.0/24) that feeds and article pages may be fetched from. Every other non-public address (loopback, LAN, link-local, cloud metadata) is refused, so a feed on your own network, or one served by another container of the same compose project (usually inside 172.16.0.0/12), needs its network listed here. |
 
 ## Article text extraction
 

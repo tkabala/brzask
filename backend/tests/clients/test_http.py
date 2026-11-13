@@ -139,3 +139,30 @@ def test_client_sends_the_user_agent_and_extra_headers(server: ThreadingHTTPServ
         assert client.headers["Accept"] == "application/rss+xml"
         assert client.headers["User-Agent"].startswith("brzask/")
         assert client.follow_redirects
+
+
+def test_backend_tries_the_next_checked_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    tried: list[str] = []
+
+    def connect(self: Any, host: str, port: int, *args: Any, **kwargs: Any) -> Any:
+        tried.append(host)
+        if host == "2606:4700::1":
+            raise httpcore2.ConnectError("network unreachable")
+        return object()
+
+    monkeypatch.setattr(httpcore2.SyncBackend, "connect_tcp", connect)
+    backend = PublicOnlyBackend(
+        [], resolve=answers({"dual.test": ["2606:4700::1", "93.184.215.14"]})
+    )
+    backend.connect_tcp("dual.test", 443)
+    assert tried == ["2606:4700::1", "93.184.215.14"]
+
+
+def test_backend_raises_when_no_checked_address_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+    def connect(self: Any, host: str, port: int, *args: Any, **kwargs: Any) -> Any:
+        raise httpcore2.ConnectError(f"{host} unreachable")
+
+    monkeypatch.setattr(httpcore2.SyncBackend, "connect_tcp", connect)
+    backend = PublicOnlyBackend([], resolve=answers({"down.test": ["93.184.215.14", "8.8.8.8"]}))
+    with pytest.raises(httpcore2.ConnectError, match=r"8\.8\.8\.8 unreachable"):
+        backend.connect_tcp("down.test", 443)

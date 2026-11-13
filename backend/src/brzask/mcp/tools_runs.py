@@ -34,6 +34,8 @@ def _check_agent_runs(deps: McpDeps) -> None:
     limit = settings.budget.agent_runs_per_day
     with deps.sessions() as session:
         count = agent_runs_today(session, datetime.now(UTC), settings.scheduler.timezone)
+    # Runs waiting for a slot have no row yet, but were started all the same.
+    count += deps.runs.waiting_agent_runs()
     if count >= limit:
         raise ToolError(f"agents started {count} runs today, the limit set by AGENT_RUNS_PER_DAY")
 

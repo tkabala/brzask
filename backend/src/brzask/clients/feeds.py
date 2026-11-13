@@ -293,7 +293,7 @@ def parse_entries(entries: Sequence[Mapping[str, Any]], now: datetime) -> list[F
         entry = dict(raw)
         link = str(entry.get("link") or "").strip()
         title = strip_html(entry.get("title"))
-        if not title or link in seen or not is_http_url(link):
+        if not title or link in seen or not _usable_link(link):
             continue
         seen.add(link)
         parsed.append(
@@ -321,3 +321,10 @@ def _published(entry: Mapping[str, Any], now: datetime) -> datetime | None:
         if moment is not None:
             return moment
     return None
+
+
+def _usable_link(link: str) -> bool:
+    """An http(s) link without whitespace or control characters, which
+    `urlsplit` lets through: such a link could carry text of its own into the
+    prompts, outside the marks around what publishers wrote."""
+    return is_http_url(link) and all(char.isprintable() and not char.isspace() for char in link)

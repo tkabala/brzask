@@ -12,7 +12,7 @@ import contextvars
 import threading
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -39,6 +39,17 @@ class BackgroundRuns:
         self._threads: set[threading.Thread] = set()
         self._lock = threading.Lock()
         self._closed = threading.Event()
+        # Agent runs accepted whose row is not written yet (waiting for a slot).
+        self._waiting = 0
+
+    def waiting_agent_runs(self) -> int:
+        """Runs agents started that wait for a slot and have no row yet."""
+        with self._lock:
+            return self._waiting
+
+    def _row_written(self) -> None:
+        with self._lock:
+            self._waiting -= 1
 
     def start(
         self,
@@ -56,7 +67,11 @@ class BackgroundRuns:
         """
         pipelines = {kind: pipeline} if pipeline is not None else self.pipelines
         run_id = uuid.uuid4()
-        started = threading.Event()
+        started: threading.Event = threading.Event()
+        if started_by is not None:
+            with self._lock:
+                self._waiting += 1
+            started = _Started(self._row_written)
         # The caller's context (trace, log fields) goes with the run.
         context = contextvars.copy_context()
         thread = threading.Thread(
@@ -111,3 +126,19 @@ class BackgroundRuns:
             started.set()
             with self._lock:
                 self._threads.discard(threading.current_thread())
+
+
+class _Started(threading.Event):
+    """Set once the run's row exists (or the run ends without one); then calls
+    `on_set` exactly once."""
+
+    def __init__(self, on_set: Callable[[], None]) -> None:
+        super().__init__()
+        self._on_set = on_set
+        self._once = threading.Lock()
+
+    def set(self) -> None:
+        with self._once:
+            if not self.is_set():
+                self._on_set()
+            super().set()
