@@ -12,12 +12,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.clients.embeddings import Embedder
 from brzask.clients.feed_finder import FeedFinder
 from brzask.clients.feeds import FeedFetcher
-from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
-from brzask.config.settings import GROUPS, LLMSettings, Settings, env_name
+from brzask.config.settings import GROUPS, Settings, env_name
 from brzask.db.session import create_db_engine, session_factory
 from brzask.services.digest.extraction import DocumentEmbedder
-from brzask.services.digest.ranking import ChatModel
 from brzask.services.errors import ServiceError
 
 # Recorded as the actor in the change log for changes made from the command line.
@@ -48,15 +46,6 @@ def get_read_only_sessions() -> sessionmaker[Session]:
 @contextmanager
 def embedder(settings: Settings, model: str) -> Iterator[DocumentEmbedder]:
     client = Embedder.from_settings(settings, model)
-    try:
-        yield client
-    finally:
-        client.client.close()
-
-
-@contextmanager
-def llm_client(settings: LLMSettings) -> Iterator[ChatModel]:
-    client = LLMClient.from_settings(settings)
     try:
         yield client
     finally:

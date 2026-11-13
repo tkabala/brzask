@@ -30,6 +30,7 @@ from brzask.db.models import (
 )
 from brzask.repositories import ChangeRepository, RunRepository
 from brzask.services import auth, pipelines, proposals
+from brzask.services import replay as replay_service
 from brzask.services.archive import TABLES
 from brzask.services.notify import TEST_MESSAGE, Message
 from brzask.services.opml import NO_FEED
@@ -622,7 +623,7 @@ def models(
         yield FakeModel()
 
     monkeypatch.setattr(common, "get_read_only_sessions", lambda: sessions)
-    monkeypatch.setattr(common, "llm_client", llm_client)
+    monkeypatch.setattr(replay_service, "llm_client", llm_client)
     return asked
 
 

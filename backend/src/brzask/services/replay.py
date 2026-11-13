@@ -24,7 +24,8 @@ What the measure can and cannot say:
 
 import tomllib
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -41,14 +42,18 @@ from pydantic import (
 )
 from sqlalchemy.orm import Session, sessionmaker
 
-from brzask.clients.judge import Judge
+from brzask import prompts
+from brzask.clients.judge import Judge, build_judge
+from brzask.clients.llm import LLMClient
 from brzask.clients.retry import APIError
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.concurrency import ContextThreadPoolExecutor
+from brzask.config import get_settings
+from brzask.config.settings import LLMSettings
 from brzask.db.models import Article, RunKind
 from brzask.log import get_logger
 from brzask.prompts import Language
-from brzask.repositories import ArticleRepository, EmbeddingRepository
+from brzask.repositories import ArticleRepository, EmbeddingRepository, SourceRepository
 from brzask.repositories.articles import DigestRun
 from brzask.services.digest import pool, ranking, scoring, selection
 from brzask.services.digest.dedup import Thresholds, deduplicate_candidates
@@ -61,10 +66,17 @@ from brzask.services.digest.pool import (
 )
 from brzask.services.digest.ranking import ChatModel, RankingLimits, rank_candidates
 from brzask.services.digest.selection import SelectionError, select_digest
+from brzask.services.embeddings import active_model
 from brzask.services.errors import ServiceError
-from brzask.services.runs import RunContext
+from brzask.services.runs import Pipeline, RunContext
 
 log = get_logger(__name__)
+
+# Bounds for a replay an agent starts (not measured): a month of digests costs
+# about $0.20 for both sides, and 50 sources is more than a week's review mutes.
+MAX_DAYS = 30
+MAX_EXCLUDED = 50
+REPLAY_WORKERS = 2  # days replayed at once in a replay run
 
 
 class _Section(BaseModel):
@@ -445,3 +457,118 @@ def report(
             for day in days
         ],
     }
+
+
+@contextmanager
+def llm_client(settings: LLMSettings) -> Iterator[ChatModel]:
+    client = LLMClient.from_settings(settings)
+    try:
+        yield client
+    finally:
+        client.client.close()
+
+
+@contextmanager
+def settings_clients(
+    sessions: sessionmaker[Session], config: ReplayConfig
+) -> Iterator[ReplayClients]:
+    """The clients a replay with `config` uses, built from the settings; closed afterwards."""
+    settings = get_settings()
+    llm_settings = settings.llm
+    if config.llm_model:
+        llm_settings = llm_settings.model_copy(update={"model": config.llm_model})
+    with sessions.begin() as session:
+        embedding_model = config.embedding_model or active_model(session, settings.embedding.model)
+    with ExitStack() as stack:
+        llm = stack.enter_context(llm_client(llm_settings))
+        judge = None
+        if config.uses_judge():
+            judge = build_judge(settings, config.judge_model)
+            stack.callback(judge.close)
+        yield ReplayClients(
+            llm=llm,
+            llm_model=llm_settings.model,
+            embedding_model=embedding_model,
+            language=prompts.language(settings.digest.language),
+            judge=judge,
+        )
+
+
+def run_replay(
+    context: RunContext,
+    clients: ReplayClients,
+    since: date,
+    exclude: Sequence[int],
+    config: ReplayConfig,
+    workers: int = 1,
+) -> None:
+    """Replay the digest days from `since` with `config`, then without `exclude`.
+
+    Both sides go into `context.stats`, compared over the days that replayed
+    on both; every model call goes into the run's usage, so its cost counts.
+    """
+    with context.sessions.begin() as session:
+        sources = SourceRepository(session).get_many(exclude)
+        for source_id in exclude:
+            if source_id not in sources:
+                raise ServiceError(f"no source {source_id}")
+        excluded = [{"id": i, "name": sources[i].name} for i in dict.fromkeys(exclude)]
+    candidate = config.model_copy(
+        update={"pool": config.pool.model_copy(update={"exclude_sources": tuple(exclude)})}
+    )
+    current_days = replay(context.sessions, clients, since, config, workers)
+    candidate_days = replay(context.sessions, clients, since, candidate, workers)
+    for day in (*current_days, *candidate_days):
+        for call in day.usage:
+            context.usage.add(call)
+
+    both = {
+        a.day
+        for a, b in zip(current_days, candidate_days, strict=True)
+        if a.error is None and b.error is None
+    }
+
+    def totals(days: Sequence[DayReplay]) -> dict[str, Any]:
+        summary = asdict(summarize([day for day in days if day.day in both]))
+        del summary["usage"]  # the run's own usage holds every call
+        return summary
+
+    context.stats.update(
+        {
+            "days": len(current_days),
+            "excluded": excluded,
+            "current": totals(current_days),
+            "candidate": totals(candidate_days),
+            "per_day": [
+                {
+                    "day": a.day.isoformat(),
+                    "shown_opened": a.shown_opened,
+                    "current_opened": a.picked_opened,
+                    "candidate_opened": b.picked_opened,
+                    "lost": b.lost,
+                }
+                for a, b in zip(current_days, candidate_days, strict=True)
+            ],
+            "failed_days": len(current_days) - len(both),
+        }
+    )
+
+
+def replay_pipeline(days: int, exclude: Sequence[int]) -> Pipeline:
+    """A replay run of the last `days` digest days, with the daily settings."""
+
+    def pipeline(context: RunContext) -> None:
+        settings = get_settings()
+        today = context.started_at.astimezone(settings.scheduler.timezone).date()
+        config = ReplayConfig().with_methods(settings.digest.ranking, settings.digest.deduplication)
+        with settings_clients(context.sessions, config) as clients:
+            run_replay(
+                context,
+                clients,
+                today - timedelta(days=days - 1),
+                exclude,
+                config,
+                REPLAY_WORKERS,
+            )
+
+    return pipeline

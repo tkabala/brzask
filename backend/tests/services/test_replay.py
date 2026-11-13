@@ -1,6 +1,7 @@
 """Replaying past digests, on Postgres, with a fake model."""
 
 import re
+import uuid
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask import prompts
 from brzask.clients.llm import Completion, LLMError
 from brzask.clients.usage import CallUsage, UsageMeter
-from brzask.db.models import Article, Run
+from brzask.db.models import Article, Run, RunKind
 from brzask.repositories import EmbeddingRepository
 from brzask.services.digest.pool import POOL_CAP
 from brzask.services.digest.scoring import WEIGHTS
@@ -25,9 +26,11 @@ from brzask.services.replay import (
     replay,
     replay_pool,
     report,
+    run_replay,
     summarize,
     with_stored_text,
 )
+from brzask.services.runs import RunContext
 from tests.factories import TEST_MODEL, Factories, unit_vector
 from tests.services.digest.fakes import NOW, FakeJudge
 
@@ -358,3 +361,106 @@ def test_methods_left_out_follow_the_daily_settings() -> None:
 
     assert (resolved.ranking.method, resolved.deduplication.method) == ("judge", "judge")
     assert ReplayConfig().with_methods("llm", "threshold").uses_judge() is False
+
+
+def replay_context(sessions: sessionmaker[Session]) -> RunContext:
+    return RunContext(
+        run_id=uuid.uuid4(),
+        kind=RunKind.REPLAY,
+        started_at=NOW,
+        sessions=sessions,
+        dry_run=True,
+    )
+
+
+def test_a_replay_run_compares_the_setup_with_the_sources_left_out(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    lobsters = history["opened"].source
+    assert lobsters is not None
+    context = replay_context(sessions)
+
+    run_replay(context, clients(FakeModel()), YESTERDAY, [lobsters.id], ReplayConfig())
+
+    stats = context.stats
+    assert stats["days"] == 2
+    assert stats["excluded"] == [{"id": lobsters.id, "name": "Lobsters"}]
+    assert stats["failed_days"] == 0
+    assert (stats["current"]["picked_opened"], stats["candidate"]["picked_opened"]) == (2, 0)
+    assert stats["current"]["shown_opened"] == stats["candidate"]["shown_opened"] == 2
+    assert "usage" not in stats["current"]
+    assert stats["per_day"] == [
+        {
+            "day": YESTERDAY.isoformat(),
+            "shown_opened": 1,
+            "current_opened": 1,
+            "candidate_opened": 0,
+            "lost": ["Opened"],
+        },
+        {
+            "day": TODAY.isoformat(),
+            "shown_opened": 1,
+            "current_opened": 1,
+            "candidate_opened": 0,
+            "lost": ["Fresh"],
+        },
+    ]
+
+
+def test_a_replay_run_counts_every_call(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    context = replay_context(sessions)
+    blog = history["ignored"].source_id
+    assert blog is not None
+
+    run_replay(context, clients(FakeModel()), YESTERDAY, [blog], ReplayConfig())
+
+    # Ranking and selection, for two days, on both sides.
+    assert len(context.usage.calls) == 8
+
+
+def test_an_unknown_source_is_refused_before_any_call(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    model = FakeModel()
+
+    with pytest.raises(ServiceError, match="no source 999"):
+        run_replay(replay_context(sessions), clients(model), YESTERDAY, [999], ReplayConfig())
+    assert model.prompts["ranking"] == []
+
+
+def test_no_digest_days_is_an_empty_comparison(sessions: sessionmaker[Session]) -> None:
+    model = FakeModel()
+    context = replay_context(sessions)
+
+    run_replay(context, clients(model), YESTERDAY, [], ReplayConfig())
+
+    assert context.stats["days"] == 0
+    assert context.stats["current"]["picked"] == context.stats["candidate"]["picked"] == 0
+    assert context.stats["per_day"] == []
+    assert model.prompts["ranking"] == []
+
+
+def test_a_day_without_candidates_on_one_side_is_left_out_of_both(
+    sessions: sessionmaker[Session], make: Factories
+) -> None:
+    only = make.source("Only")
+    make.article(
+        only,
+        title="Alone",
+        first_seen_at=NOW - timedelta(hours=1),
+        digest_date=TODAY,
+        shown_at=NOW,
+        opened_at=NOW + timedelta(hours=1),
+    )
+    make.article(only, title="Unshown", first_seen_at=NOW - timedelta(hours=2))
+    context = replay_context(sessions)
+
+    run_replay(context, clients(FakeModel()), TODAY, [only.id], ReplayConfig())
+
+    stats = context.stats
+    assert stats["failed_days"] == 1
+    assert stats["current"]["days"] == stats["candidate"]["days"] == 0
+    assert stats["current"]["picked"] == 0
+    assert stats["per_day"][0]["lost"] == ["Alone"]

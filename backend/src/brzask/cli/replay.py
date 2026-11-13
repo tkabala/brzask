@@ -11,16 +11,14 @@ import typer
 from brzask import prompts
 from brzask.cli import common
 from brzask.cli.common import table
-from brzask.clients.judge import build_judge
 from brzask.config import get_settings
-from brzask.services.embeddings import active_model
 from brzask.services.replay import (
     DayReplay,
-    ReplayClients,
     ReplayConfig,
     ReplaySummary,
     replay,
     report,
+    settings_clients,
     summarize,
 )
 
@@ -62,9 +60,6 @@ def replay_command(
 
     settings = get_settings()
     config = config.with_methods(settings.digest.ranking, settings.digest.deduplication)
-    llm_settings = settings.llm
-    if config.llm_model:
-        llm_settings = llm_settings.model_copy(update={"model": config.llm_model})
     today = datetime.now(UTC).astimezone(settings.scheduler.timezone).date()
     since = today - timedelta(days=days - 1)
 
@@ -75,21 +70,7 @@ def replay_command(
             except ValueError as error:
                 raise typer.BadParameter(str(error), param_hint="--prompt-dir") from error
         sessions = common.get_read_only_sessions()
-        with sessions.begin() as session:
-            embedding_model = config.embedding_model or active_model(
-                session, settings.embedding.model
-            )
-        judge = None
-        if config.uses_judge():
-            judge = build_judge(settings, config.judge_model)
-            stack.callback(judge.close)
-        clients = ReplayClients(
-            llm=stack.enter_context(common.llm_client(llm_settings)),
-            llm_model=llm_settings.model,
-            embedding_model=embedding_model,
-            language=prompts.language(settings.digest.language),
-            judge=judge,
-        )
+        clients = stack.enter_context(settings_clients(sessions, config))
         with common.errors_as_messages():
             results = replay(sessions, clients, since, config, workers)
 
