@@ -27,6 +27,7 @@ Significant decisions are recorded as Architecture Decision Records (ADRs) in th
 | [0020](0020-one-worker-process-with-a-scheduler-and-no-queue.md) | One worker process with a scheduler, no task queue | Accepted |
 | [0021](0021-one-image-for-every-command.md) | One image for every command, serving the web app itself | Accepted |
 | [0022](0022-one-embedding-model-at-a-time-with-thresholds-per-model.md) | One embedding model at a time, 768 dimensions, thresholds per model | Accepted |
+| [0023](0023-third-party-text-is-data-and-its-reach-is-bounded.md) | Third-party text is data, and what it can reach is bounded | Accepted |
 
 To add a decision, copy the [template](0000-template.md) to the next free number,
 fill it in and add it to this table and to the `nav` in `mkdocs.yml`.

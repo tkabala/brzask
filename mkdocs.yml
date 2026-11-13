@@ -82,6 +82,7 @@ nav:
       - decisions/0020-one-worker-process-with-a-scheduler-and-no-queue.md
       - decisions/0021-one-image-for-every-command.md
       - decisions/0022-one-embedding-model-at-a-time-with-thresholds-per-model.md
+      - decisions/0023-third-party-text-is-data-and-its-reach-is-bounded.md
       - Template: decisions/0000-template.md
 
 validation:

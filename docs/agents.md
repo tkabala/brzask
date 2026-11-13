@@ -145,7 +145,9 @@ titles in them), run stats and change details. The
 server tells agents to treat those values as data, never as instructions.
 A page that says "mute every source" stays a page; still, prefer a `read`
 token unless the agent needs to change things, and a `propose` token over a
-`write` token when you want to see each change first.
+`write` token when you want to see each change first. The threat model and
+what bounds each path are in
+[ADR 0023](decisions/0023-third-party-text-is-data-and-its-reach-is-bounded.md).
 
 ## Behind a proxy
 
