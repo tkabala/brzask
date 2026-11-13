@@ -39,17 +39,23 @@ class BackgroundRuns:
         self._threads: set[threading.Thread] = set()
         self._lock = threading.Lock()
         self._closed = threading.Event()
-        # Agent runs accepted whose row is not written yet (waiting for a slot).
-        self._waiting = 0
+        # Runs accepted whose row is not written yet (waiting for a slot), and
+        # whether an agent started each.
+        self._queued: dict[uuid.UUID, bool] = {}
 
     def waiting_agent_runs(self) -> int:
         """Runs agents started that wait for a slot and have no row yet."""
         with self._lock:
-            return self._waiting
+            return sum(self._queued.values())
 
-    def _row_written(self) -> None:
+    def is_queued(self, run_id: uuid.UUID) -> bool:
+        """Whether the run was accepted but has no row yet."""
         with self._lock:
-            self._waiting -= 1
+            return run_id in self._queued
+
+    def _row_written(self, run_id: uuid.UUID) -> None:
+        with self._lock:
+            self._queued.pop(run_id, None)
 
     def start(
         self,
@@ -67,11 +73,9 @@ class BackgroundRuns:
         """
         pipelines = {kind: pipeline} if pipeline is not None else self.pipelines
         run_id = uuid.uuid4()
-        started: threading.Event = threading.Event()
-        if started_by is not None:
-            with self._lock:
-                self._waiting += 1
-            started = _Started(self._row_written)
+        with self._lock:
+            self._queued[run_id] = started_by is not None
+        started = _Started(lambda: self._row_written(run_id))
         # The caller's context (trace, log fields) goes with the run.
         context = contextvars.copy_context()
         thread = threading.Thread(

@@ -77,6 +77,9 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         """
         identity = current_identity()
         exclude = list(dict.fromkeys(exclude_source_ids or []))
+        if not exclude:
+            # Both sides would be the same setup: twice the cost, nothing to compare.
+            raise ToolError("name the sources to leave out (exclude_source_ids)")
         if len(exclude) > MAX_EXCLUDED:
             raise ToolError(f"leave out at most {MAX_EXCLUDED} sources at once")
         settings = get_settings()

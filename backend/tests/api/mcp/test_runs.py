@@ -78,6 +78,14 @@ def propose_token(sessions: sessionmaker[Session]) -> str:
 
 
 @pytest.fixture
+def quiet(session: Session, make: Factories) -> int:
+    """A source for replays to leave out."""
+    source = make.source("Quiet")
+    session.commit()
+    return source.id
+
+
+@pytest.fixture
 def pipelines() -> dict[RunKind, Pipeline]:
     release.clear()
     return {RunKind.DIGEST: quick, RunKind.REVIEW: blocking}
@@ -201,11 +209,13 @@ def test_runs_beyond_the_limit_wait_their_turn(
 
     assert status_of(sessions, str(first)) is RunStatus.RUNNING
     assert status_of(sessions, str(second)) is None
+    assert (runs.is_queued(first), runs.is_queued(second)) == (False, True)
     release.set()
     deadline = time.monotonic() + 5
     while status_of(sessions, str(second)) is not RunStatus.OK:
         assert time.monotonic() < deadline
         time.sleep(0.05)
+    assert not runs.is_queued(second)
     runs.close()
 
 
@@ -252,13 +262,14 @@ async def test_a_replay_over_the_budget_is_refused(
     session: Session,
     make: Factories,
     monkeypatch: pytest.MonkeyPatch,
+    quiet: int,
 ) -> None:
     monkeypatch.setenv("LLM_BUDGET_DAILY_USD", "0.05")
     make.run(datetime.now(UTC), cost=0.06)
     session.commit()
 
     async with connect(read_token) as client:
-        result = await client.call_tool("start_replay", {})
+        result = await client.call_tool("start_replay", {"exclude_source_ids": [quiet]})
 
     assert "daily" in error_text(result)
     with sessions() as s:
@@ -268,6 +279,8 @@ async def test_a_replay_over_the_budget_is_refused(
 @pytest.mark.parametrize(
     ("arguments", "message"),
     [
+        ({}, "name the sources to leave out"),
+        ({"exclude_source_ids": []}, "name the sources to leave out"),
         ({"exclude_source_ids": [999]}, "no source 999"),
         ({"exclude_source_ids": list(range(1, 52))}, "at most 50 sources"),
         ({"days": 0}, "days"),
@@ -290,11 +303,18 @@ async def test_a_replay_with_bad_arguments_is_refused(
 
 
 async def test_a_second_replay_while_one_runs_is_skipped(
-    connect: Connect, read_token: str, sessions: sessionmaker[Session]
+    connect: Connect,
+    read_token: str,
+    sessions: sessionmaker[Session],
+    quiet: int,
 ) -> None:
     async with connect(read_token) as client:
-        first = data(await client.call_tool("start_replay", {"days": 13}))
-        second = data(await client.call_tool("start_replay", {"days": 13}))
+        first = data(
+            await client.call_tool("start_replay", {"days": 13, "exclude_source_ids": [quiet]})
+        )
+        second = data(
+            await client.call_tool("start_replay", {"days": 13, "exclude_source_ids": [quiet]})
+        )
         await until(lambda: status_of(sessions, second["run_id"]) is RunStatus.SKIPPED)
         release.set()
         await until(lambda: status_of(sessions, first["run_id"]) is RunStatus.OK)
@@ -317,6 +337,7 @@ async def test_agents_start_at_most_the_daily_number_of_runs(
     session: Session,
     make: Factories,
     monkeypatch: pytest.MonkeyPatch,
+    quiet: int,
 ) -> None:
     monkeypatch.setenv("AGENT_RUNS_PER_DAY", "2")
     for _ in range(2):
@@ -325,7 +346,7 @@ async def test_agents_start_at_most_the_daily_number_of_runs(
 
     async with connect(read_token) as client:
         run = await client.call_tool("start_run", {"kind": "digest"})
-        replay = await client.call_tool("start_replay", {})
+        replay = await client.call_tool("start_replay", {"exclude_source_ids": [quiet]})
 
     message = "agents started 2 runs today, the limit set by AGENT_RUNS_PER_DAY"
     assert message in error_text(run)
@@ -364,11 +385,12 @@ async def test_runs_waiting_for_a_slot_count_towards_the_daily_number(
     read_token: str,
     sessions: sessionmaker[Session],
     monkeypatch: pytest.MonkeyPatch,
+    quiet: int,
 ) -> None:
     monkeypatch.setenv("AGENT_RUNS_PER_DAY", "3")
     async with connect(read_token) as client:
         # A replay of 13 days and a review hold both slots until released.
-        data(await client.call_tool("start_replay", {"days": 13}))
+        data(await client.call_tool("start_replay", {"days": 13, "exclude_source_ids": [quiet]}))
         data(await client.call_tool("start_run", {"kind": "review"}))
         queued = await client.call_tool("start_run", {"kind": "digest"})
         refused = await client.call_tool("start_run", {"kind": "digest"})

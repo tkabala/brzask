@@ -237,6 +237,9 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
     def get_run(run_id: uuid.UUID) -> models.RunItem:
         """One pipeline run; poll it after start_run until its status is no longer running."""
         with sessions.begin() as session, service_errors():
+            # A run waiting for a free slot has no row yet.
+            if deps.runs.is_queued(run_id) and RunRepository(session).get(run_id) is None:
+                raise ToolError(f"run {run_id} waits for a free slot; ask again later")
             return models.RunItem.of(runs.get_run(session, run_id))
 
     @server.tool()
@@ -279,9 +282,10 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         """Changes to sources, interests and settings, newest first, by anyone (agents too)."""
         entity_type = entity_id = None
         if entity is not None:
-            entity_type, _, entity_id = entity.partition(":")
-            if not entity_type or not entity_id:
+            parts = rollback.split_entity(entity)
+            if parts is None:
                 raise ToolError("entity must look like source:12")
+            entity_type, entity_id = parts
         with sessions.begin() as session, service_errors():
             found = rollback.list_changes(
                 session,
