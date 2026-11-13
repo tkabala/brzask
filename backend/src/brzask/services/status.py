@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
-from brzask.db.models import Run, RunKind, SourceStatus
+from brzask.db.models import PIPELINE_KINDS, Run, RunKind, SourceStatus
 from brzask.repositories import (
     ArticleRepository,
     EmbeddingRepository,
@@ -38,7 +38,7 @@ def get_status(session: Session, now: datetime, configured_model: str) -> Status
         sources={status: counts.get(status, 0) for status in SourceStatus},
         last_digest=articles.latest_digest_date(),
         paused_until=paused_until(session, now),
-        last_runs={kind: runs.latest(kind) for kind in RunKind},
+        last_runs={kind: runs.latest(kind) for kind in PIPELINE_KINDS},
         embedding_model=active_model(session, configured_model),
         embeddings=EmbeddingRepository(session).counts_by_model(),
     )

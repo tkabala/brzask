@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from brzask.db.models import RunKind, SourceStatus
+from brzask.db.models import PIPELINE_KINDS, RunKind, SourceStatus
 from brzask.repositories import RunRepository
 from brzask.services.pause import pause
 from brzask.services.status import get_status
@@ -19,7 +19,7 @@ def test_empty_instance(session: Session) -> None:
     assert status.embeddings == {}
     assert (status.articles.total, status.last_digest, status.paused_until) == (0, None, None)
     assert set(status.sources.values()) == {0}
-    assert status.last_runs == dict.fromkeys(RunKind)
+    assert status.last_runs == dict.fromkeys(PIPELINE_KINDS)
 
 
 def test_counts_pause_and_last_runs(session: Session, make: Factories) -> None:
@@ -41,3 +41,12 @@ def test_counts_pause_and_last_runs(session: Session, make: Factories) -> None:
     assert status.paused_until == NOW + timedelta(days=2)
     assert status.last_runs[RunKind.DIGEST] is run
     assert status.last_runs[RunKind.REVIEW] is None
+
+
+def test_status_lists_pipelines_only(session: Session, make: Factories) -> None:
+    make.run(NOW, kind=RunKind.REPLAY, dry_run=True)
+
+    status = get_status(session, NOW, TEST_MODEL)
+
+    assert set(status.last_runs) == set(PIPELINE_KINDS)
+    assert RunKind.REPLAY not in PIPELINE_KINDS

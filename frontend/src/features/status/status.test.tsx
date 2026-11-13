@@ -73,6 +73,18 @@ describe('status', () => {
     ).toBeInTheDocument()
   })
 
+  it('names a replay an agent started among the recent runs', async () => {
+    const replay = { ...runs[0], id: 'replay', kind: 'replay', dry_run: true, stats: {} }
+    loggedInApi({
+      'GET /api/v1/status': () => json(status),
+      'GET /api/v1/runs': () => json({ items: [replay], next_cursor: null }),
+    })
+    renderApp('/status')
+
+    const recent = await screen.findByRole('region', { name: 'Recent runs' })
+    expect(await within(recent).findByRole('heading', { name: 'Replay' })).toBeInTheDocument()
+  })
+
   it('pauses until the start of a chosen day', async () => {
     let paused: string | null = null
     const api = loggedInApi({

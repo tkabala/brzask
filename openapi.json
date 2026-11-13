@@ -3712,7 +3712,8 @@
           "digest",
           "review",
           "visited",
-          "discovery"
+          "discovery",
+          "replay"
         ],
         "title": "RunKind"
       },

@@ -25,14 +25,14 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.config.settings import Schedule, SchedulerSettings
-from brzask.db.models import RunKind
+from brzask.db.models import PIPELINE_KINDS, RunKind
 from brzask.log import get_logger
 from brzask.services.runs import run_pipeline, sweep_abandoned
 
 log = get_logger(__name__)
 
 # The order of pipelines that share a schedule.
-ORDER = (RunKind.DIGEST, RunKind.REVIEW, RunKind.VISITED, RunKind.DISCOVERY)
+ORDER = PIPELINE_KINDS
 # A run that could not start on time while the worker was up (the machine
 # slept, an earlier job ran long) still runs if it is at most this late; later
 # ones wait for the next time. Jobs are kept in memory, so a worker started

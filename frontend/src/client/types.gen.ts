@@ -645,7 +645,7 @@ export type RankingOut = {
 /**
  * RunKind
  */
-export type RunKind = 'digest' | 'review' | 'visited' | 'discovery';
+export type RunKind = 'digest' | 'review' | 'visited' | 'discovery' | 'replay';
 
 /**
  * RunOut

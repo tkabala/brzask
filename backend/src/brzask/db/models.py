@@ -211,6 +211,13 @@ class RunKind(StrEnum):
     REVIEW = "review"
     VISITED = "visited"
     DISCOVERY = "discovery"
+    # A replay an agent started: recorded, so its cost counts towards the
+    # spending limits, but not a pipeline (nothing schedules or forces it).
+    REPLAY = "replay"
+
+
+# The kinds the worker schedules, in the order of pipelines sharing a time.
+PIPELINE_KINDS = (RunKind.DIGEST, RunKind.REVIEW, RunKind.VISITED, RunKind.DISCOVERY)
 
 
 class RunStatus(StrEnum):

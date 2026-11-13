@@ -184,6 +184,7 @@ export const en = {
       review: 'Source review',
       visited: 'Opened links',
       discovery: 'Discovery',
+      replay: 'Replay',
     },
     runStatus: { running: 'running', ok: 'ok', skipped: 'skipped', failed: 'failed' },
     dryRun: 'dry run',

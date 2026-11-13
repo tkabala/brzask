@@ -335,10 +335,11 @@ def running_row(session: Session, kind: RunKind) -> uuid.UUID:
     return run_id
 
 
+@pytest.mark.parametrize("kind", [RunKind.DIGEST, RunKind.REPLAY])
 def test_sweep_fails_a_running_row_whose_lock_is_free(
-    sessions: sessionmaker[Session], session: Session
+    sessions: sessionmaker[Session], session: Session, kind: RunKind
 ) -> None:
-    run_id = running_row(session, RunKind.DIGEST)
+    run_id = running_row(session, kind)
     session.commit()
 
     swept = sweep_abandoned(sessions, NOW)

@@ -190,6 +190,7 @@ export const pl: Resources = {
       review: 'Przegląd źródeł',
       visited: 'Otwarte linki',
       discovery: 'Wyszukiwanie źródeł',
+      replay: 'Powtórka przeglądów',
     },
     runStatus: { running: 'trwa', ok: 'ok', skipped: 'pominięty', failed: 'błąd' },
     dryRun: 'próba',
