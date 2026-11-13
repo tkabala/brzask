@@ -1,8 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import { listChangesOptions, logoutMutation } from '@/client/@tanstack/react-query.gen'
+import {
+  getSessionStateQueryKey,
+  listChangesOptions,
+  logoutMutation,
+} from '@/client/@tanstack/react-query.gen'
 import type { SessionOut } from '@/client/types.gen'
 import { Button } from '@/components/ui/button'
 import { LANGUAGES } from '@/i18n'
@@ -31,14 +35,19 @@ export function AppHeader({ session }: { session: SessionOut }) {
     // Offline the request fails at once instead of waiting: the saved copy
     // must go now, not whenever the connection returns.
     networkMode: 'always',
-    onMutate: () => {
+    onMutate: async () => {
       forgetSaved(queryClient)
+      // A read still under way could reach the server after the logout and come back 401.
+      await queryClient.cancelQueries()
     },
     onSettled: () => {
       setCsrfToken(null)
       forgetSaved(queryClient)
-      // Back to nothing known: the session is asked again, and the gate shows the login.
-      void queryClient.resetQueries()
+      // Back to nothing known. Only the session is asked again (the gate then shows
+      // the login); refetching the rest would send reads that end in 401.
+      const session = getSessionStateQueryKey()
+      queryClient.removeQueries({ predicate: (query) => query.queryHash !== hashKey(session) })
+      void queryClient.resetQueries({ queryKey: session, exact: true })
     },
   })
 

@@ -175,6 +175,34 @@ describe('logged in', () => {
     expect(read?.headers.get('X-CSRF-Token')).toBeNull()
   })
 
+  it('asks only for the session once logged out', async () => {
+    let session: SessionOut = loggedIn
+    const api = fakeApi({
+      'GET /api/v1/auth/session': () => json(session),
+      'GET /api/v1/digests/today': () => json(emptyDigest),
+      'GET /api/v1/changes': () =>
+        session.authenticated ? json([]) : problem(401, 'Unauthorized', 'Log in first.'),
+      'POST /api/v1/auth/logout': () => {
+        session = loggedOut
+        return new Response(null, { status: 204 })
+      },
+    })
+    const user = userEvent.setup()
+    renderApp()
+    await screen.findByRole('heading', { name: 'Today' })
+    await waitFor(() => {
+      expect(api.sent('GET /api/v1/changes')).toHaveLength(1)
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
+
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument()
+    const after = api.requests.slice(
+      api.requests.findIndex((r) => r.url.endsWith('/auth/logout')) + 1,
+    )
+    expect(after.map((r) => new URL(r.url).pathname)).toEqual(['/api/v1/auth/session'])
+  })
+
   it('speaks Polish', async () => {
     fakeApi({
       'GET /api/v1/auth/session': () => json(loggedIn),
