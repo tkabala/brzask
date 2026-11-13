@@ -218,7 +218,7 @@ class DayReplay:
     error: str | None = None
     # Opened articles of the real digest from excluded sources: what leaving
     # them out certainly costs, whatever the model picks instead.
-    lost: list[str] = field(default_factory=list)
+    lost: list[dict[str, Any]] = field(default_factory=list)  # {title, source_id}
 
     @property
     def picked_opened(self) -> int:
@@ -314,7 +314,7 @@ def replay_day(
         shown=len(shown),
         shown_opened=sum(article.opened_at is not None for article in shown),
         lost=[
-            article.title
+            {"title": article.title, "source_id": article.source_id}
             for article in shown
             if article.opened_at is not None and article.source_id in config.pool.exclude_sources
         ],
@@ -383,15 +383,19 @@ def replay(
     since: date,
     config: ReplayConfig | None = None,
     workers: int = 1,
+    runs: Sequence[DigestRun] | None = None,
 ) -> list[DayReplay]:
     """Every digest day from `since` on, chosen again, oldest first.
 
+    `runs` are those days' runs when the caller already has them, so two
+    replays compare the same days even if a digest is built in between.
     Days run in parallel on `workers` threads: each waits on two model calls.
     """
     config = config or ReplayConfig()
     with sessions.begin() as session:
         stored = EmbeddingRepository(session).counts_by_model()
-        runs = ArticleRepository(session).digest_runs(since)
+        if runs is None:
+            runs = ArticleRepository(session).digest_runs(since)
     if stored and clients.embedding_model not in stored:
         # Deduplication would compare nothing and the replay would look valid.
         raise ServiceError(
@@ -514,11 +518,13 @@ def run_replay(
             if source_id not in sources:
                 raise ServiceError(f"no source {source_id}")
         excluded = [{"id": i, "name": sources[i].name} for i in dict.fromkeys(exclude)]
+        # Fetched once: a digest finished between the two sides adds a day.
+        runs = ArticleRepository(session).digest_runs(since)
     candidate = config.model_copy(
         update={"pool": config.pool.model_copy(update={"exclude_sources": tuple(exclude)})}
     )
-    current_days = replay(context.sessions, clients, since, config, workers)
-    candidate_days = replay(context.sessions, clients, since, candidate, workers)
+    current_days = replay(context.sessions, clients, since, config, workers, runs)
+    candidate_days = replay(context.sessions, clients, since, candidate, workers, runs)
     for day in (*current_days, *candidate_days):
         for call in day.usage:
             context.usage.add(call)

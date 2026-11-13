@@ -22,9 +22,11 @@ suggest a fix only when one fits.
 ## Steps
 
 1. **What happened today.** Call `get_status()` and
-   `get_digest()` (today), then `list_runs(kind="digest", limit=5)`. Take
-   the newest real run of today (`dry_run` false) and call
-   `get_run(run_id=...)`.
+   `get_digest()` (today), then `list_runs(kind="digest", limit=10)`. Of
+   today's real runs (`dry_run` false), take the one that finished `ok`;
+   without one, the newest. A run `skipped` because today's digest already
+   exists only means someone ran it again: look past it. Call
+   `get_run(run_id=...)` for the run you took.
 
 2. **Walk the run, in order, and stop at the first stage that explains it.**
    Stats are under `external.stats`.
@@ -32,9 +34,9 @@ suggest a fix only when one fits.
      run is older than today's digest time. Say so; the owner checks the
      worker.
    - **Paused.** `get_status()` shows `paused_until` in the future, or the
-     run is `skipped` with a `reason`. `resume()` ends a pause.
-   - **Skipped, already done.** A digest already exists for today; this is
-     not a short digest.
+     run is `skipped` with a `reason` that says so. `resume()` ends a
+     pause. Another `reason` on a skipped run (no candidates, say) is the
+     answer itself: quote it.
    - **Failed.** `status` is `failed`; quote `external.error` and name the
      stage it points at (an API error, a database error).
    - **Thin pool.** `pool`: `candidates` is small (fewer than about 20).

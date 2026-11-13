@@ -244,8 +244,8 @@ def test_a_day_names_the_opened_articles_an_exclusion_loses(
     first, second = replay(sessions, clients(FakeModel()), since=YESTERDAY, config=config)
     plain = replay(sessions, clients(FakeModel()), since=YESTERDAY)
 
-    assert first.lost == ["Opened"]
-    assert second.lost == ["Fresh"]
+    assert first.lost == [{"title": "Opened", "source_id": lobsters}]
+    assert second.lost == [{"title": "Fresh", "source_id": lobsters}]
     # Only what the pool could still hold counts as openable.
     assert first.opened_in_pool == 0
     assert [day.lost for day in plain] == [[], []]
@@ -395,14 +395,14 @@ def test_a_replay_run_compares_the_setup_with_the_sources_left_out(
             "shown_opened": 1,
             "current_opened": 1,
             "candidate_opened": 0,
-            "lost": ["Opened"],
+            "lost": [{"title": "Opened", "source_id": lobsters.id}],
         },
         {
             "day": TODAY.isoformat(),
             "shown_opened": 1,
             "current_opened": 1,
             "candidate_opened": 0,
-            "lost": ["Fresh"],
+            "lost": [{"title": "Fresh", "source_id": lobsters.id}],
         },
     ]
 
@@ -463,4 +463,37 @@ def test_a_day_without_candidates_on_one_side_is_left_out_of_both(
     assert stats["failed_days"] == 1
     assert stats["current"]["days"] == stats["candidate"]["days"] == 0
     assert stats["current"]["picked"] == 0
-    assert stats["per_day"][0]["lost"] == ["Alone"]
+    assert stats["per_day"][0]["lost"] == [{"title": "Alone", "source_id": only.id}]
+
+
+def test_a_digest_finished_during_a_replay_run_does_not_split_the_sides(
+    sessions: sessionmaker[Session], history: dict[str, Article], make: Factories
+) -> None:
+    blog = history["ignored"].source
+    assert blog is not None
+
+    class DigestMeanwhile(FakeModel):
+        """Today's digest is built while the first side is being replayed."""
+
+        def complete_json(
+            self, prompt: str, *, purpose: str, meter: UsageMeter | None = None
+        ) -> tuple[Any, Completion]:
+            if not self.prompts["ranking"]:
+                later = NOW + timedelta(days=1)
+                make.article(
+                    blog,
+                    first_seen_at=later - timedelta(hours=1),
+                    digest_date=TODAY + timedelta(days=1),
+                    shown_at=later,
+                )
+            return super().complete_json(prompt, purpose=purpose, meter=meter)
+
+    context = replay_context(sessions)
+
+    run_replay(context, clients(DigestMeanwhile()), YESTERDAY, [blog.id], ReplayConfig())
+
+    assert context.stats["days"] == 2
+    assert [day["day"] for day in context.stats["per_day"]] == [
+        YESTERDAY.isoformat(),
+        TODAY.isoformat(),
+    ]

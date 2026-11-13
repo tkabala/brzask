@@ -45,20 +45,24 @@ replay. Nothing here is urgent: when in doubt, leave a source alone.
    status is no longer `running`. Tell the user it takes a while. Under
    `external.stats`:
    - `per_day[].lost`: opened articles of the real digests that came from
-     the candidates. Muting them would certainly have cost these.
+     the candidates, each with its `title` and `source_id`. Muting them
+     would certainly have cost these.
    - `current.opened_in_pool` and `candidate.opened_in_pool`: opened
      articles the pools held, with and without the candidates.
    - `current.picked_opened` and `candidate.picked_opened`: picks the owner
      had opened, as chosen again by the model on each side.
-   - `failed_days`: days left out of both sides.
+   - `failed_days`: days that failed on either side (a model call that kept
+     failing), left out of both sides.
 
-   Keep the mutes only when `lost` is empty on every day and both
+   Keep the mutes only when `failed_days` is 0, `lost` is empty on every
+   day and both
    `opened_in_pool` values are equal: then no article the owner opened came
    from the candidates. Report `picked_opened` on both sides but do not
    decide on it: the model does not pick the same way twice, and in daily
    use two sides with the same opened articles in their pools differed by 2
-   opens over 10 days. If something is lost, drop the source that article
-   came from and tell the user; do not replay again for less than a clear
+   opens over 10 days. If something is lost, drop the sources named by its
+   `source_id` and tell the user; with failed days, the comparison misses
+   those days, so report it and propose no mutes; do not replay again for less than a clear
    reason. A run that `failed` or was `skipped` (another replay running)
    proves nothing: say so and propose no mutes.
 
