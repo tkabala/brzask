@@ -14,7 +14,7 @@ from brzask.clients.extractors import build_chain
 from brzask.clients.extractors.adapters import FEED_MIN_CHARS, PAGE_TIMEOUT
 from brzask.clients.extractors.robots import RobotsPolicy
 from brzask.clients.feeds import FeedFetcher
-from brzask.clients.http import new_client
+from brzask.clients.http import new_client, public_client
 from brzask.config import get_settings
 from brzask.config.settings import Extractor as ExtractorName
 from brzask.config.settings import ExtractorSettings
@@ -80,12 +80,15 @@ def extract_bench_command(
         err=True,
     )
     with ExitStack() as stack:
-        feeds = FeedFetcher()
+        allowed = get_settings().fetch.allowed_private_networks
+        feeds = FeedFetcher(allowed=allowed)
         stack.callback(feeds.close)
-        client = new_client(PAGE_TIMEOUT)
+        client = public_client(PAGE_TIMEOUT, allowed)
         stack.callback(client.close)
+        services = new_client(PAGE_TIMEOUT)
+        stack.callback(services.close)
         items = with_feed_content(items, feeds)
-        chain = build_chain(bench_settings, client)
+        chain = build_chain(bench_settings, client, services)
         intervals = {"jina": JINA_KEYLESS_INTERVAL} if settings.jina_api_key is None else {}
         attempts = run_bench(items, chain.extractors, RobotsPolicy(client), workers, intervals)
 

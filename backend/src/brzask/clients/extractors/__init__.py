@@ -32,7 +32,7 @@ from brzask.clients.extractors.chain import (
     Outcome,
 )
 from brzask.clients.extractors.robots import RobotsPolicy
-from brzask.clients.http import new_client
+from brzask.clients.http import new_client, public_client
 from brzask.config.settings import ExtractorSettings
 
 __all__ = [
@@ -51,9 +51,20 @@ __all__ = [
 ]
 
 
-def build_chain(settings: ExtractorSettings, client: httpx2.Client | None = None) -> ExtractorChain:
-    """The chain configured by `EXTRACTORS`, sharing one HTTP client."""
-    client = client or new_client(PAGE_TIMEOUT)
+def build_chain(
+    settings: ExtractorSettings,
+    pages: httpx2.Client | None = None,
+    services: httpx2.Client | None = None,
+) -> ExtractorChain:
+    """The chain configured by `EXTRACTORS`.
+
+    Article pages and robots.txt are fetched with `pages`, which should refuse
+    private addresses (`public_client`): their URLs come from feeds. Extraction
+    services the owner configured get `services`, since a self-hosted one may
+    run on the owner's own network.
+    """
+    pages = pages or public_client(PAGE_TIMEOUT, ())
+    services = services or new_client(PAGE_TIMEOUT)
 
     jina_key = settings.jina_api_key.get_secret_value() if settings.jina_api_key else None
     firecrawl_key = (
@@ -68,16 +79,16 @@ def build_chain(settings: ExtractorSettings, client: httpx2.Client | None = None
             case "feed":
                 extractors.append(FeedExtractor())
             case "trafilatura":
-                extractors.append(TrafilaturaExtractor(client))
+                extractors.append(TrafilaturaExtractor(pages))
             case "jina":
-                extractors.append(JinaExtractor(client, jina_key))
+                extractors.append(JinaExtractor(services, jina_key))
             case "firecrawl":
                 extractors.append(
-                    FirecrawlExtractor(client, str(settings.firecrawl_base_url), firecrawl_key)
+                    FirecrawlExtractor(services, str(settings.firecrawl_base_url), firecrawl_key)
                 )
             case "crawl4ai":
                 assert settings.crawl4ai_base_url is not None  # noqa: S101  (settings validate it)
                 extractors.append(
-                    Crawl4AIExtractor(client, str(settings.crawl4ai_base_url), crawl4ai_token)
+                    Crawl4AIExtractor(services, str(settings.crawl4ai_base_url), crawl4ai_token)
                 )
-    return ExtractorChain(extractors, RobotsPolicy(client))
+    return ExtractorChain(extractors, RobotsPolicy(pages))

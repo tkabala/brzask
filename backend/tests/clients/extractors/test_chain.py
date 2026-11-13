@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
+import httpx2
 import pytest
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
@@ -215,3 +216,18 @@ def test_build_chain_follows_the_configured_order() -> None:
 
     assert [e.name for e in built.extractors] == ["jina", "feed", "crawl4ai"]
     assert built.robots is not None
+
+
+def test_pages_and_services_use_their_own_clients() -> None:
+    settings = ExtractorSettings.model_validate(
+        {"EXTRACTORS": "trafilatura,crawl4ai", "CRAWL4AI_BASE_URL": "http://10.0.0.7:11235"}
+    )
+    pages, services = httpx2.Client(), httpx2.Client()
+
+    built = build_chain(settings, pages, services)
+
+    trafilatura, crawl4ai = built.extractors
+    assert trafilatura.client is pages  # type: ignore[attr-defined]
+    assert built.robots.client is pages  # type: ignore[union-attr]
+    # A self-hosted extraction service may run on the owner's own network.
+    assert crawl4ai.client is services  # type: ignore[attr-defined]

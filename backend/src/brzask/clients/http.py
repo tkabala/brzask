@@ -28,6 +28,9 @@ REQUEST_ERRORS = (httpx2.HTTPError, httpx2.InvalidURL, UnicodeError, ResponseToo
 
 Resolver = Callable[[str, int], list[str]]
 
+# Ends every refusal; httpx2 keeps only the message of a connection error.
+NOT_PUBLIC = "is not public (ALLOWED_PRIVATE_NETWORKS)"
+
 
 def new_client(timeout: httpx2.Timeout) -> httpx2.Client:
     """For services the owner configured (LLM, search, extraction services),
@@ -41,6 +44,11 @@ def is_allowed(address: IPv4Address | IPv6Address, allowed: Sequence[Network]) -
     if isinstance(address, IPv6Address) and address.ipv4_mapped is not None:
         address = address.ipv4_mapped
     return address.is_global or any(address in network for network in allowed)
+
+
+def is_refused_address(error: Exception) -> bool:
+    """Whether a request failed because its address is not allowed."""
+    return isinstance(error, httpx2.ConnectError) and NOT_PUBLIC in str(error)
 
 
 def _resolve(host: str, port: int) -> list[str]:
@@ -77,9 +85,7 @@ class PublicOnlyBackend(httpcore2.SyncBackend):
             raise httpcore2.ConnectError(f"no address for {host}")
         for address in addresses:
             if not is_allowed(ip_address(address), self.allowed):
-                raise httpcore2.ConnectError(
-                    f"address {address} is not public (ALLOWED_PRIVATE_NETWORKS)"
-                )
+                raise httpcore2.ConnectError(f"address {address} {NOT_PUBLIC}")
         return super().connect_tcp(addresses[0], port, timeout, local_address, socket_options)
 
 

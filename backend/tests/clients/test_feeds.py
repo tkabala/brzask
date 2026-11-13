@@ -1,4 +1,7 @@
+import threading
 from datetime import UTC, datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from ipaddress import ip_network
 from pathlib import Path
 
 import httpx2
@@ -426,3 +429,48 @@ def test_a_block_page_is_judged_only_when_read_whole(scripts: int, temporary: bo
     result = server.fetcher().fetch(FeedRequest(f"{BASE}/feed.xml"))
 
     assert result.temporary is temporary
+
+
+# --- Addresses -----------------------------------------------------------------
+
+
+def test_a_refused_address_is_a_permanent_fetch_error() -> None:
+    fetcher = FeedFetcher(allowed=())
+    try:
+        result = fetcher.fetch(FeedRequest("http://127.0.0.1:9/feed"))
+    finally:
+        fetcher.close()
+
+    assert result.status is FetchStatus.FAILED
+    assert result.error is not None
+    assert "address 127.0.0.1 is not public (ALLOWED_PRIVATE_NETWORKS)" in result.error
+    # It will not start working by itself: the owner has to allow the network.
+    assert result.temporary is False
+
+
+def test_an_allowed_network_is_fetched() -> None:
+    body = (FIXTURES / "rss2.xml").read_bytes()
+
+    class Feed(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/rss+xml")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Feed)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    fetcher = FeedFetcher(allowed=[ip_network("127.0.0.0/8")])
+    try:
+        result = fetcher.fetch(FeedRequest(f"http://127.0.0.1:{httpd.server_port}/feed"))
+    finally:
+        fetcher.close()
+        httpd.shutdown()
+        httpd.server_close()
+
+    assert result.status is FetchStatus.OK
+    assert result.entries

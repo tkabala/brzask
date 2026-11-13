@@ -53,7 +53,7 @@ def embedder(settings: Settings, model: str) -> Iterator[DocumentEmbedder]:
 
 
 def get_feed_finder() -> FeedFinder:
-    return FeedFinder(FeedFetcher())
+    return FeedFinder(FeedFetcher.from_settings(get_settings().fetch))
 
 
 @contextmanager

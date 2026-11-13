@@ -15,7 +15,7 @@ from brzask.services.sources import SiteFeedFinder
 
 @contextmanager
 def _feed_finder() -> Iterator[SiteFeedFinder]:
-    finder = FeedFinder(FeedFetcher())
+    finder = FeedFinder(FeedFetcher.from_settings(get_settings().fetch))
     try:
         yield finder
     finally:

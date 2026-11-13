@@ -15,8 +15,9 @@ import feedparser
 import httpx2
 
 from brzask.clients.extractors.base import is_block_page
-from brzask.clients.http import REQUEST_ERRORS, USER_AGENT, read_limited
+from brzask.clients.http import REQUEST_ERRORS, is_refused_address, public_client, read_limited
 from brzask.concurrency import ContextThreadPoolExecutor
+from brzask.config.settings import FetchSettings, Network
 from brzask.log import get_logger
 from brzask.text import from_struct_time, strip_html
 from brzask.urls import is_http_url
@@ -98,16 +99,17 @@ class FeedFetcher:
         self,
         client: httpx2.Client | None = None,
         *,
+        allowed: Sequence[Network] = (),
         workers: int = WORKERS,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
-        self.client = client or httpx2.Client(
-            timeout=TIMEOUT,
-            follow_redirects=True,
-            headers={"User-Agent": USER_AGENT, "Accept": ACCEPT},
-        )
+        self.client = client or public_client(TIMEOUT, allowed, headers={"Accept": ACCEPT})
         self.workers = workers
         self._now = now
+
+    @classmethod
+    def from_settings(cls, settings: FetchSettings) -> "FeedFetcher":
+        return cls(allowed=settings.allowed_private_networks)
 
     def close(self) -> None:
         self.client.close()
@@ -271,6 +273,9 @@ def is_temporary(error: Exception) -> bool:
             # channel still goes dead through the longer rule for any failure.
             return True
         return status in {408, 429} or status >= 500
+    # A refused address stays refused until the owner allows its network.
+    if is_refused_address(error):
+        return False
     # A scheme httpx2 cannot speak (a redirect to ftp:) will not start working later.
     return isinstance(error, httpx2.TransportError) and not isinstance(
         error, httpx2.UnsupportedProtocol

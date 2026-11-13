@@ -10,7 +10,7 @@ from brzask.clients.embeddings import Embedder
 from brzask.clients.extractors import build_chain
 from brzask.clients.extractors.adapters import PAGE_TIMEOUT
 from brzask.clients.feeds import FeedFetcher
-from brzask.clients.http import new_client
+from brzask.clients.http import new_client, public_client
 from brzask.clients.judge import Judge, build_judge
 from brzask.clients.llm import LLMClient
 from brzask.config import get_settings
@@ -109,10 +109,12 @@ def run_digest(context: RunContext) -> None:
             active=model,
         )
     with ExitStack() as stack:
-        feeds = FeedFetcher()
+        feeds = FeedFetcher.from_settings(settings.fetch)
         stack.callback(feeds.close)
-        pages = new_client(PAGE_TIMEOUT)
+        pages = public_client(PAGE_TIMEOUT, settings.fetch.allowed_private_networks)
         stack.callback(pages.close)
+        services = new_client(PAGE_TIMEOUT)
+        stack.callback(services.close)
         llm = LLMClient.from_settings(settings.llm)
         stack.callback(llm.client.close)
         embedder = Embedder.from_settings(settings, model)
@@ -127,7 +129,7 @@ def run_digest(context: RunContext) -> None:
             DigestClients(
                 feeds=feeds,
                 llm=llm,
-                extractor=build_chain(settings.extractors, pages),
+                extractor=build_chain(settings.extractors, pages, services),
                 embedder=embedder,
                 language=prompts.language(settings.digest.language),
                 timezone=settings.scheduler.timezone,

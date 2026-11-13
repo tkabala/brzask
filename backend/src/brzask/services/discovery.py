@@ -412,7 +412,7 @@ def discover_sources(
 def run_discovery(context: RunContext) -> None:
     """Discovery with clients built from the settings."""
     settings = get_settings()
-    finder = FeedFinder(FeedFetcher())
+    finder = FeedFinder(FeedFetcher.from_settings(settings.fetch))
     judge = build_judge(settings)
     search = build_web_search(settings)
     try:

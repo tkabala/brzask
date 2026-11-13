@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 from brzask.clients.feed_finder import FeedFinder, FoundFeed
 from brzask.clients.feeds import FeedFetcher
+from brzask.config import get_settings
 from brzask.db.models import Article, SourceOrigin, SourceStatus
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository, SourceRepository
@@ -166,7 +167,7 @@ def propose_visited(context: RunContext, finder: FindsFeeds) -> None:
 
 def run_visited(context: RunContext) -> None:
     """The visited pipeline with a feed finder of its own."""
-    finder = FeedFinder(FeedFetcher())
+    finder = FeedFinder(FeedFetcher.from_settings(get_settings().fetch))
     try:
         propose_visited(context, finder)
     finally:
