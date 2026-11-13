@@ -75,6 +75,8 @@ class PoolConfig(_Section):
     max_age_days: PositiveInt = pool.MAX_AGE.days
     carry_over_days: PositiveInt = pool.CARRY_OVER.days
     cap: PositiveInt = pool.POOL_CAP
+    # Sources whose articles the pool never sees, as if muted before each day.
+    exclude_sources: tuple[PositiveInt, ...] = ()
 
 
 class RankingConfig(_Section):
@@ -201,6 +203,9 @@ class DayReplay:
     stats: dict[str, Any] = field(default_factory=dict)
     usage: list[CallUsage] = field(default_factory=list)
     error: str | None = None
+    # Opened articles of the real digest from excluded sources: what leaving
+    # them out certainly costs, whatever the model picks instead.
+    lost: list[str] = field(default_factory=list)
 
     @property
     def picked_opened(self) -> int:
@@ -229,10 +234,10 @@ def replay_pool(articles: Iterable[Article], at: datetime, config: PoolConfig) -
     """The pool a run started at `at` would have built from these stored articles.
 
     `articles` are those first seen in the carry-over window up to the run's
-    end and not shown before `at`; stale ones are dropped and the cap applied
-    as in a real run.
+    end and not shown before `at`; those of excluded sources, and stale ones,
+    are dropped and the cap applied as in a real run.
     """
-    stored = list(articles)
+    stored = [a for a in articles if a.source_id not in config.exclude_sources]
     sources = {a.source.id: FeedSource.of(a.source) for a in stored if a.source is not None}
     candidates, _ = carried_candidates(stored, sources)
     kept, _ = filter_candidates([], candidates, set(), at, timedelta(days=config.max_age_days))
@@ -295,6 +300,11 @@ def replay_day(
         ),
         shown=len(shown),
         shown_opened=sum(article.opened_at is not None for article in shown),
+        lost=[
+            article.title
+            for article in shown
+            if article.opened_at is not None and article.source_id in config.pool.exclude_sources
+        ],
     )
     if not candidates:
         return replace(result, error="no stored candidates")
@@ -428,6 +438,7 @@ def report(
                 "same": day.same,
                 "top_with_text": day.top_with_text,
                 "error": day.error,
+                "lost": day.lost,
                 "picks": [asdict(pick) for pick in day.picks],
                 "stats": day.stats,
             }

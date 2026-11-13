@@ -205,6 +205,7 @@ def test_the_report_has_every_day_and_pick(
         f"T {history[name].link}" for name in ("unshown", "fresh", "skipped")
     }
     assert day["stats"]["ranking"]["top"] == 3
+    assert day["lost"] == []
 
 
 def test_the_pool_drops_stale_articles_and_keeps_the_cap(session: Session, make: Factories) -> None:
@@ -219,6 +220,32 @@ def test_the_pool_drops_stale_articles_and_keeps_the_cap(session: Session, make:
     assert len(pool) == 3
     assert len(capped) == 2
     assert PoolConfig().cap == POOL_CAP
+
+
+def test_excluded_sources_leave_the_pool(session: Session, make: Factories) -> None:
+    kept, left_out = make.source("Kept"), make.source("Left out")
+    articles = [make.article(kept, published_at=NOW), make.article(left_out, published_at=NOW)]
+
+    pool = replay_pool(articles, NOW, PoolConfig(exclude_sources=(left_out.id,)))
+
+    assert [c.link for c in pool] == [articles[0].link]
+
+
+def test_a_day_names_the_opened_articles_an_exclusion_loses(
+    sessions: sessionmaker[Session], history: dict[str, Article]
+) -> None:
+    lobsters = history["opened"].source_id
+    assert lobsters is not None
+    config = ReplayConfig(pool=PoolConfig(exclude_sources=(lobsters,)))
+
+    first, second = replay(sessions, clients(FakeModel()), since=YESTERDAY, config=config)
+    plain = replay(sessions, clients(FakeModel()), since=YESTERDAY)
+
+    assert first.lost == ["Opened"]
+    assert second.lost == ["Fresh"]
+    # Only what the pool could still hold counts as openable.
+    assert first.opened_in_pool == 0
+    assert [day.lost for day in plain] == [[], []]
 
 
 def test_stored_text_and_vectors_of_the_same_model_are_used(
@@ -245,6 +272,7 @@ def test_config_from_toml(tmp_path: Path) -> None:
     path = tmp_path / "candidate.toml"
     path.write_text(
         'llm_model = "x/y"\n'
+        "[pool]\nexclude_sources = [3, 7]\n"
         "[ranking]\ntop_n = 20\n"
         "[deduplication]\ncross_day = 0.95\nsame_day = [0.85, 0.9]\n"
     )
@@ -252,6 +280,7 @@ def test_config_from_toml(tmp_path: Path) -> None:
     config = ReplayConfig.load(path)
 
     assert config.llm_model == "x/y"
+    assert config.pool.exclude_sources == (3, 7)
     assert config.limits().top_n == 20
     assert config.limits().max_per_source == 2  # left out: the digest's own value
     thresholds = config.thresholds()
@@ -309,6 +338,7 @@ def test_a_judge_config_without_a_judge_is_refused(
         ('[ranking]\nmethod = "votes"\n', "'llm' or 'judge'"),
         ('[deduplication]\nmethod = "votes"\n', "'threshold' or 'judge'"),
         ("[ranking]\ntop_n = 0\n", "greater than 0"),
+        ("[pool]\nexclude_sources = [0]\n", "exclude_sources"),
         ("[deduplication]\ncross_day = 0.95\n", "same_day"),
         ("[ranking\n", "Expected"),
     ],
