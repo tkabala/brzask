@@ -607,6 +607,13 @@ def test_run_rejects_unknown_pipelines(cli: Invoke) -> None:
     assert cli("run", "everything").exit_code == 2
 
 
+def test_run_points_a_replay_to_its_own_command(cli: Invoke) -> None:
+    result = cli("run", "replay")
+
+    assert result.exit_code == 2
+    assert "brzask replay" in result.stderr
+
+
 # --- replay --------------------------------------------------------------------
 
 

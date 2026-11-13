@@ -29,7 +29,7 @@ from brzask.cli.replay import replay_command
 from brzask.cli.setup import setup_command
 from brzask.config import get_settings
 from brzask.db import migrations
-from brzask.db.models import RunKind, RunStatus
+from brzask.db.models import PIPELINE_KINDS, RunKind, RunStatus
 from brzask.log import configure_logging
 from brzask.services import auth
 from brzask.services import pause as pausing
@@ -167,6 +167,10 @@ def run(
     ] = False,
 ) -> None:
     """Run a pipeline now, as the worker would."""
+    if pipeline not in PIPELINE_KINDS:
+        raise typer.BadParameter(
+            f"{pipeline.value} is not a pipeline; use `brzask replay`", param_hint="PIPELINE"
+        )
     with errors_as_messages():
         finished = run_pipeline(common.get_sessions(), pipeline, dry_run=dry_run, force=force)
     reason = finished.stats.get("reason")
