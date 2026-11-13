@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from brzask.clients.feed_finder import FoundFeed
+from brzask.clients.http import AddressNotAllowedError
 from brzask.db.models import ChangeStatus, SourceKind, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository, SourceRepository
 from brzask.services.errors import ConflictError, NotFoundError, ServiceError
@@ -10,6 +11,7 @@ from brzask.services.sources import (
     change_status,
     default_name,
     enable_source,
+    find_feed,
     find_source,
     is_release_feed,
     move_source,
@@ -430,3 +432,18 @@ def test_an_unchanged_note_records_nothing(session: Session, make: Factories) ->
     assert not set_note(session, source, "same", actor="user")
 
     assert ChangeRepository(session).find(limit=1) == []
+
+
+class RefusingFinder:
+    def find(self, url: str) -> FoundFeed | None:
+        raise AddressNotAllowedError("address 192.168.1.5 is not public (ALLOWED_PRIVATE_NETWORKS)")
+
+
+def test_find_feed_names_the_setting_for_a_refused_address() -> None:
+    with pytest.raises(NotFoundError) as error:
+        find_feed(RefusingFinder(), "http://nas.lan/feed")
+
+    assert str(error.value) == (
+        "http://nas.lan/feed: address 192.168.1.5 is not public; list its network in "
+        "ALLOWED_PRIVATE_NETWORKS to follow a feed on your own network"
+    )

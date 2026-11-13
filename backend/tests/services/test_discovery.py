@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FoundFeed
 from brzask.clients.feeds import FeedEntry
+from brzask.clients.http import AddressNotAllowedError
 from brzask.clients.judge import JudgeError, Judgement, ScoreAnswer, Text
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.clients.web_search import SearchResult, WebSearchError
@@ -639,3 +640,13 @@ def test_run_discovery_passes_the_spending_limits_and_time_zone(
 
     assert seen["budget"].monthly_usd == Decimal("2")
     assert str(seen["timezone"]) == "Europe/Warsaw"
+
+
+def test_a_refused_address_resolves_to_no_feed() -> None:
+    class Refusing(FakeFinder):
+        def find(self, url: str) -> FoundFeed | None:
+            raise AddressNotAllowedError(
+                "address 10.0.0.5 is not public (ALLOWED_PRIVATE_NETWORKS)"
+            )
+
+    assert discovery._resolve(Refusing({}), "http://10.0.0.5/feed") is None

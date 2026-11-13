@@ -46,6 +46,10 @@ def is_allowed(address: IPv4Address | IPv6Address, allowed: Sequence[Network]) -
     return address.is_global or any(address in network for network in allowed)
 
 
+class AddressNotAllowedError(Exception):
+    """A URL's host resolves to an address `public_client` refuses."""
+
+
 def is_refused_address(error: Exception) -> bool:
     """Whether a request failed because its address is not allowed."""
     return isinstance(error, httpx2.ConnectError) and NOT_PUBLIC in str(error)

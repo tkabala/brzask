@@ -22,6 +22,7 @@ from defusedxml.ElementTree import fromstring
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FoundFeed, with_scheme
+from brzask.clients.http import AddressNotAllowedError
 from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.db.models import Source, SourceOrigin, SourceStatus
 from brzask.log import get_logger
@@ -268,6 +269,8 @@ def _find(finder: SiteFeedFinder, outline: Outline, stopped: threading.Event) ->
         try:
             if (feed := finder.find(url)) is not None:
                 return feed
+        except AddressNotAllowedError as error:
+            log.info("feed not fetched", url=url, reason=str(error))
         except Exception:  # one odd URL must not stop the whole import
             if stopped.is_set():  # its client was closed after the deadline
                 return None

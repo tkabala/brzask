@@ -13,6 +13,7 @@ from brzask.clients.feed_finder import (
     youtube_channel_id,
 )
 from brzask.clients.feeds import FeedFetcher
+from brzask.clients.http import AddressNotAllowedError
 
 FEEDS = Path(__file__).parent.parent / "fixtures" / "feeds"
 RSS = (FEEDS / "rss2.xml").read_bytes()
@@ -470,3 +471,12 @@ def test_reddit_is_not_asked_for_a_feed(url: str) -> None:
 )
 def test_other_sites_may_have_feeds(url: str) -> None:
     assert without_feeds(url) is None
+
+
+def test_a_refused_address_is_reported_not_searched() -> None:
+    finder = FeedFinder(FeedFetcher(allowed=()))
+    try:
+        with pytest.raises(AddressNotAllowedError, match=r"address 127\.0\.0\.1 is not public"):
+            finder.find("http://127.0.0.1:9/blog/")
+    finally:
+        finder.close()

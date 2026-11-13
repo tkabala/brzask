@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 from brzask import prompts
 from brzask.clients.feed_finder import FeedFinder, FoundFeed
 from brzask.clients.feeds import FeedEntry, FeedFetcher
+from brzask.clients.http import AddressNotAllowedError
 from brzask.clients.judge import Judge, JudgeError, Score, build_judge
 from brzask.clients.usage import UsageMeter
 from brzask.clients.web_search import WebSearch, WebSearchError, build_web_search
@@ -432,7 +433,11 @@ def run_discovery(context: RunContext) -> None:
 
 
 def _resolve(finder: FindsSourceFeeds, url: str) -> FoundFeed | None:
-    found = finder.find(url)
+    try:
+        found = finder.find(url)
+    except AddressNotAllowedError as error:
+        log.info("site not fetched", url=url, reason=str(error))
+        return None
     return finder.upstream(found) if found is not None else None
 
 

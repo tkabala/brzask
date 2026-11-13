@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.feed_finder import FoundFeed
+from brzask.clients.http import AddressNotAllowedError
 from brzask.db.models import Article, ChangeStatus, Source, SourceOrigin, SourceStatus
 from brzask.repositories import ChangeRepository
 from brzask.services.visited import (
@@ -214,3 +215,33 @@ def test_two_videos_of_one_channel_propose_it_once(
     propose_visited(run, finder)
 
     assert run.stats["proposed"] == [{"host": "youtube.com/watch?v=1", "url": channel.url}]
+
+
+class RefusingFinder(FakeFinder):
+    def find(self, url: str) -> FoundFeed | None:
+        if "homelab.dev" in url:
+            self.asked.append(url)
+            raise AddressNotAllowedError(
+                "address 10.0.0.5 is not public (ALLOWED_PRIVATE_NETWORKS)"
+            )
+        return super().find(url)
+
+
+def test_a_refused_site_counts_as_one_without_a_feed(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    make.article(link="https://homelab.dev/a", opened_at=NOW - timedelta(days=1))
+    make.article(link="https://newsite.dev/a", opened_at=NOW - timedelta(days=2))
+    session.commit()
+    finder = RefusingFinder(
+        {
+            "https://newsite.dev/a": FoundFeed(
+                "https://newsite.dev/feed", "New", "https://newsite.dev"
+            )
+        }
+    )
+
+    propose_visited(context(sessions), finder)
+
+    assert finder.asked == ["https://homelab.dev/a", "https://newsite.dev/a"]
+    assert session.scalars(select(Source).where(Source.url == "https://newsite.dev/feed")).one()

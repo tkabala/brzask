@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from brzask.clients.feeds import FeedEntry, FeedFetcher, FeedRequest, FetchStatus
-from brzask.clients.http import REQUEST_ERRORS, read_limited
+from brzask.clients.http import NOT_PUBLIC, REQUEST_ERRORS, AddressNotAllowedError, read_limited
 from brzask.log import get_logger
 from brzask.urls import host_matches, host_of, is_http_url
 
@@ -75,7 +75,11 @@ class FeedFinder:
         self.fetcher.close()
 
     def find(self, url: str) -> FoundFeed | None:
-        """The feed for the site of `url`, or None when none can be found."""
+        """The feed for the site of `url`, or None when none can be found.
+
+        Raises `AddressNotAllowedError` when the host of `url` itself is
+        refused (`public_client`): no other URL on that site would be fetched.
+        """
         page = with_scheme(url)
         host = host_of(page)
         if not host:
@@ -94,7 +98,7 @@ class FeedFinder:
 
     def _site(self, page: str) -> FoundFeed | None:
         site_url = _origin(page)
-        found = self._feed(page, site_url)  # the URL may be the feed itself
+        found = self._feed(page, site_url, own_host=True)  # the URL may be the feed itself
         if found:
             return found
         html, final_url = self._download(page)
@@ -114,9 +118,12 @@ class FeedFinder:
         log.info("no feed found", url=page, tried=len(tried))
         return None
 
-    def _feed(self, url: str, site_url: str) -> FoundFeed | None:
+    def _feed(self, url: str, site_url: str, *, own_host: bool = False) -> FoundFeed | None:
         # Most candidates are expected to fail; that is not worth a warning.
         result = self.fetcher.fetch(FeedRequest(url), log_failure=False)
+        if own_host and result.error is not None and NOT_PUBLIC in result.error:
+            # The error reads "ConnectError: address ... is not public (...)".
+            raise AddressNotAllowedError(result.error.partition(": ")[2] or result.error)
         if result.status is not FetchStatus.OK or is_comment_feed(result.entries):
             return None
         return FoundFeed(url, result.title, site_url, tuple(result.entries))

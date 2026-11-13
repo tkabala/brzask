@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 from brzask.clients.feed_finder import FeedFinder, FoundFeed
 from brzask.clients.feeds import FeedFetcher
+from brzask.clients.http import AddressNotAllowedError
 from brzask.config import get_settings
 from brzask.db.models import Article, SourceOrigin, SourceStatus
 from brzask.log import get_logger
@@ -126,7 +127,11 @@ def propose_visited(context: RunContext, finder: FindsFeeds) -> None:
     without_feed: list[str] = []
     feeds: set[str] = set()
     for candidate in candidates:
-        found = finder.find(candidate.link)
+        try:
+            found = finder.find(candidate.link)
+        except AddressNotAllowedError as error:
+            log.info("site not fetched", url=candidate.link, reason=str(error))
+            found = None
         if found is None:
             without_feed.append(candidate.host)
             continue
