@@ -533,6 +533,15 @@ class BudgetSettings(SettingsGroup):
         description="Spending limit per calendar month in USD, counted and applied like "
         "LLM_BUDGET_DAILY_USD. Empty: no limit.",
     )
+    # A weekly tune-up starts one replay per proposed mute and a dry digest;
+    # ten leaves room for that. Not measured: it bounds a looping agent.
+    agent_runs_per_day: int = Field(
+        10,
+        ge=0,
+        validation_alias="AGENT_RUNS_PER_DAY",
+        description="Runs (dry digests, replays, real runs) agents may start over MCP per "
+        "day, all tokens together, whatever the spending limits; 0: none.",
+    )
 
 
 # A comma separates two targets only before another URL; inside one it lists

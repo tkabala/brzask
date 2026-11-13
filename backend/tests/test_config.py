@@ -544,3 +544,10 @@ def test_allowed_private_networks_reject_nonsense(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(ValidationError):
         FetchSettings()
+
+
+def test_agent_runs_per_day(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert BudgetSettings().agent_runs_per_day == 10
+    monkeypatch.setenv("AGENT_RUNS_PER_DAY", "-1")
+    with pytest.raises(ValidationError):
+        BudgetSettings()

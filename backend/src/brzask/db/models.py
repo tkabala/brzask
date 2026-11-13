@@ -247,6 +247,10 @@ class Run(Base):
         server_default=text("'{}'"), comment="Duration of each stage in milliseconds."
     )
     error: Mapped[str | None]
+    started_by: Mapped[str | None] = mapped_column(
+        comment="agent:<token name> for a run started over MCP; "
+        "empty for the scheduler and the CLI."
+    )
 
     __table_args__ = (Index(None, "kind", "started_at"),)
 

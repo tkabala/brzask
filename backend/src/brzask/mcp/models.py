@@ -241,6 +241,7 @@ class RunItem(BaseModel):
     started_at: datetime
     finished_at: datetime | None
     timings: dict[str, Any]
+    started_by: str | None = Field(description="agent:<token name>, or empty for the schedule.")
     external: RunExternal
 
     @classmethod
@@ -253,6 +254,7 @@ class RunItem(BaseModel):
             started_at=run.started_at,
             finished_at=run.finished_at,
             timings=run.timings,
+            started_by=run.started_by,
             external=RunExternal(stats=run.stats, error=run.error),
         )
 

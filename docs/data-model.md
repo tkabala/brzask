@@ -131,6 +131,8 @@ Every pipeline run (`digest`, `review`, `visited`, `discovery`) writes one row,
 and so does a replay an agent starts (`replay`, always a dry run), so that its
 cost counts towards the spending limits. A replay run is not a pipeline:
 nothing schedules it and the status page's pipelines leave it out.
+A run an agent started over MCP has `started_by` set to `agent:<token name>`,
+which `AGENT_RUNS_PER_DAY` counts; the scheduler and the CLI leave it empty.
 Its `id` is the same as the `run_id` in the logs, so a failed run can be traced
 from the status page to its log lines. `status` is `running`, `ok`, `skipped`
 (paused, or today's digest already exists) or `failed`. A process stopped

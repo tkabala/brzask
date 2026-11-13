@@ -20,12 +20,25 @@ class RunRepository:
         return self.session.get(Run, run_id)
 
     def start(
-        self, run_id: uuid.UUID, kind: RunKind, started_at: datetime, *, dry_run: bool = False
+        self,
+        run_id: uuid.UUID,
+        kind: RunKind,
+        started_at: datetime,
+        *,
+        dry_run: bool = False,
+        started_by: str | None = None,
     ) -> Run:
-        run = Run(id=run_id, kind=kind, started_at=started_at, dry_run=dry_run)
+        run = Run(
+            id=run_id, kind=kind, started_at=started_at, dry_run=dry_run, started_by=started_by
+        )
         self.session.add(run)
         self.session.flush()
         return run
+
+    def started_by_agents_since(self, since: datetime) -> int:
+        """How many runs an agent started at or after `since`."""
+        query = select(func.count()).where(Run.started_by.is_not(None), Run.started_at >= since)
+        return self.session.scalar(query) or 0
 
     def finish(
         self,

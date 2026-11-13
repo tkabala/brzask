@@ -90,6 +90,11 @@ def check_budget(
     return evaluate(settings, Spending(today, month, unpriced))
 
 
+def agent_runs_today(session: Session, now: datetime, tz: tzinfo) -> int:
+    """Runs agents started since local midnight, skipped and failed ones included."""
+    return RunRepository(session).started_by_agents_since(window_starts(now, tz)[0])
+
+
 def _limit(value: Decimal) -> str:
     """A limit as written, without trailing zeros: 0.05, 1, 20."""
     return f"{value.normalize():f}"

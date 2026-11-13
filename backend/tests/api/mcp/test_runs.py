@@ -308,3 +308,52 @@ async def test_start_run_cannot_start_a_replay(connect: Connect, write_token: st
         result = await client.call_tool("start_run", {"kind": "replay"})
 
     assert result.is_error
+
+
+async def test_agents_start_at_most_the_daily_number_of_runs(
+    connect: Connect,
+    read_token: str,
+    sessions: sessionmaker[Session],
+    session: Session,
+    make: Factories,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENT_RUNS_PER_DAY", "2")
+    for _ in range(2):
+        make.run(datetime.now(UTC), started_by="agent:reader")
+    session.commit()
+
+    async with connect(read_token) as client:
+        run = await client.call_tool("start_run", {"kind": "digest"})
+        replay = await client.call_tool("start_replay", {})
+
+    message = "agents started 2 runs today, the limit set by AGENT_RUNS_PER_DAY"
+    assert message in error_text(run)
+    assert message in error_text(replay)
+    with sessions() as s:
+        assert len(RunRepository(s).recent(5)) == 2
+
+
+async def test_no_runs_when_agents_may_start_none(
+    connect: Connect,
+    read_token: str,
+    sessions: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENT_RUNS_PER_DAY", "0")
+
+    async with connect(read_token) as client:
+        result = await client.call_tool("start_run", {"kind": "digest"})
+
+    assert "agents started 0 runs today" in error_text(result)
+
+
+async def test_a_run_records_the_agent_that_started_it(
+    connect: Connect, read_token: str, sessions: sessionmaker[Session]
+) -> None:
+    async with connect(read_token) as client:
+        started = data(await client.call_tool("start_run", {"kind": "digest"}))
+        await until(lambda: status_of(sessions, started["run_id"]) is RunStatus.OK)
+        run = data(await client.call_tool("get_run", {"run_id": started["run_id"]}))
+
+    assert run["started_by"] == "agent:reader"

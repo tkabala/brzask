@@ -133,6 +133,7 @@ class Factories:
         status: RunStatus = RunStatus.OK,
         dry_run: bool = False,
         error: str | None = None,
+        started_by: str | None = None,
     ) -> Run:
         """A finished run; `cost` fills its usage as a fully priced run reports it."""
         if stats is None:
@@ -158,5 +159,6 @@ class Factories:
                 dry_run=dry_run,
                 error=error,
                 stats=stats,
+                started_by=started_by,
             )
         )

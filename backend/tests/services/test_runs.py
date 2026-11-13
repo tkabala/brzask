@@ -385,3 +385,13 @@ def test_sweep_survives_an_unreachable_database() -> None:
         engine.dispose()
 
     assert any(log["event"] == "abandoned runs not checked" for log in logs)
+
+
+def test_run_pipeline_records_who_started_it(sessions: sessionmaker[Session]) -> None:
+    by_agent = run_pipeline(
+        sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed}, started_by="agent:t"
+    )
+    by_scheduler = run_pipeline(sessions, RunKind.REVIEW, pipelines={RunKind.REVIEW: succeed})
+
+    assert by_agent.started_by == "agent:t"
+    assert by_scheduler.started_by is None

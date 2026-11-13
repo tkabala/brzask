@@ -12,7 +12,7 @@ from brzask.db.models import RunKind
 from brzask.mcp.errors import service_errors
 from brzask.mcp.server import McpDeps, current_identity, require_write
 from brzask.repositories import SourceRepository
-from brzask.services.budget import check_budget
+from brzask.services.budget import agent_runs_today, check_budget
 from brzask.services.replay import MAX_DAYS, MAX_EXCLUDED
 
 
@@ -21,6 +21,21 @@ class StartedRun(BaseModel):
     kind: RunKind
     dry_run: bool
     status: Literal["running"] = "running"
+
+
+def _check_agent_runs(deps: McpDeps) -> None:
+    """Refuse a run past AGENT_RUNS_PER_DAY.
+
+    Counting and starting are not one transaction: two calls at the same
+    moment can both pass and go one run over, which a bound on a looping
+    agent can live with.
+    """
+    settings = get_settings()
+    limit = settings.budget.agent_runs_per_day
+    with deps.sessions() as session:
+        count = agent_runs_today(session, datetime.now(UTC), settings.scheduler.timezone)
+    if count >= limit:
+        raise ToolError(f"agents started {count} runs today, the limit set by AGENT_RUNS_PER_DAY")
 
 
 def register(server: MCPServer[Any], deps: McpDeps) -> None:
@@ -36,11 +51,11 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         cents); a read token may start one. A real run, or `force` (build today's
         digest again), needs a write token.
         """
-        if not dry_run or force:
-            require_write()
-        else:
-            current_identity()
-        run_id = deps.runs.start(RunKind(kind), dry_run=dry_run, force=force)
+        identity = require_write() if not dry_run or force else current_identity()
+        _check_agent_runs(deps)
+        run_id = deps.runs.start(
+            RunKind(kind), dry_run=dry_run, force=force, started_by=identity.actor
+        )
         return StartedRun(run_id=str(run_id), kind=RunKind(kind), dry_run=dry_run)
 
     @server.tool()
@@ -58,7 +73,7 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         $0.20 and 20 to 30 minutes for 14 days, counted towards the spending limits;
         any token may start one. A replay started while another runs is recorded as skipped.
         """
-        current_identity()
+        identity = current_identity()
         exclude = list(dict.fromkeys(exclude_source_ids or []))
         if len(exclude) > MAX_EXCLUDED:
             raise ToolError(f"leave out at most {MAX_EXCLUDED} sources at once")
@@ -72,7 +87,12 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
             )
         if budget is not None and budget.reason is not None:
             raise ToolError(budget.reason)
+        _check_agent_runs(deps)
         run_id = deps.runs.start(
-            RunKind.REPLAY, dry_run=True, force=False, pipeline=deps.replay(days, exclude)
+            RunKind.REPLAY,
+            dry_run=True,
+            force=False,
+            pipeline=deps.replay(days, exclude),
+            started_by=identity.actor,
         )
         return StartedRun(run_id=str(run_id), kind=RunKind.REPLAY, dry_run=True)

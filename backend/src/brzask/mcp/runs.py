@@ -41,7 +41,13 @@ class BackgroundRuns:
         self._closed = threading.Event()
 
     def start(
-        self, kind: RunKind, *, dry_run: bool, force: bool, pipeline: Pipeline | None = None
+        self,
+        kind: RunKind,
+        *,
+        dry_run: bool,
+        force: bool,
+        pipeline: Pipeline | None = None,
+        started_by: str | None = None,
     ) -> uuid.UUID:
         """Start a run and return its ID once its row exists (or after a few seconds).
 
@@ -55,7 +61,7 @@ class BackgroundRuns:
         context = contextvars.copy_context()
         thread = threading.Thread(
             target=context.run,
-            args=(self._run, kind, run_id, started, dry_run, force, pipelines),
+            args=(self._run, kind, run_id, started, dry_run, force, pipelines, started_by),
             name=f"agent-run-{kind.value}",
             daemon=True,
         )
@@ -82,6 +88,7 @@ class BackgroundRuns:
         dry_run: bool,
         force: bool,
         pipelines: Mapping[RunKind, Pipeline] | None,
+        started_by: str | None,
     ) -> None:
         try:
             with self._slots:
@@ -95,6 +102,7 @@ class BackgroundRuns:
                     pipelines=pipelines,
                     run_id=run_id,
                     started=started,
+                    started_by=started_by,
                 )
         except Exception:
             # Recorded on the run's row already; nobody is waiting for it here.

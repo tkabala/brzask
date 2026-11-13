@@ -8,7 +8,14 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from brzask.config.settings import BudgetSettings
-from brzask.services.budget import Spending, check_budget, evaluate, window_starts
+from brzask.db.models import RunStatus
+from brzask.services.budget import (
+    Spending,
+    agent_runs_today,
+    check_budget,
+    evaluate,
+    window_starts,
+)
 from tests.factories import Factories
 
 WARSAW = ZoneInfo("Europe/Warsaw")
@@ -98,3 +105,17 @@ def test_check_budget_counts_a_run_late_on_the_last_day_of_the_month(
     assert late is not None and late.over
     assert next_day is not None and not next_day.over
     assert next_day.spending.month == 0
+
+
+def test_agent_runs_today_counts_local_days_and_agents_only(
+    session: Session, make: Factories
+) -> None:
+    now = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)  # 10:00 in Warsaw
+    make.run(datetime(2026, 11, 12, 23, 30, tzinfo=UTC), started_by="agent:a")  # 00:30 local
+    make.run(
+        datetime(2026, 11, 13, 8, 0, tzinfo=UTC), started_by="agent:b", status=RunStatus.SKIPPED
+    )
+    make.run(datetime(2026, 11, 13, 8, 30, tzinfo=UTC))  # the scheduler
+    make.run(datetime(2026, 11, 12, 22, 30, tzinfo=UTC), started_by="agent:a")  # 23:30 yesterday
+
+    assert agent_runs_today(session, now, WARSAW) == 2

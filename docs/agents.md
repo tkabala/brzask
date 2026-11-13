@@ -60,7 +60,9 @@ source is muted or rejected, which keeps its articles and stops it from being
 proposed again. A dry run writes nothing but still calls the paid model APIs,
 a few cents for a digest, and a replay of 14 days about $0.20; runs and
 replays count towards the [spending limits](configuration.md#spending-limits),
-and a replay is refused once a limit is reached.
+and a replay is refused once a limit is reached. Whatever the limits, agents
+start at most `AGENT_RUNS_PER_DAY` runs a day (10 by default, all tokens
+together), so an agent caught in a loop cannot keep starting paid runs.
 
 Every change is logged as `agent:<token name>` and can be undone like any
 other ([Data model](data-model.md#change-log)):

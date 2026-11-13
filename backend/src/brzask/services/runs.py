@@ -139,11 +139,13 @@ def run_pipeline(
     notifier: Notifier | Literal[_Default.FROM_SETTINGS] | None = FROM_SETTINGS,
     run_id: uuid.UUID | None = None,
     started: threading.Event | None = None,
+    started_by: str | None = None,
 ) -> Run:
     """Run one pipeline and return its finished run row.
 
     `run_id` lets a caller that starts the run in the background know its ID
-    beforehand; `started` is set once the run's row is committed.
+    beforehand; `started` is set once the run's row is committed. `started_by`
+    names the agent that asked for the run.
 
     `pipelines` defaults to `brzask.services.pipelines.PIPELINES`, and the
     run's metrics go to `instruments` (the global meter provider's unless
@@ -183,7 +185,9 @@ def run_pipeline(
             instruments=instruments,
         )
         with sessions.begin() as session:
-            RunRepository(session).start(run_id, kind, context.started_at, dry_run=dry_run)
+            RunRepository(session).start(
+                run_id, kind, context.started_at, dry_run=dry_run, started_by=started_by
+            )
         if started is not None:
             started.set()
         if not acquired:
