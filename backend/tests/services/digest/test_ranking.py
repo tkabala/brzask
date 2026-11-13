@@ -155,8 +155,11 @@ def test_prompt_numbers_candidates_by_pool_position_and_summarises_opens() -> No
 
     text = ranking_prompt(pool, [{"topic": "Rust", "keywords": [], "notes": ""}], opens, now=NOW)
 
-    assert "1. [RELEASE] [Source 1] Article 1 (under a day old)\n   Notes\n" in text
-    assert "2. [Source 2] Article 2 (under a day old)\n" in text
+    assert (
+        "1. [RELEASE] <untrusted>[Source 1] Article 1</untrusted> (under a day old)\n"
+        "   <untrusted>Notes</untrusted>\n"
+    ) in text
+    assert "2. <untrusted>[Source 2] Article 2</untrusted> (under a day old)\n" in text
     assert "77." not in text
     assert f"- Opened {OPENED_TITLES - 1}\n" in text
     assert f"- Opened {OPENED_TITLES}\n" not in text
@@ -181,10 +184,10 @@ def test_prompt_gives_each_candidate_its_age_at_the_run_start() -> None:
 
     text = ranking_prompt(pool, [], [], now=NOW)
 
-    assert "1. [Source 1] Article 1 (8 days old)\n" in text
-    assert "2. [Source 2] Article 2 (1 day old)\n" in text
-    assert "3. [Source 3] Article 3\n" in text
-    assert "4. [Source 4] Article 4 (under a day old)\n" in text
+    assert "1. <untrusted>[Source 1] Article 1</untrusted> (8 days old)\n" in text
+    assert "2. <untrusted>[Source 2] Article 2</untrusted> (1 day old)\n" in text
+    assert "3. <untrusted>[Source 3] Article 3</untrusted>\n" in text
+    assert "4. <untrusted>[Source 4] Article 4</untrusted> (under a day old)\n" in text
     assert "lose most of their value" in text
 
 
@@ -263,7 +266,7 @@ def test_ages_are_taken_at_the_run_start(sessions: sessionmaker[Session]) -> Non
         context(sessions, dry_run=True, started_at=NOW + timedelta(days=3)), pool, model
     )
 
-    assert "1. [Source 1] Article 1 (5 days old)\n" in model.prompts[0]
+    assert "1. <untrusted>[Source 1] Article 1</untrusted> (5 days old)\n" in model.prompts[0]
 
 
 def test_a_dry_run_stores_no_ranks(

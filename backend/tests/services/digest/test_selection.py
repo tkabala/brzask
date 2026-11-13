@@ -155,11 +155,11 @@ def test_prompt_shows_the_text_cut_to_length_or_the_snippet() -> None:
 
     text = selection_prompt(candidates, [], POLISH)
 
-    assert "1. [Article 1](https://news.example/1)" in text
-    assert "x" * PROMPT_TEXT_CHARS + "\n" in text
+    assert "1. <untrusted>Article 1</untrusted>\n   Link: https://news.example/1\n" in text
+    assert "<untrusted>" + "x" * PROMPT_TEXT_CHARS + "</untrusted>\n" in text
     assert "x" * (PROMPT_TEXT_CHARS + 1) not in text
     assert "Published: 2026-10-18" in text
-    assert "   Only a snippet" in text
+    assert "   <untrusted>Only a snippet</untrusted>" in text
     assert "Published: unknown" in text
     assert "in Polish" in text
 
@@ -168,7 +168,7 @@ def test_prompt_marks_release_notes() -> None:
     text = selection_prompt([candidate(1, release=True), candidate(2)], [], ENGLISH)
 
     assert text.count("Release notes: yes") == 1
-    assert text.index("Release notes: yes") < text.index("2. [Article 2]")
+    assert text.index("Release notes: yes") < text.index("2. <untrusted>Article 2</untrusted>")
 
 
 class FakeModel:
@@ -230,8 +230,8 @@ def test_a_short_answer_is_topped_up_from_the_candidates_left(
     ]
     assert len(model.prompts) == 2
     assert "select exactly 4 articles" in model.prompts[1]
-    assert "https://news.example/1)" not in model.prompts[1]
-    assert "https://news.example/4)" in model.prompts[1]
+    assert "Link: https://news.example/1\n" not in model.prompts[1]
+    assert "Link: https://news.example/4\n" in model.prompts[1]
     assert run.stats["selection"]["picked"] == 7
     assert run.stats["selection"]["topped_up"] == 4
 
