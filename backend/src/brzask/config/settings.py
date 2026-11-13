@@ -276,6 +276,30 @@ Extractor = Literal["feed", "trafilatura", "jina", "firecrawl", "crawl4ai"]
 FIRECRAWL_CLOUD_URL = HttpUrl("https://api.firecrawl.dev")
 
 
+Network = IPv4Network | IPv6Network
+
+
+def _parse_networks(value: object) -> object:
+    items = _split_csv(value)
+    if isinstance(items, list):
+        return [ip_network(item, strict=False) if isinstance(item, str) else item for item in items]
+    return items
+
+
+class FetchSettings(SettingsGroup):
+    """Fetching feeds and the pages they link to."""
+
+    allowed_private_networks: Annotated[
+        list[Network], NoDecode, BeforeValidator(_parse_networks)
+    ] = Field(
+        [],
+        validation_alias="ALLOWED_PRIVATE_NETWORKS",
+        description="Comma-separated private networks (e.g. 192.168.1.0/24) that feeds "
+        "and article pages may be fetched from. Every other non-public address "
+        "(loopback, LAN, link-local, cloud metadata) is refused.",
+    )
+
+
 class ExtractorSettings(SettingsGroup):
     """Article text extraction."""
 
@@ -344,16 +368,6 @@ class WebSearchSettings(SettingsGroup):
         return self
 
 
-ProxyNetwork = IPv4Network | IPv6Network
-
-
-def _parse_networks(value: object) -> object:
-    items = _split_csv(value)
-    if isinstance(items, list):
-        return [ip_network(item, strict=False) if isinstance(item, str) else item for item in items]
-    return items
-
-
 class AuthSettings(SettingsGroup):
     """Authentication for the web UI and API."""
 
@@ -380,12 +394,10 @@ class AuthSettings(SettingsGroup):
         )
     )
     header: str = Field("Remote-User", description="Header with the user name (mode=header).")
-    trusted_proxies: Annotated[list[ProxyNetwork], NoDecode, BeforeValidator(_parse_networks)] = (
-        Field(
-            [],
-            validation_alias="TRUSTED_PROXIES",
-            description="Comma-separated proxy addresses or networks allowed to set the header.",
-        )
+    trusted_proxies: Annotated[list[Network], NoDecode, BeforeValidator(_parse_networks)] = Field(
+        [],
+        validation_alias="TRUSTED_PROXIES",
+        description="Comma-separated proxy addresses or networks allowed to set the header.",
     )
 
     @model_validator(mode="after")
@@ -615,6 +627,7 @@ GROUPS: tuple[type[SettingsGroup], ...] = (
     LLMSettings,
     EmbeddingSettings,
     JudgeSettings,
+    FetchSettings,
     ExtractorSettings,
     WebSearchSettings,
     AuthSettings,
@@ -649,6 +662,10 @@ class Settings:
     @cached_property
     def judge(self) -> JudgeSettings:
         return JudgeSettings()
+
+    @cached_property
+    def fetch(self) -> FetchSettings:
+        return FetchSettings()
 
     @cached_property
     def extractors(self) -> ExtractorSettings:

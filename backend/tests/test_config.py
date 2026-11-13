@@ -17,6 +17,7 @@ from brzask.config.settings import (
     DatabaseSettings,
     EmbeddingSettings,
     ExtractorSettings,
+    FetchSettings,
     LLMSettings,
     LoggingSettings,
     NotificationSettings,
@@ -521,3 +522,25 @@ def test_base_url_env_name(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert env_name(ServerSettings, "base_url") == "BASE_URL"
     assert ServerSettings().base_url is None
+
+
+def test_allowed_private_networks_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALLOWED_PRIVATE_NETWORKS", "192.168.1.0/24, 10.0.0.0/8")
+
+    assert FetchSettings().allowed_private_networks == [
+        ip_network("192.168.1.0/24"),
+        ip_network("10.0.0.0/8"),
+    ]
+
+
+def test_allowed_private_networks_default_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALLOWED_PRIVATE_NETWORKS", "")
+
+    assert FetchSettings().allowed_private_networks == []
+
+
+def test_allowed_private_networks_reject_nonsense(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALLOWED_PRIVATE_NETWORKS", "nonsense")
+
+    with pytest.raises(ValidationError):
+        FetchSettings()

@@ -57,6 +57,12 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 | `JUDGE_BASE_URL` | (none) | Base URL of the API; defaults to LLM_BASE_URL. |
 | `JUDGE_API_KEY` | secret | API key; defaults to LLM_API_KEY. |
 
+## Fetching feeds and the pages they link to
+
+| Variable | Default | Description |
+|---|---|---|
+| `ALLOWED_PRIVATE_NETWORKS` | (none) | Comma-separated private networks (e.g. 192.168.1.0/24) that feeds and article pages may be fetched from. Every other non-public address (loopback, LAN, link-local, cloud metadata) is refused. |
+
 ## Article text extraction
 
 | Variable | Default | Description |
