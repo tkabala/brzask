@@ -10,7 +10,7 @@ logged as `agent:<token name>`.
 """
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -33,6 +33,8 @@ from brzask.api.problems import problem_response
 from brzask.db.models import TokenScope
 from brzask.mcp.runs import BackgroundRuns
 from brzask.services import tokens
+from brzask.services.replay import replay_pipeline
+from brzask.services.runs import Pipeline
 
 INSTRUCTIONS = """\
 brzask builds a daily digest of 7 articles from the owner's RSS and Atom \
@@ -114,6 +116,7 @@ class McpDeps:
     sessions: sessionmaker[Session]
     clients: ApiClients
     runs: BackgroundRuns
+    replay: Callable[[int, Sequence[int]], Pipeline] = replay_pipeline  # days, sources left out
 
 
 def build_mcp(deps: McpDeps) -> MCPServer[Any]:

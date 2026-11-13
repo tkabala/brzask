@@ -13,7 +13,7 @@ also without it: proxies that strip the prefix and probes that never knew
 it reach the same routes.
 """
 
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -74,17 +74,22 @@ def create_app(
     server: ServerSettings | None = None,
     web_dir: Path | None = None,
     pipelines: Mapping[RunKind, Pipeline] | None = None,
+    replay: Callable[[int, Sequence[int]], Pipeline] | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
     reach outside services (embeddings, feed lookup) and `auth_settings` say who
     may use the API; `server` gives BASE_URL; all three come from the settings
     unless given. `web_dir` is the built web app to serve at `/`; without it only
-    the API is served. `pipelines` replaces the real ones for runs agents start."""
+    the API is served. `pipelines` replaces the real ones for runs agents start,
+    and `replay` the replay runs they start (days, sources left out)."""
     server = server or get_settings().server
     clients = clients or ApiClients()
     agent_runs = BackgroundRuns(sessions, pipelines)
-    mcp = build_mcp(McpDeps(sessions, clients, agent_runs))
+    deps = McpDeps(sessions, clients, agent_runs)
+    if replay is not None:
+        deps.replay = replay
+    mcp = build_mcp(deps)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:

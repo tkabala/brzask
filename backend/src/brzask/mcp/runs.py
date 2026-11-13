@@ -40,15 +40,22 @@ class BackgroundRuns:
         self._lock = threading.Lock()
         self._closed = threading.Event()
 
-    def start(self, kind: RunKind, *, dry_run: bool, force: bool) -> uuid.UUID:
-        """Start a run and return its ID once its row exists (or after a few seconds)."""
+    def start(
+        self, kind: RunKind, *, dry_run: bool, force: bool, pipeline: Pipeline | None = None
+    ) -> uuid.UUID:
+        """Start a run and return its ID once its row exists (or after a few seconds).
+
+        `pipeline` runs instead of the one of that kind, e.g. a replay built
+        for the agent's arguments.
+        """
+        pipelines = {kind: pipeline} if pipeline is not None else self.pipelines
         run_id = uuid.uuid4()
         started = threading.Event()
         # The caller's context (trace, log fields) goes with the run.
         context = contextvars.copy_context()
         thread = threading.Thread(
             target=context.run,
-            args=(self._run, kind, run_id, started, dry_run, force),
+            args=(self._run, kind, run_id, started, dry_run, force, pipelines),
             name=f"agent-run-{kind.value}",
             daemon=True,
         )
@@ -68,7 +75,13 @@ class BackgroundRuns:
             thread.join(max(0.0, deadline - time.monotonic()))
 
     def _run(
-        self, kind: RunKind, run_id: uuid.UUID, started: threading.Event, dry_run: bool, force: bool
+        self,
+        kind: RunKind,
+        run_id: uuid.UUID,
+        started: threading.Event,
+        dry_run: bool,
+        force: bool,
+        pipelines: Mapping[RunKind, Pipeline] | None,
     ) -> None:
         try:
             with self._slots:
@@ -79,7 +92,7 @@ class BackgroundRuns:
                     kind,
                     dry_run=dry_run,
                     force=force,
-                    pipelines=self.pipelines,
+                    pipelines=pipelines,
                     run_id=run_id,
                     started=started,
                 )
