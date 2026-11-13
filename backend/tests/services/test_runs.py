@@ -1,11 +1,12 @@
 import threading
 import uuid
+from contextlib import AbstractContextManager
 from datetime import UTC, date, datetime
 
 import pytest
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 from structlog.testing import capture_logs
 
@@ -13,6 +14,7 @@ from brzask.clients.usage import CallUsage
 from brzask.db.models import RunKind, RunStatus
 from brzask.db.session import create_db_engine, session_factory
 from brzask.repositories import RunRepository
+from brzask.services import runs as runs_module
 from brzask.services.errors import ServiceError
 from brzask.services.notify import Message
 from brzask.services.run_metrics import RunInstruments
@@ -368,6 +370,24 @@ def test_sweep_keeps_a_running_row_whose_lock_is_held(
     run = RunRepository(session).get(run_id)
     assert run is not None
     assert run.status is RunStatus.RUNNING
+
+
+def test_sweep_locks_only_pipelines_with_a_running_row(
+    sessions: sessionmaker[Session], session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    running_row(session, RunKind.REVIEW)
+    session.commit()
+    locked: list[RunKind] = []
+
+    def recording_lock(bind: Engine | Connection, kind: RunKind) -> AbstractContextManager[bool]:
+        locked.append(kind)
+        return pipeline_lock(bind, kind)
+
+    monkeypatch.setattr(runs_module, "pipeline_lock", recording_lock)
+    sweep_abandoned(sessions, NOW)
+
+    # A digest due while the process starts must not find its lock taken.
+    assert locked == [RunKind.REVIEW]
 
 
 def test_sweep_ignores_finished_runs(sessions: sessionmaker[Session], session: Session) -> None:

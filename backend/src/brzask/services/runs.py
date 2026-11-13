@@ -222,11 +222,16 @@ def sweep_abandoned(sessions: sessionmaker[Session], now: datetime) -> list[uuid
     period) cannot close its run. Its advisory lock went with its connection,
     so a running row whose pipeline lock is free has no process behind it. The
     lock is held while the rows are closed, so a new run cannot start between
-    the check and the update. A database error is logged, not raised.
+    the check and the update. Only pipelines with a running row are locked: a
+    scheduled run starting meanwhile would find its lock taken and be skipped.
+    A database error is logged, not raised.
     """
     swept: list[uuid.UUID] = []
     try:
-        for kind in RunKind:
+        with sessions() as session:
+            runs = RunRepository(session)
+            kinds = [kind for kind in RunKind if runs.running(kind)]
+        for kind in kinds:
             with pipeline_lock(session_bind(sessions), kind) as acquired:
                 if not acquired:
                     continue
