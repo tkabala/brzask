@@ -72,11 +72,12 @@ from brzask.services.runs import Pipeline, RunContext
 
 log = get_logger(__name__)
 
-# Bounds for a replay an agent starts (not measured): a month of digests costs
-# about $0.20 for both sides, and 50 sources is more than a week's review mutes.
+# Bounds for a replay an agent starts (limits, not measurements): 50 sources is
+# more than a week's review mutes. Measured on daily use (2026-11-13): 10 digest
+# days, both sides, took 53 calls, $0.149 and 36 minutes with 2 days at once.
 MAX_DAYS = 30
 MAX_EXCLUDED = 50
-REPLAY_WORKERS = 2  # days replayed at once in a replay run
+REPLAY_WORKERS = 4  # days replayed at once, as `brzask replay` does by default
 
 
 class _Section(BaseModel):

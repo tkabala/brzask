@@ -55,8 +55,8 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
         with and without the sources (`current`, `candidate`), and `per_day.lost`
         names opened articles of the real digests that came from them. It writes
         nothing but calls the LLM two or three times per day on each side, about
-        $0.10 for 14 days, counted towards the spending limits; any token may
-        start one. A replay started while another runs is recorded as skipped.
+        $0.20 and 20 to 30 minutes for 14 days, counted towards the spending limits;
+        any token may start one. A replay started while another runs is recorded as skipped.
         """
         current_identity()
         exclude = list(dict.fromkeys(exclude_source_ids or []))

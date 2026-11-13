@@ -58,7 +58,7 @@ only on a machine nobody else can reach.
 Settings, API keys and tokens are out of reach. Nothing is deleted: a
 source is muted or rejected, which keeps its articles and stops it from being
 proposed again. A dry run writes nothing but still calls the paid model APIs,
-a few cents for a digest, and a replay of 14 days about $0.10; runs and
+a few cents for a digest, and a replay of 14 days about $0.20; runs and
 replays count towards the [spending limits](configuration.md#spending-limits),
 and a replay is refused once a limit is reached.
 
@@ -112,8 +112,8 @@ report.
 The **weekly tune-up** looks at what was shown and opened over the week and
 the month, picks sources that were shown often and never opened (or have
 been failing for a week), and checks them with `start_replay`: it proposes
-a mute only when replaying the last 14 days without the source loses no
-opened article. It may also suggest up to three new sites on the topics you
+a mute only when no article you opened in the last 14 days' pools came from
+the source. It may also suggest up to three new sites on the topics you
 open. **Empty digest** walks today's digest run stage by stage (pause, pool,
 ranking, deduplication, selection, spending limit) and names the one that
 left the digest short. **Onboarding** asks what you want to read and drafts
