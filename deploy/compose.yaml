@@ -160,7 +160,7 @@ services:
   # --- observability profile ---------------------------------------------------
 
   otel-collector:
-    image: otel/opentelemetry-collector:0.164.0
+    image: otel/opentelemetry-collector:0.165.0
     profiles: [observability]
     restart: unless-stopped
     logging: *logging
@@ -172,7 +172,7 @@ services:
       - tempo
 
   prometheus:
-    image: prom/prometheus:v3.15.1
+    image: prom/prometheus:v3.16.0
     profiles: [observability]
     restart: unless-stopped
     logging: *logging
@@ -204,7 +204,7 @@ services:
       - tempo-data:/var/tempo
 
   grafana:
-    image: grafana/grafana:13.3.0
+    image: grafana/grafana:13.3.1
     profiles: [observability]
     restart: unless-stopped
     logging: *logging
