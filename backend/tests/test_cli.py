@@ -1,5 +1,6 @@
 import gzip
 import json
+import re
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import click
 import pytest
+import typer
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 from typer.testing import CliRunner, Result
@@ -146,6 +148,35 @@ def test_help_lists_the_commands() -> None:
     }.items():
         output = runner.invoke(app, [group, "--help"]).stdout
         assert all(command in output for command in commands)
+
+
+def _commands(
+    command: typer.core.TyperCommand | typer.core.TyperGroup, path: tuple[str, ...] = ()
+) -> Iterator[tuple[tuple[str, ...], typer.core.TyperCommand | typer.core.TyperGroup]]:
+    yield path, command
+    if isinstance(command, typer.core.TyperGroup):
+        for name, sub in command.commands.items():
+            assert isinstance(sub, typer.core.TyperCommand | typer.core.TyperGroup)
+            yield from _commands(sub, (*path, name))
+
+
+def test_help_keeps_bracketed_names() -> None:
+    # Rich reads `[pool]` as a style tag and drops it unless it is escaped.
+    checked = 0
+    root = typer.main.get_command(app)
+    assert isinstance(root, typer.core.TyperGroup)
+    for path, command in _commands(root):
+        names = {
+            name
+            for param in command.params
+            for name in re.findall(r"\[[\w.]+\]", getattr(param, "help", None) or "")
+        }
+        if not names:
+            continue
+        output = runner.invoke(app, [*path, "--help"], env={"COLUMNS": "200"}).stdout
+        assert all(name in output for name in names), (path, names)
+        checked += 1
+    assert checked  # the replay command has some
 
 
 # --- notify --------------------------------------------------------------------

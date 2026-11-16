@@ -31,9 +31,10 @@ def replay_command(
         Path | None,
         typer.Option(
             "--config",
-            help="TOML file with the values to try: llm_model, judge_model, [pool], "
-            "[ranking] (method = judge, [ranking.weights]), [deduplication] "
-            "(method = judge), [selection].",
+            # Escaped: Rich would read `[pool]` as a style tag and drop it.
+            help="TOML file with the values to try: llm_model, judge_model, \\[pool], "
+            "\\[ranking] (method = judge, \\[ranking.weights]), \\[deduplication] "
+            "(method = judge), \\[selection].",
         ),
     ] = None,
     prompt_dir: Annotated[
