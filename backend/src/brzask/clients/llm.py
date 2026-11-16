@@ -111,30 +111,33 @@ class LLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        def attempt() -> tuple[str, CallUsage, dict[str, Any]]:
+        def attempt() -> tuple[str, CallUsage]:
             started = time.perf_counter()
             response = self._create(messages, json_mode=json_mode)
             content = _content(response)
             usage = _usage(response, self.model, purpose, started)
-            return content, usage, _call_details(response, content)
+            # Every answer is paid for and logged, also one retried below.
+            if meter is not None:
+                meter.add(usage)
+            log.info(
+                "llm call",
+                purpose=purpose,
+                model=usage.model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cost_usd=usage.cost_usd,
+                duration_ms=usage.duration_ms,
+                **_call_details(response, content),
+            )
+            if json_mode and _is_empty_json(content):
+                raise EmptyResponseError("empty JSON answer")
+            return content, usage
 
         with api_call_span("chat", self.model, purpose) as span:
-            content, usage, details = call_with_retries(
+            content, usage = call_with_retries(
                 attempt, purpose=purpose, error=LLMError, sleep=self._sleep
             )
             span.record(usage)
-        if meter is not None:
-            meter.add(usage)
-        log.info(
-            "llm call",
-            purpose=purpose,
-            model=usage.model,
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            cost_usd=usage.cost_usd,
-            duration_ms=usage.duration_ms,
-            **details,
-        )
         return Completion(content, usage)
 
     def complete_json(
@@ -171,6 +174,22 @@ def _content(response: ChatCompletion) -> str:
         error = (response.model_extra or {}).get("error")
         raise EmptyResponseError(f"empty answer{f': {error}' if error else ''}")
     return content
+
+
+def _is_empty_json(content: str) -> bool:
+    """Whether a JSON-mode answer is an empty object or array, which no caller can use.
+
+    In a 30-day replay of daily digests on deepseek-v4-flash through OpenRouter,
+    one provider answered `{}` within 2 s and without reasoning to 3 of the 3
+    ranking and selection calls routed to it (the others: 0 of 62); in text
+    mode it answered the same prompt in full. Asked again, the call usually
+    goes to another provider.
+    """
+    try:
+        value = parse_json(content)
+    except InvalidJSONError:
+        return False
+    return isinstance(value, dict | list) and not value
 
 
 def _call_details(response: ChatCompletion, content: str) -> dict[str, Any]:

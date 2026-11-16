@@ -274,6 +274,47 @@ def test_client_errors_are_not_retried(status: int) -> None:
     assert fake.sleeps == []
 
 
+@pytest.mark.parametrize("empty", ["{}", "[]", " { } ", "```json\n{}\n```"])
+def test_an_empty_json_answer_is_retried_and_paid_for(empty: str) -> None:
+    fake = Fake(answer(empty), answer('{"ranking": [2, 1]}'))
+    meter = UsageMeter()
+
+    with capture_logs() as logs:
+        value, _ = fake.llm.complete_json("Rank", purpose="ranking", meter=meter)
+
+    assert value == {"ranking": [2, 1]}
+    assert len(fake.requests) == 2
+    assert len(fake.sleeps) == 1
+    assert len(meter.calls) == 2  # the empty answer was paid for, so it is counted
+    events = [entry["event"] for entry in logs]
+    assert events == ["llm call", "api call failed, retrying", "llm call"]
+
+
+def test_empty_json_every_time_gives_up() -> None:
+    fake = Fake(*[answer("{}") for _ in range(ATTEMPTS)])
+    meter = UsageMeter()
+
+    with pytest.raises(LLMError, match=f"selection: gave up after {ATTEMPTS} attempts"):
+        fake.llm.complete_json("Pick", purpose="selection", meter=meter)
+
+    assert len(meter.calls) == ATTEMPTS
+
+
+@pytest.mark.parametrize("content", ['{"ranking": []}', "[0]", "not json"])
+def test_only_an_empty_json_value_counts_as_empty(content: str) -> None:
+    fake = Fake(answer(content))
+
+    assert fake.llm.complete("p", purpose="test", json_mode=True).content == content
+    assert len(fake.requests) == 1
+
+
+def test_an_empty_object_outside_json_mode_is_an_answer() -> None:
+    fake = Fake(answer("{}"))
+
+    assert fake.llm.complete("p", purpose="test").content == "{}"
+    assert len(fake.requests) == 1
+
+
 def test_an_error_body_with_status_200_is_retried_and_reported() -> None:
     body = {"error": {"message": "upstream provider failed", "code": 502}}
     fake = Fake(*[httpx2.Response(200, json=body) for _ in range(ATTEMPTS)])

@@ -86,7 +86,8 @@ flowchart LR
 - **Repositories** own every query, with the typed SQLAlchemy ORM
   ([ADR 0019](decisions/0019-typed-sqlalchemy-and-raw-sql-only-where-needed.md)).
 - **Clients** talk to the outside: one OpenAI-compatible client per role,
-  with retries and usage metering, and an extractor chain tried in the order
+  with retries (also of a JSON-mode answer that is only `{}` or `[]`) and
+  usage metering of every answer paid for, and an extractor chain tried in the order
   of `EXTRACTORS`.
 
 ## The daily digest
