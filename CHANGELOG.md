@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/tkabala/brzask/compare/v0.3.0...v0.3.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **cli:** show the table names in `brzask replay --help` ([a3d9159](https://github.com/tkabala/brzask/commit/a3d91591c40f46f630a3920a5a9aff6ad15f2f44))
+* **llm:** ask again when a JSON-mode answer is empty ([d4016cf](https://github.com/tkabala/brzask/commit/d4016cfaddfb3e99cad53736ac4adfb50fb92ecd))
+
 ## [0.3.0](https://github.com/tkabala/brzask/compare/v0.2.0...v0.3.0) (2026-11-13)
 
 
