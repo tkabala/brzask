@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.3.0](https://github.com/tkabala/brzask/compare/v0.2.0...v0.3.0) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fetch:** feeds and pages on loopback, LAN or other private addresses are no longer fetched unless their network is listed in ALLOWED_PRIVATE_NETWORKS.
+
+### Features
+
+* **api:** list, approve and reject proposed changes ([de31d45](https://github.com/tkabala/brzask/commit/de31d4596ad31cfbd80d7de949680955152cb34b))
+* **changes:** propose, approve and reject changes ([289dd47](https://github.com/tkabala/brzask/commit/289dd47b381baa4ff1826e711402305f50bf631a))
+* **config:** keep a long note from hiding what a change did ([9dc982c](https://github.com/tkabala/brzask/commit/9dc982c58ef702dc21720d981e5e76c83c6f53c7))
+* **config:** list changes and roll one back from the CLI ([52af153](https://github.com/tkabala/brzask/commit/52af1537ae67ea85b51c0539147d8c1331eb6adc))
+* **config:** roll back added sources, interests and pauses ([907ad4b](https://github.com/tkabala/brzask/commit/907ad4becd1c9612762ac9a6ea6a6d2080b812f3))
+* **config:** roll back source status changes and renames ([6ebb7ef](https://github.com/tkabala/brzask/commit/6ebb7efd32cad9846a8e9bf9a081880a82aed774))
+* **fetch:** guard feeds, feed discovery, pages and robots ([cd565db](https://github.com/tkabala/brzask/commit/cd565dbb4084cd899e3618dccaadc893ede5e4cb))
+* **fetch:** refuse non-public addresses for third-party URLs ([a1aeae1](https://github.com/tkabala/brzask/commit/a1aeae161c65a50ea46f68dbf0fb373740810ef9))
+* **mcp:** cap the runs agents start per day ([ee77233](https://github.com/tkabala/brzask/commit/ee7723354ed4d44a1fa9e5a8fb307e1a09036ce9))
+* **mcp:** changes by propose tokens wait for approval ([39a5c50](https://github.com/tkabala/brzask/commit/39a5c50db049e4e92ff291e050af52b9dd0cd6c3))
+* **mcp:** read tools for digests, sources, runs and costs ([2da5b5f](https://github.com/tkabala/brzask/commit/2da5b5f5e4eff70fa873842cae82ac341a262348))
+* **mcp:** serve an MCP endpoint for API tokens ([0f023af](https://github.com/tkabala/brzask/commit/0f023af9875f5051130804d59c368e2a00f549fd))
+* **mcp:** start pipeline runs in the background ([c470bad](https://github.com/tkabala/brzask/commit/c470badbbf08448d6c8289eac6ce73d9ee086f1b))
+* **mcp:** start_replay checks a mute against past digests ([508fc5a](https://github.com/tkabala/brzask/commit/508fc5aae6cc694e154a573031de547bb46555a4))
+* **mcp:** write tools for sources, interests and pauses ([c2e6f92](https://github.com/tkabala/brzask/commit/c2e6f9224d55b6f346eb6f42fb8c8886f92c8f86))
+* **prompts:** mark third-party text as data in ranking, selection and judge prompts ([84d93ce](https://github.com/tkabala/brzask/commit/84d93ce0b3d9e6086b0d716909f564d7d68b1885))
+* **replay:** a replay run comparing the setup with sources left out ([ef92fe0](https://github.com/tkabala/brzask/commit/ef92fe07ff830c869eac2bdfe51015880ed91f77))
+* **replay:** leave out given sources and name the opens that loses ([35fc2fa](https://github.com/tkabala/brzask/commit/35fc2fa337e99030534e5293f3f6ea0322d5afde))
+* **runs:** finish runs left behind by a stopped process ([8161139](https://github.com/tkabala/brzask/commit/8161139536f56c4199d4687aadf894278f4b81bc))
+* **runs:** record replays as runs of their own kind ([00f5595](https://github.com/tkabala/brzask/commit/00f5595cdd8ccf90f0335ba5569e32719b9dec09))
+* **skills:** weekly tune-up, empty digest, onboarding and explain pick ([abf3204](https://github.com/tkabala/brzask/commit/abf3204fd54602710a7e9990d6966fbe221ac8bf))
+* **sources:** change a source's note on its own ([2efa8b5](https://github.com/tkabala/brzask/commit/2efa8b5fdc84fe4683f66cc1e8e07a3ef45c35b0))
+* **sources:** refuse Reddit links when finding feeds ([5588b93](https://github.com/tkabala/brzask/commit/5588b9301f50f28d0d13fec9bdd3bc2755af336c))
+* **stats:** count shown and opened articles by source and topic ([3850dce](https://github.com/tkabala/brzask/commit/3850dce761822b2b647371c26e70d53db8ff1f51))
+* **tokens:** add a propose scope ([bb32e8c](https://github.com/tkabala/brzask/commit/bb32e8c026a8efa9d12d9f1fa5336791dd5ab18e))
+* **web:** approve or reject proposed changes ([648e4f1](https://github.com/tkabala/brzask/commit/648e4f1e23903c6a2c4835b2e924908aac4b0584))
+
+
+### Bug Fixes
+
+* **cli:** name an approved or rejected addition without an ID ([14b51ce](https://github.com/tkabala/brzask/commit/14b51ce9eb57bbc39c4dbbdd4a39d1dcd4e0ed8c))
+* **cli:** refuse `brzask run replay` and point to `brzask replay` ([9d10e89](https://github.com/tkabala/brzask/commit/9d10e897eb6c1c250a9b0f6f348685680a1476ff))
+* **config:** refuse malformed change records and tidy the history table ([372f80e](https://github.com/tkabala/brzask/commit/372f80ed205cdc5bf471d986fb2c3c2358c3c682))
+* **fetch:** count queued agent runs, try every address, drop links with spaces ([9dc73d8](https://github.com/tkabala/brzask/commit/9dc73d873f87002f6584d1dada2db365c0625b84))
+* **fetch:** judge NAT64 addresses by the IPv4 address they carry ([97f468a](https://github.com/tkabala/brzask/commit/97f468aa86bb79e818c8e40a638cbee3ec77a970))
+* **mcp:** find a day's real digest run for its dedup decisions ([02fa4ed](https://github.com/tkabala/brzask/commit/02fa4edfae27acc3d0570dd6e7c4cc146d8f9d34))
+* **mcp:** let the API stop during a run and keep pipeline notes external ([53d2341](https://github.com/tkabala/brzask/commit/53d2341292566464f74bf77e2425367fcc896b76))
+* **mcp:** say when a run waits for a slot, refuse replays leaving nothing out ([56dd320](https://github.com/tkabala/brzask/commit/56dd320b3f0df18f3ad97a07ac2b0e501bbe63ca))
+* **replay:** compare the same days on both sides and name each lost source ([5803984](https://github.com/tkabala/brzask/commit/5803984bde256c208ac557613fb167f991ccf260))
+* **replay:** keep a mute on what the pools held, not on the model's picks ([f140edd](https://github.com/tkabala/brzask/commit/f140edd460ba7b2eb1f30392e964c1d1875255a0))
+* **rollback:** keep a note edited after a status change ([5af740c](https://github.com/tkabala/brzask/commit/5af740c84ff94e9f4777a0873260697501834791))
+* **runs:** lock only pipelines with a running row when sweeping ([e5a7b93](https://github.com/tkabala/brzask/commit/e5a7b93139f9d21a3f67146e0c2c7ae6219531fe))
+* **sources:** say why a feed on a private address is not added ([5536974](https://github.com/tkabala/brzask/commit/5536974e65f8e5c0a4d57eb665090d0791de0380))
+* **web:** headings in order and only the fields a change sets ([6dcf4af](https://github.com/tkabala/brzask/commit/6dcf4af9faa6e7499f00bdd7c3e007d5bf36e0ee))
+* **web:** refresh what an approval changed and keep each decision busy ([72a4e67](https://github.com/tkabala/brzask/commit/72a4e67e133edac0dbb5b1bb19d319c7cd4d7709))
+* **web:** send no reads after logging out ([13624de](https://github.com/tkabala/brzask/commit/13624de5567e925de6784e14794049c4b3bb32ab))
+
+
+### Documentation
+
+* agent skills and replay runs ([d3bef48](https://github.com/tkabala/brzask/commit/d3bef48e63c170cda8bf905010e5dcebe2105f84))
+* approval of agent changes ([abda4ac](https://github.com/tkabala/brzask/commit/abda4aca7d657d1f4cce81237ce6aee1ec86e714))
+* connect an agent over MCP ([9bef6da](https://github.com/tkabala/brzask/commit/9bef6da9747c1212cce26d2772c1793bf1510218))
+* decide how third-party text and fetches are bounded ([dbf7147](https://github.com/tkabala/brzask/commit/dbf7147b58ce0209179ce0baa8d8b82d2a10bd5b))
+
 ## [0.2.0](https://github.com/tkabala/brzask/compare/v0.1.16...v0.2.0) (2026-11-06)
 
 
