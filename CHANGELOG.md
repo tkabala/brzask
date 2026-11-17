@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.4.0](https://github.com/tkabala/brzask/compare/v0.3.1...v0.4.0) (2026-11-17)
+
+
+### Features
+
+* **api:** serve briefs and record their views ([26e9df1](https://github.com/tkabala/brzask/commit/26e9df1e67cce1b20ef1924dc5a39b7f812929d9))
+* **digest:** keep the full text of picked articles ([9a178eb](https://github.com/tkabala/brzask/commit/9a178ebc9adbce690bd8e5bde5f5f22718dbfefd))
+* **digest:** write a brief for every picked article ([e29d796](https://github.com/tkabala/brzask/commit/e29d796f122d25fac7711871ca3b255a988ebe48))
+* **extract:** read YouTube videos from their captions ([8da363a](https://github.com/tkabala/brzask/commit/8da363a54d79564d6125a07061dfa8c9d40193a9))
+* **fetch:** tunnel third-party fetches through FETCH_PROXY ([3821cbb](https://github.com/tkabala/brzask/commit/3821cbb2c952c9e855c4c1717d62e9669345ec60))
+* **opens:** count a brief view as a preference signal ([53cae42](https://github.com/tkabala/brzask/commit/53cae42269990cae3f9f60c05299d6a78417e3a5))
+* **web:** read an article's brief in the app ([c3b4199](https://github.com/tkabala/brzask/commit/c3b4199aaa73828c5211699f7286b4b4b661c3ce))
+
+
+### Bug Fixes
+
+* **digest:** ask again for briefs whose points are not text ([ef26600](https://github.com/tkabala/brzask/commit/ef26600d42a79a484db0971172443f27d589dc74))
+* **digest:** skip empty briefs and junk pages, never invent dates ([1001e84](https://github.com/tkabala/brzask/commit/1001e84bd58b62ec538a1a9f386a00b12ad251a1))
+* **extract:** keep caption errors inside the extractor ([7ff2d70](https://github.com/tkabala/brzask/commit/7ff2d70ac1e9b57ce19561fe5b8da6f8539ae99f))
+* **extract:** keep captions off environment proxies ([1645927](https://github.com/tkabala/brzask/commit/164592771a191e2c6349a20aed3f5cc91906c761))
+* **visited:** say read, not opened, in a proposed source's note ([91f120b](https://github.com/tkabala/brzask/commit/91f120bff09e14aa1790f90b709bd7c0bed6f5ad))
+* **web:** open a brief's links in the background and show offline state ([afc3b2f](https://github.com/tkabala/brzask/commit/afc3b2f10678a7d505d54baf0220616d6e0c51e3))
+
+
+### Documentation
+
+* **install:** run the fetch proxy safely with tinyproxy ([015ca94](https://github.com/tkabala/brzask/commit/015ca943b3619b530b350e1c8621946b46172696))
+
 ## [0.3.1](https://github.com/tkabala/brzask/compare/v0.3.0...v0.3.1) (2026-11-16)
 
 
