@@ -17,7 +17,7 @@ from brzask.clients.extractors.base import (
     from_headline,
     unusable_reason,
 )
-from brzask.clients.extractors.rules import DOMAIN_RULES, DomainRule, rule_for
+from brzask.clients.extractors.rules import DOMAIN_RULES, DomainRule, rules_allow
 from brzask.log import get_logger
 from brzask.text import strip_html
 from brzask.urls import host_of
@@ -87,11 +87,10 @@ class ExtractorChain:
 
     def extract(self, item: ExtractionInput) -> ExtractionResult:
         host = host_of(item.url)
-        rule = rule_for(host, self.rules)
         attempts: list[Attempt] = []
         robots_allowed: bool | None = None
         for extractor in self.extractors:
-            if rule is not None and extractor.name not in rule.only:
+            if not rules_allow(extractor.name, host, self.rules):
                 attempts.append(self._record(extractor.name, host, Outcome.SKIPPED_RULE))
                 continue
             if extractor.fetches_page and self.robots is not None:

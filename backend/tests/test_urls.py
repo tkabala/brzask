@@ -1,6 +1,6 @@
 import pytest
 
-from brzask.urls import feed_key, host_matches, host_of, is_http_url, item_key
+from brzask.urls import feed_key, host_matches, host_of, is_http_url, item_key, youtube_video_id
 
 
 @pytest.mark.parametrize(
@@ -105,3 +105,25 @@ def test_item_keys_tell_items_apart(first: str, second: str) -> None:
 
 def test_an_item_key_of_a_malformed_link_is_the_link() -> None:
     assert item_key(" http://[oops ") == "http://[oops"
+
+
+@pytest.mark.parametrize(
+    ("url", "video_id"),
+    [
+        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+        ("https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ&t=5s", "dQw4w9WgXcQ"),
+        ("https://www.youtube.com/shorts/EMIRXv2iE_Q", "EMIRXv2iE_Q"),
+        ("https://www.youtube.com/live/CKFUx7COIwQ?si=x", "CKFUx7COIwQ"),
+        ("https://www.youtube-nocookie.com/embed/CKFUx7COIwQ", None),
+        ("https://www.youtube.com/embed/CKFUx7COIwQ", "CKFUx7COIwQ"),
+        ("https://youtu.be/CKFUx7COIwQ?t=5", "CKFUx7COIwQ"),
+        ("https://www.youtube.com/@example/videos", None),
+        ("https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv", None),
+        ("https://www.youtube.com/watch?v=tooshort", None),
+        ("https://www.youtube.com/watch?v=dQw4w9WgXcQextra", None),
+        ("https://example.com/watch?v=dQw4w9WgXcQ", None),
+        ("https://[oops/watch?v=dQw4w9WgXcQ", None),
+    ],
+)
+def test_youtube_video_id(url: str, video_id: str | None) -> None:
+    assert youtube_video_id(url) == video_id

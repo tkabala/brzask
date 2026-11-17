@@ -88,7 +88,7 @@ flowchart LR
 - **Clients** talk to the outside: one OpenAI-compatible client per role,
   with retries (also of a JSON-mode answer that is only `{}` or `[]`) and
   usage metering of every answer paid for, and an extractor chain tried in the order
-  of `EXTRACTORS`.
+  of `EXTRACTORS`, after a reader of YouTube captions that handles videos only.
 
 ## The daily digest
 

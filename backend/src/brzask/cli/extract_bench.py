@@ -90,7 +90,7 @@ def extract_bench_command(
         services = new_client(PAGE_TIMEOUT)
         stack.callback(services.close)
         items = with_feed_content(items, feeds)
-        chain = build_chain(bench_settings, client, services)
+        chain = build_chain(bench_settings, client, services, fetch.proxy_target())
         intervals = {"jina": JINA_KEYLESS_INTERVAL} if settings.jina_api_key is None else {}
         attempts = run_bench(items, chain.extractors, RobotsPolicy(client), workers, intervals)
 

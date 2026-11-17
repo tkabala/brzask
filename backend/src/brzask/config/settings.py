@@ -313,7 +313,8 @@ class FetchSettings(SettingsGroup):
         "only http:// and socks5:// proxies are supported (not https://). brzask still "
         "resolves each host and refuses non-public addresses itself, then asks the proxy "
         "for a tunnel to the checked IP address, so the proxy must allow CONNECT to ports "
-        "80 and 443. Services you configure (LLM, embeddings, search, extraction services, "
+        "80 and 443. YouTube captions go through it too, asked for by host name. "
+        "Services you configure (LLM, embeddings, search, extraction services, "
         "notifications) are always reached directly. Empty: no proxy.",
     )
 
@@ -335,7 +336,8 @@ class ExtractorSettings(SettingsGroup):
     extractors: Annotated[list[Extractor], *CommaList] = Field(
         ["feed", "trafilatura", "jina"],
         validation_alias="EXTRACTORS",
-        description="Extractors tried in order; the feed snippet is the final fallback.",
+        description="Extractors tried in order; the feed snippet is the final fallback. "
+        "YouTube videos are read from their captions before any of them.",
     )
     jina_api_key: OptionalSecret = Field(
         None, description="Jina Reader API key; optional, raises rate limits."

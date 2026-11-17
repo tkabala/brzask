@@ -148,7 +148,9 @@ def run_digest(context: RunContext) -> None:
             DigestClients(
                 feeds=feeds,
                 llm=llm,
-                extractor=build_chain(settings.extractors, pages, services),
+                extractor=build_chain(
+                    settings.extractors, pages, services, settings.fetch.proxy_target()
+                ),
                 embedder=embedder,
                 language=prompts.language(settings.digest.language),
                 timezone=settings.scheduler.timezone,

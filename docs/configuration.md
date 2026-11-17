@@ -62,13 +62,13 @@ Short typed questions (yes/no, one of a set, a level) about articles.
 | Variable | Default | Description |
 |---|---|---|
 | `ALLOWED_PRIVATE_NETWORKS` | (none) | Comma-separated private networks (e.g. 192.168.1.0/24) that feeds and article pages may be fetched from. Every other non-public address (loopback, LAN, link-local, cloud metadata) is refused, so a feed on your own network, or one served by another container of the same compose project (usually inside 172.16.0.0/12), needs its network listed here. |
-| `FETCH_PROXY` | secret | Proxy for every fetch of a third-party site (feeds, article pages, robots.txt), e.g. http://proxy.lan:3128 or socks5://user:password@proxy.lan:1080; only http:// and socks5:// proxies are supported (not https://). brzask still resolves each host and refuses non-public addresses itself, then asks the proxy for a tunnel to the checked IP address, so the proxy must allow CONNECT to ports 80 and 443. Services you configure (LLM, embeddings, search, extraction services, notifications) are always reached directly. Empty: no proxy. |
+| `FETCH_PROXY` | secret | Proxy for every fetch of a third-party site (feeds, article pages, robots.txt), e.g. http://proxy.lan:3128 or socks5://user:password@proxy.lan:1080; only http:// and socks5:// proxies are supported (not https://). brzask still resolves each host and refuses non-public addresses itself, then asks the proxy for a tunnel to the checked IP address, so the proxy must allow CONNECT to ports 80 and 443. YouTube captions go through it too, asked for by host name. Services you configure (LLM, embeddings, search, extraction services, notifications) are always reached directly. Empty: no proxy. |
 
 ## Article text extraction
 
 | Variable | Default | Description |
 |---|---|---|
-| `EXTRACTORS` | `feed,trafilatura,jina` | Extractors tried in order; the feed snippet is the final fallback. |
+| `EXTRACTORS` | `feed,trafilatura,jina` | Extractors tried in order; the feed snippet is the final fallback. YouTube videos are read from their captions before any of them. |
 | `JINA_API_KEY` | secret | Jina Reader API key; optional, raises rate limits. |
 | `FIRECRAWL_BASE_URL` | `https://api.firecrawl.dev/` | Firecrawl API URL; change it for a self-hosted instance. |
 | `FIRECRAWL_API_KEY` | secret | Firecrawl API key; required for the hosted service. |

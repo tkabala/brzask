@@ -85,6 +85,13 @@ name; plain-HTTP pages go through a tunnel too. So the proxy must allow
 Services you configured (LLM, embeddings, search, extraction services,
 notifications) are always reached directly.
 
+YouTube captions are the exception to the address check: they are fetched by
+a library that hands the proxy the host name (`www.youtube.com`, a public
+site). From daily use, captions came through for 14 of 14 recent digest
+videos from a home connection and for none of them from a hosted server,
+which YouTube answered with "request blocked"; without a proxy, videos on
+such a server keep their feed description as text.
+
 Keep the proxy off your LAN: the address check in brzask is the first line,
 a firewall on the proxy host that drops connections to private networks is
 the second. A LAN feed listed in `ALLOWED_PRIVATE_NETWORKS` is then reached

@@ -1,6 +1,7 @@
 """Article text extraction: a chain of extractors with one rule for usable text.
 
-`EXTRACTORS` sets the order (e.g. `feed,trafilatura,jina`). Each extractor
+`EXTRACTORS` sets the order (e.g. `feed,trafilatura,jina`); YouTube videos
+are read from their captions before any of them. Each extractor
 either returns text that passes `unusable_reason` or the next one is tried;
 the feed snippet is the final fallback. Pages are fetched only where
 robots.txt allows it, and some sites have their own rules (see `rules`).
@@ -32,7 +33,9 @@ from brzask.clients.extractors.chain import (
     Outcome,
 )
 from brzask.clients.extractors.robots import RobotsPolicy
+from brzask.clients.extractors.youtube import YouTubeExtractor
 from brzask.clients.http import new_client, public_client
+from brzask.clients.tunnel import ProxyTarget
 from brzask.config.settings import ExtractorSettings
 
 __all__ = [
@@ -55,13 +58,16 @@ def build_chain(
     settings: ExtractorSettings,
     pages: httpx2.Client | None = None,
     services: httpx2.Client | None = None,
+    proxy: ProxyTarget | None = None,
 ) -> ExtractorChain:
-    """The chain configured by `EXTRACTORS`.
+    """The chain configured by `EXTRACTORS`, after the YouTube captions reader.
 
     Article pages and robots.txt are fetched with `pages`, which should refuse
     private addresses (`public_client`): their URLs come from feeds. Extraction
     services the owner configured get `services`, since a self-hosted one may
-    run on the owner's own network.
+    run on the owner's own network. Captions are fetched through `proxy`
+    (`FETCH_PROXY`) when one is set. The captions reader comes first whatever
+    `EXTRACTORS` says, since it reads no other site.
     """
     pages = pages or public_client(PAGE_TIMEOUT, ())
     services = services or new_client(PAGE_TIMEOUT)
@@ -73,7 +79,7 @@ def build_chain(
     crawl4ai_token = (
         settings.crawl4ai_api_token.get_secret_value() if settings.crawl4ai_api_token else None
     )
-    extractors: list[Extractor] = []
+    extractors: list[Extractor] = [YouTubeExtractor(proxy)]
     for name in settings.extractors:
         match name:
             case "feed":

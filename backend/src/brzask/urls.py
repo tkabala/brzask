@@ -5,7 +5,7 @@ Links come from feeds and pages, where malformed ones (`http://[oops`) occur;
 """
 
 import re
-from urllib.parse import unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
 
 
 def host_of(url: str) -> str:
@@ -74,3 +74,26 @@ def item_key(link: str) -> str:
         return "release:" + unquote(tag.group(1)).lower().removeprefix("v")
     query = f"?{parts.query}" if parts.query else ""
     return f"{host}{parts.path.rstrip('/')}{query}"
+
+
+_VIDEO_ID = re.compile(r"[\w-]{11}")
+_VIDEO_PATH = re.compile(r"^/(?:shorts|live|embed)/([^/]+)/?$")
+
+
+def youtube_video_id(url: str) -> str | None:
+    """The video a YouTube link points to (`watch?v=`, `/shorts/`, `/live/`,
+    `/embed/`, `youtu.be/`); None for channels, playlists and other sites."""
+    try:
+        parts = urlsplit(url.strip())
+        host = (parts.hostname or "").removeprefix("www.")
+    except ValueError:
+        return None
+    candidate: str | None = None
+    if host == "youtu.be":
+        candidate = parts.path.strip("/")
+    elif host_matches(host, "youtube.com"):
+        if parts.path.rstrip("/") == "/watch":
+            candidate = next(iter(parse_qs(parts.query).get("v", [])), None)
+        elif match := _VIDEO_PATH.match(parts.path):
+            candidate = match.group(1)
+    return candidate if candidate and _VIDEO_ID.fullmatch(candidate) else None

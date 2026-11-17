@@ -30,6 +30,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "pydantic>=2.9",
     "pydantic-settings>=2.11",
+    "pysocks>=1.7.1",
     "sentry-sdk>=2.72",
     "socksio>=1.0.0",
     "sqlalchemy>=2.0.40",
@@ -37,6 +38,7 @@ dependencies = [
     "trafilatura>=2.0",
     "typer>=0.15",
     "uvicorn[standard]>=0.54.0",
+    "youtube-transcript-api>=1.2,<2",
 ]
 
 [project.urls]
@@ -56,6 +58,7 @@ dev = [
     "testcontainers[postgres]>=4.10",
     "types-defusedxml>=0.7.0.20260504",
     "types-pyyaml>=6.0.12.20261103",
+    "types-requests>=2.33.0.20261030",
 ]
 docs = [
     "mkdocs>=1.6,<2",

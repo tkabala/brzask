@@ -8,6 +8,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoi
 
 from brzask.clients.extractors import (
     SNIPPET,
+    Attempt,
     Extracted,
     ExtractionBlockedError,
     ExtractionError,
@@ -17,6 +18,9 @@ from brzask.clients.extractors import (
     build_chain,
 )
 from brzask.clients.extractors.chain import ATTEMPTS_METRIC, attempts_counter
+from brzask.clients.extractors.robots import RobotsPolicy
+from brzask.clients.extractors.youtube import Line, YouTubeExtractor
+from brzask.clients.tunnel import ProxyTarget
 from brzask.config.settings import ExtractorSettings
 
 USABLE = "A real article paragraph. " * 20
@@ -58,7 +62,9 @@ def metrics() -> Iterator[tuple[MeterProvider, InMemoryMetricReader]]:
 
 
 def chain(
-    *extractors: Fake, robots: Robots | None = None, provider: MeterProvider | None = None
+    *extractors: Fake | YouTubeExtractor,
+    robots: Robots | RobotsPolicy | None = None,
+    provider: MeterProvider | None = None,
 ) -> ExtractorChain:
     counter = attempts_counter(provider.get_meter("test")) if provider else None
     return ExtractorChain(list(extractors), robots, counter=counter)
@@ -214,8 +220,18 @@ def test_build_chain_follows_the_configured_order() -> None:
 
     built = build_chain(settings)
 
-    assert [e.name for e in built.extractors] == ["jina", "feed", "crawl4ai"]
+    # YouTube videos are read from their captions whatever EXTRACTORS says.
+    assert [e.name for e in built.extractors] == ["youtube", "jina", "feed", "crawl4ai"]
     assert built.robots is not None
+
+
+def test_build_chain_gives_the_proxy_to_the_youtube_extractor() -> None:
+    proxy = ProxyTarget("socks5", "proxy.lan", 1080)
+
+    youtube = build_chain(ExtractorSettings(), proxy=proxy).extractors[0]
+
+    assert isinstance(youtube, YouTubeExtractor)
+    assert youtube.proxy == proxy
 
 
 def test_pages_and_services_use_their_own_clients() -> None:
@@ -226,8 +242,103 @@ def test_pages_and_services_use_their_own_clients() -> None:
 
     built = build_chain(settings, pages, services)
 
-    trafilatura, crawl4ai = built.extractors
+    _, trafilatura, crawl4ai = built.extractors
     assert trafilatura.client is pages  # type: ignore[attr-defined]
     assert built.robots.client is pages  # type: ignore[union-attr]
     # A self-hosted extraction service may run on the owner's own network.
     assert crawl4ai.client is services  # type: ignore[attr-defined]
+
+
+VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+DESCRIPTION = "What the video is about, from the feed."
+
+
+def captions(result: list[Line] | Exception) -> YouTubeExtractor:
+    def fetch(video_id: str) -> list[Line]:
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    return YouTubeExtractor(None, fetch=fetch)
+
+
+def test_video_falls_back_to_the_description_when_captions_fail() -> None:
+    from youtube_transcript_api import RequestBlocked
+
+    feed = Fake("feed", None, fetches_page=False)
+
+    result = chain(captions(RequestBlocked("dQw4w9WgXcQ")), feed, Fake("trafilatura")).extract(
+        ExtractionInput(VIDEO, snippet=DESCRIPTION)
+    )
+
+    assert (result.text, result.extracted_by) == (DESCRIPTION, SNIPPET)
+    assert [a.outcome for a in result.attempts] == [
+        Outcome.BLOCKED,
+        Outcome.EMPTY,
+        Outcome.SKIPPED_RULE,
+    ]
+
+
+def test_short_transcript_is_too_short() -> None:
+    lines = [Line(0, "x" * 142)]  # 150 characters with its time marker
+
+    result = chain(captions(lines)).extract(ExtractionInput(VIDEO, snippet=DESCRIPTION))
+
+    assert [(a.outcome, a.chars) for a in result.attempts] == [(Outcome.TOO_SHORT, 150)]
+    assert result.extracted_by == SNIPPET
+
+
+def test_video_captions_are_the_text() -> None:
+    lines = [Line(n * 10, f"Spoken sentence number {n}.") for n in range(20)]
+
+    result = chain(captions(lines), Fake("feed", fetches_page=False)).extract(
+        ExtractionInput(VIDEO, snippet=DESCRIPTION)
+    )
+
+    assert result.extracted_by == "youtube"
+    assert result.text is not None
+    assert result.text.startswith("[00:00] Spoken sentence number 0.")
+
+
+def test_youtube_extractor_is_not_tried_for_other_sites() -> None:
+    def fetch(video_id: str) -> list[Line]:
+        raise AssertionError("not a video")
+
+    result = chain(YouTubeExtractor(None, fetch=fetch), Fake("trafilatura")).extract(
+        ExtractionInput(URL)
+    )
+
+    assert result.extracted_by == "trafilatura"
+    assert result.attempts[0] == Attempt("youtube", Outcome.SKIPPED_RULE)
+
+
+# The rules of https://www.youtube.com/robots.txt that concern video pages, as served.
+YOUTUBE_ROBOTS = """
+User-agent: *
+Disallow: /api/
+Disallow: /feeds/videos.xml
+Disallow: /results
+Disallow: /watch_ajax
+Disallow: /watch_popup
+Disallow: /youtubei/
+"""
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        VIDEO,
+        "https://www.youtube.com/shorts/EMIRXv2iE_Q",
+        "https://www.youtube.com/live/CKFUx7COIwQ",
+        "https://youtu.be/CKFUx7COIwQ?t=5",
+    ],
+)
+def test_youtube_robots_allows_reading_videos(url: str) -> None:
+    client = httpx2.Client(
+        transport=httpx2.MockTransport(lambda _: httpx2.Response(200, text=YOUTUBE_ROBOTS))
+    )
+    lines = [Line(n * 10, f"Spoken sentence number {n}.") for n in range(20)]
+
+    result = chain(captions(lines), robots=RobotsPolicy(client)).extract(ExtractionInput(url))
+
+    assert result.extracted_by == "youtube"
