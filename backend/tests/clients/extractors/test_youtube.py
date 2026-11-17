@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+import requests
 from youtube_transcript_api import (
     IpBlocked,
     RequestBlocked,
@@ -99,13 +100,30 @@ def test_blocked_is_reported_as_blocked(error: Exception) -> None:
 
 @pytest.mark.parametrize(
     "error",
-    [VideoUnavailable("dQw4w9WgXcQ"), ConnectionError("reset"), ValueError("bad XML")],
+    [
+        VideoUnavailable("dQw4w9WgXcQ"),
+        ConnectionError("reset"),
+        ValueError("bad XML"),
+        IndexError("list index out of range"),
+        AttributeError("'NoneType' object has no attribute 'get'"),
+    ],
 )
 def test_other_library_errors_are_extraction_errors(error: Exception) -> None:
     with pytest.raises(ExtractionError) as raised:
         extractor(error).extract(ExtractionInput(VIDEO))
 
     assert not isinstance(raised.value, ExtractionBlockedError)
+
+
+def test_errors_never_quote_the_proxy() -> None:
+    error = requests.exceptions.ProxyError(
+        "Unable to connect to proxy socks5h://user:s3cret@proxy.lan:1080"
+    )
+
+    with pytest.raises(ExtractionError) as raised:
+        extractor(error).extract(ExtractionInput(VIDEO))
+
+    assert str(raised.value) == "captions: ProxyError"
 
 
 def test_no_tracks_is_empty() -> None:

@@ -5,6 +5,7 @@ import httpx2
 import pytest
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
+from youtube_transcript_api import RequestBlocked
 
 from brzask.clients.extractors import (
     SNIPPET,
@@ -263,8 +264,6 @@ def captions(result: list[Line] | Exception) -> YouTubeExtractor:
 
 
 def test_video_falls_back_to_the_description_when_captions_fail() -> None:
-    from youtube_transcript_api import RequestBlocked
-
     feed = Fake("feed", None, fetches_page=False)
 
     result = chain(captions(RequestBlocked("dQw4w9WgXcQ")), feed, Fake("trafilatura")).extract(

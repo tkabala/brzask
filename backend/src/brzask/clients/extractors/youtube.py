@@ -10,14 +10,12 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import quote
-from xml.etree.ElementTree import ParseError
 
 import requests
 from youtube_transcript_api import (
     RequestBlocked,
     TranscriptsDisabled,
     YouTubeTranscriptApi,
-    YouTubeTranscriptApiException,
 )
 from youtube_transcript_api.proxies import GenericProxyConfig
 
@@ -147,6 +145,11 @@ class YouTubeExtractor:
     Goes through `FETCH_PROXY` when one is set: YouTube refuses captions to
     many hosted servers. youtube.com is a public site, so the proxy is handed
     to the library as it is, without brzask's own address check.
+
+    robots.txt is checked for the video page, which it allows. The caption
+    endpoints the library calls (`/youtubei/`, `/api/timedtext`) are disallowed
+    there for all agents; brzask reads them anyway, once per candidate video,
+    as a viewer's player does when it shows the captions.
     """
 
     name = "youtube"
@@ -170,19 +173,15 @@ class YouTubeExtractor:
             return None
         except RequestBlocked as error:
             raise ExtractionBlockedError(f"captions: {type(error).__name__}") from error
-        except YouTubeTranscriptApiException as error:
-            # Its message is a page of advice; the class names the cause.
+        except Exception as error:
+            # Anything else the library raises: its own errors, network errors,
+            # and whatever parsing YouTube's pages and XML runs into when their
+            # shape changes (IndexError, AttributeError, ...). Only an
+            # ExtractionError may leave an extractor, or one video would stop
+            # the digest. The class name alone: the library's messages are a
+            # page of advice, and network errors may quote the proxy URL with
+            # its credentials.
             raise ExtractionError(f"captions: {type(error).__name__}") from error
-        except (
-            requests.RequestException,
-            OSError,
-            ParseError,
-            ValueError,
-            KeyError,
-            TypeError,
-        ) as error:
-            # The library parses YouTube's pages and XML, whose shape may change.
-            raise ExtractionError(f"captions: {type(error).__name__}: {error}") from error
         if not lines:
             return None
         return Extracted(format_transcript(lines))
