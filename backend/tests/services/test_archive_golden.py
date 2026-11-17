@@ -104,6 +104,7 @@ def test_the_v1_archive_still_imports(session: Session, sessions: sessionmaker[S
         "articles": 3,
         "article_embeddings": 2,
         "article_contents": 0,
+        "article_briefs": 0,
         "runs": 1,
         "settings": 1,
         "change_log": 1,

@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.db.migrations import head_revision
 from brzask.db.models import (
     ApiToken,
+    ArticleBrief,
     ArticleContent,
+    BriefBasis,
     Change,
     ChangeStatus,
     ContentKind,
@@ -56,6 +58,15 @@ def fill_every_table(session: Session, make: Factories) -> None:
     session.add_all(
         [
             ArticleContent(article_id=picked.id, text="The whole text.", kind=ContentKind.PAGE),
+            ArticleBrief(
+                article_id=picked.id,
+                gist="The gist.",
+                points=["one", "two", "three"],
+                caveats=[],
+                chapters=[{"start": 95, "title": "Demo"}],
+                basis=BriefBasis.FULL_TEXT,
+                model="test/model",
+            ),
             Setting(key="embedding_model", value={"model": "test/model"}),
             Change(
                 actor="user",
@@ -120,7 +131,7 @@ def test_rows_are_ordered_by_primary_key(session: Session, make: Factories) -> N
 
 def test_rows_hold_every_column_as_plain_json(session: Session, make: Factories) -> None:
     fill_every_table(session, make)
-    run_id = session.scalars(select(TABLES[5].c.id)).one()
+    run_id = session.scalars(select(TABLES[6].c.id)).one()
 
     rows = {line["table"]: line["row"] for line in export_lines(session) if "table" in line}
 

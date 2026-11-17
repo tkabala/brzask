@@ -98,6 +98,7 @@ flowchart LR
     ranking --> extraction["Text and embeddings<br/>extraction.py"]
     extraction --> dedup["Deduplication<br/>dedup.py"]
     dedup --> selection["Selection of 7<br/>selection.py"]
+    selection --> briefs["Briefs<br/>services/briefs.py"]
 ```
 
 | Stage | What it does | Decision |
@@ -107,6 +108,7 @@ flowchart LR
 | Text and embeddings | Extractors in turn, the first 4,000 characters embedded | [ADR 0002](decisions/0002-trafilatura-as-the-default-page-extractor.md), [ADR 0022](decisions/0022-one-embedding-model-at-a-time-with-thresholds-per-model.md) |
 | Deduplication | Against 7 days of shown articles, then within the day | [ADR 0012](decisions/0012-embedding-deduplication-across-days-and-within-the-day.md), [ADR 0007](decisions/0007-a-judge-decides-same-day-duplicates-in-the-grey-zone.md) |
 | Selection | The LLM picks 7 and writes title, summary and why it matters; a short answer is topped up once from the candidates it left | [ADR 0010](decisions/0010-rank-candidates-and-show-a-fixed-seven.md) |
+| Briefs | After the digest is stored, the LLM writes a brief of each pick from its full text or transcript: gist, points, caveats and video chapters; skipped over the spending limit, and a failure never fails the run | [ADR 0023](decisions/0023-third-party-text-is-data-and-its-reach-is-bounded.md) |
 
 If the selection fails, nothing is marked as shown and the candidates stay
 in the pool for the next run. The data each stage reads and writes is

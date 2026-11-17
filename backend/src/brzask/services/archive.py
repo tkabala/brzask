@@ -38,6 +38,7 @@ TABLES: tuple[Table, ...] = tuple(
         "articles",
         "article_embeddings",
         "article_contents",
+        "article_briefs",
         "runs",
         "settings",
         "change_log",

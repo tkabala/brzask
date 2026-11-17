@@ -1,9 +1,9 @@
-"""The digest pipeline: pool → ranking → extraction → deduplication → selection."""
+"""The digest pipeline: pool → ranking → extraction → deduplication → selection → briefs."""
 
 from collections.abc import Sequence
 from contextlib import ExitStack
 from dataclasses import dataclass
-from datetime import tzinfo
+from datetime import date, tzinfo
 
 from brzask import prompts
 from brzask.clients.embeddings import Embedder
@@ -19,6 +19,7 @@ from brzask.log import get_logger
 from brzask.prompts import Language
 from brzask.repositories import ArticleRepository, ContentRepository
 from brzask.repositories.articles import DigestEntry
+from brzask.services import briefs
 from brzask.services.budget import check_budget
 from brzask.services.digest.dedup import Deduplicated, deduplicate_candidates
 from brzask.services.digest.extraction import (
@@ -57,6 +58,10 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
     the last position. A dry run computes everything and writes nothing.
     When a spending limit is reached, the pool order replaces the ranking and
     duplicates are decided without the judge; selection still writes the 7.
+
+    Once the digest is stored, the picks of today and yesterday that lack a
+    brief get one (`briefs.write_missing`), unless the limit is reached. The
+    briefs never fail the run: the digest is already committed.
     """
     now = context.started_at
     day = now.astimezone(clients.timezone).date()
@@ -76,9 +81,13 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
     over = False
     if budget is not None:
         over = budget.over
-        context.stats["budget"] = budget.stats(["ranking", "deduplication_judge"] if over else [])
+        context.stats["budget"] = budget.stats(
+            ["ranking", "deduplication_judge", "briefs"] if over else []
+        )
         if over:
-            log.warning("LLM budget reached; ranking and dedup judge skipped", reason=budget.reason)
+            log.warning(
+                "LLM budget reached; ranking, dedup judge and briefs skipped", reason=budget.reason
+            )
 
     pool = gather_candidates(context, clients.feeds)
     if not pool:
@@ -109,6 +118,17 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
                         content_kind(candidate.extracted_by),
                         candidate.extracted_by,
                     )
+        if not over:
+            _write_briefs(context, clients, day)
+
+
+def _write_briefs(context: RunContext, clients: DigestClients, day: date) -> None:
+    """The briefs stage, after the digest is stored; its errors are recorded, never raised."""
+    try:
+        briefs.write_missing(context, clients.llm, clients.language, day)
+    except Exception as error:
+        log.warning("briefs stage failed", error=f"{type(error).__name__}: {error}")
+        context.stats["briefs"] = {"error": f"{type(error).__name__}: {error}"}
 
 
 def run_digest(context: RunContext) -> None:

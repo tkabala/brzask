@@ -18,6 +18,7 @@ from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import BudgetSettings
 from brzask.db.models import (
     Article,
+    ArticleBrief,
     ArticleContent,
     ArticleState,
     ContentKind,
@@ -26,6 +27,7 @@ from brzask.db.models import (
     Source,
 )
 from brzask.repositories import ArticleRepository, EmbeddingRepository
+from brzask.services import briefs
 from brzask.services.digest import pipeline
 from brzask.services.digest.dedup import Deduplicated, Drop
 from brzask.services.digest.pipeline import DigestClients, build_digest, repeats, run_digest
@@ -49,11 +51,16 @@ WARSAW = ZoneInfo("Europe/Warsaw")
 TODAY = NOW.astimezone(WARSAW).date()
 
 
-class FakeModel:
-    """Ranks candidates in pool order and picks the first links of the selection prompt."""
+BRIEF = {"gist": "G.", "points": ["a", "b", "c", "d"], "caveats": [], "chapters": []}
 
-    def __init__(self, selection: Any = None) -> None:
+
+class FakeModel:
+    """Ranks candidates in pool order, picks the first links of the selection prompt
+    and answers briefs with `brief` (raised when it is an exception)."""
+
+    def __init__(self, selection: Any = None, brief: Any = None) -> None:
         self.selection = selection
+        self.brief = brief or BRIEF
         self.purposes: list[str] = []
 
     def complete_json(
@@ -65,6 +72,10 @@ class FakeModel:
             meter.add(usage)
         if purpose == "ranking":
             return {"ranking": list(range(1, 41))}, Completion("{}", usage)
+        if purpose == "brief":
+            if isinstance(self.brief, Exception):
+                raise self.brief
+            return self.brief, Completion("{}", usage)
         if self.selection is not None:
             return self.selection, Completion("{}", usage)
         links = re.findall(r"^   Link: (\S+)$", prompt, re.MULTILINE)
@@ -402,7 +413,7 @@ def test_over_budget_the_digest_ranks_by_pool_and_skips_the_dedup_judge(
     budget = finished.stats["budget"]
     assert budget["over"] is True
     assert budget["reason"] == "daily LLM budget $0.01 reached ($0.0500 spent today)"
-    assert budget["skipped"] == ["ranking", "deduplication_judge"]
+    assert budget["skipped"] == ["ranking", "deduplication_judge", "briefs"]
 
 
 def test_under_budget_the_digest_runs_in_full_and_records_the_budget(
@@ -455,3 +466,118 @@ def test_run_digest_passes_the_spending_limits(
 
     assert built[0] is not None
     assert built[0].daily_usd == Decimal("0.5")
+
+
+# --- Briefs -----------------------------------------------------------------------
+
+
+def with_long_texts(digest: DigestClients, sources: list[Source]) -> DigestClients:
+    """Every entry of `feeds_for(sources)` extracted as a text long enough to brief."""
+    texts = {
+        f"https://{source.id}.example/{n}": f"Text of {source.id}/{n}. " * 40
+        for source in sources
+        for n in range(4)
+    }
+    return replace(digest, extractor=FakeExtractor(texts))
+
+
+def stored_briefs(session: Session) -> list[ArticleBrief]:
+    session.expire_all()
+    return list(session.scalars(select(ArticleBrief)))
+
+
+def test_a_run_writes_a_brief_per_picked_article(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel()
+
+    finished = run(sessions, with_long_texts(clients(feeds_for(sources), model), sources))
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert {b.article_id for b in stored_briefs(session)} == {a.id for a in shown(session)}
+    assert finished.stats["briefs"] == {"written": DIGEST_SIZE, "failed": 0, "skipped": 0}
+    assert model.purposes == ["ranking", "selection"] + ["brief"] * DIGEST_SIZE
+    assert "briefs" in finished.timings
+
+
+def test_brief_failure_does_not_fail_the_digest(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel(brief=RuntimeError("provider down"))
+
+    finished = run(sessions, with_long_texts(clients(feeds_for(sources), model), sources))
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert len(shown(session)) == DIGEST_SIZE
+    assert stored_briefs(session) == []
+    assert finished.stats["briefs"] == {"written": 0, "failed": DIGEST_SIZE, "skipped": 0}
+
+
+def test_an_error_around_the_briefs_is_recorded_not_raised(
+    sessions: sessionmaker[Session],
+    session: Session,
+    make: Factories,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sources = [make.source() for _ in range(6)]
+
+    def broken(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("database gone")
+
+    monkeypatch.setattr(briefs, "write_missing", broken)
+    finished = run(sessions, with_long_texts(clients(feeds_for(sources)), sources))
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert len(shown(session)) == DIGEST_SIZE
+    assert finished.stats["briefs"] == {"error": "RuntimeError: database gone"}
+
+
+def test_briefs_are_skipped_over_budget(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    make.run(NOW - timedelta(hours=1), cost=0.05)
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel()
+    digest = with_long_texts(clients(feeds_for(sources), model), sources)
+
+    finished = run(sessions, limited(digest, "0.01"))
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert "briefs" in finished.stats["budget"]["skipped"]
+    assert "brief" not in model.purposes
+    assert stored_briefs(session) == []
+
+
+def test_dry_run_writes_no_briefs(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    model = FakeModel()
+
+    finished = run(
+        sessions, with_long_texts(clients(feeds_for(sources), model), sources), dry_run=True
+    )
+
+    assert finished.status is RunStatus.OK, finished.error
+    assert "brief" not in model.purposes
+    assert "briefs" not in finished.stats
+    assert stored_briefs(session) == []
+
+
+def test_a_forced_rerun_briefs_only_the_new_picks(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    run(sessions, with_long_texts(clients(feeds_for(sources)), sources))
+    first = {b.article_id: b.created_at for b in stored_briefs(session)}
+
+    model = FakeModel()
+    forced = run(sessions, with_long_texts(clients(feeds_for(sources), model), sources), force=True)
+
+    assert forced.status is RunStatus.OK, forced.error
+    after = {b.article_id: b.created_at for b in stored_briefs(session)}
+    assert len(after) == 2 * DIGEST_SIZE
+    assert {k: after[k] for k in first} == first
+    assert model.purposes.count("brief") == DIGEST_SIZE

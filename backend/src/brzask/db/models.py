@@ -16,6 +16,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from brzask.db.base import Base, TimestampMixin, text_enum
@@ -221,6 +222,34 @@ class ArticleContent(Base):
     kind: Mapped[ContentKind] = mapped_column(text_enum(ContentKind, "content_kind"))
     extracted_by: Mapped[str | None] = mapped_column(comment="Extractor that produced the text.")
     fetched_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class BriefBasis(StrEnum):
+    FULL_TEXT = "full_text"  # the whole extracted page
+    TRANSCRIPT = "transcript"  # the whole transcript of a video
+    PARTIAL = "partial"  # the beginning of a text too long to brief whole
+    DESCRIPTION = "description"  # only the feed's snippet
+
+
+class ArticleBrief(Base):
+    """What a picked article says, written from its stored text after the digest run."""
+
+    __tablename__ = "article_briefs"
+
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True
+    )
+    gist: Mapped[str]
+    points: Mapped[list[str]] = mapped_column(JSONB)
+    caveats: Mapped[list[str]] = mapped_column(JSONB)
+    chapters: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, comment="Video chapters: [{start: seconds, title}]."
+    )
+    basis: Mapped[BriefBasis] = mapped_column(
+        text_enum(BriefBasis, "brief_basis"), comment="What text the brief was written from."
+    )
+    model: Mapped[str] = mapped_column(comment="The LLM that wrote it.")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 # --- Runs ------------------------------------------------------------------------

@@ -12,6 +12,7 @@ what the states mean and why some columns exist.
 | `interests` | Topics you care about: keywords and free-text reader notes |
 | `articles` | Every fetched entry, its ranking, embedding, digest text and whether you opened it |
 | `article_contents` | The untruncated text of picked articles: page text, video transcript or feed description |
+| `article_briefs` | One brief per picked article: gist, points, caveats and, for videos, chapters |
 | `runs` | One row per pipeline run: status, stats, timings, error |
 | `settings` | Values changed at runtime, such as a pause (configuration lives in environment variables) |
 | `change_log` | Every change to sources, interests or configuration, by a person, a pipeline or an agent |
@@ -72,6 +73,16 @@ the transaction that marks them shown: the extracted page, a video's transcript
 or, when only the feed's snippet was usable, that description (`kind` says
 which). The text is cut at 200,000 characters. A forced run never replaces
 a stored text, and deleting an article deletes its content.
+
+After the digest is stored, each picked article with at least 200 characters
+of text gets a brief in `article_briefs`, written by the LLM from that text:
+`gist`, `points` (3-7), `caveats` (0-3) and, for a transcript, `chapters`
+(`[{start, title}]`, `start` in seconds within the video). `basis` says what it
+was written from: `full_text`, `transcript`, `description`, or `partial` when
+the text was longer than 120,000 characters and only its beginning, cut at a
+paragraph, was read. `model` names the LLM that wrote it. A brief is written
+once: a forced run never replaces one. An article whose brief failed is tried
+again by later digest runs on its digest day and the day after, not later.
 
 ## Sources
 
