@@ -1,4 +1,4 @@
-import { formatDay, nextDay, runBudget } from './format'
+import { formatDay, formatOffset, nextDay, runBudget } from './format'
 
 describe('formatDay', () => {
   it('names the day without shifting it', () => {
@@ -30,5 +30,16 @@ describe('runBudget', () => {
     expect(runBudget({})).toBeNull()
     expect(runBudget({ budget: 'over' })).toBeNull()
     expect(runBudget({ budget: { skipped: 'all' } })).toBeNull()
+  })
+})
+
+describe('formatOffset', () => {
+  it.each([
+    [0, '0:00'],
+    [95, '1:35'],
+    [754, '12:34'],
+    [3725, '1:02:05'],
+  ])('shows %i seconds as %s', (seconds, shown) => {
+    expect(formatOffset(seconds)).toBe(shown)
   })
 })

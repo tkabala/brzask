@@ -48,6 +48,19 @@ export const en = {
     hideWhy: 'Hide',
     whyItMatters: 'Why it matters',
   },
+  brief: {
+    back: 'Back to the digest',
+    basis: {
+      full_text: 'From the full text',
+      transcript: 'From the transcript',
+      partial: 'From part of the text',
+      description: 'From the description only',
+    },
+    caveats: 'Caveats',
+    chapters: 'Chapters',
+    openOriginal: 'Open original',
+    missing: 'This article has no brief.',
+  },
   ranking: {
     title: 'How it got here',
     position: 'Place {{position}} in the digest',
@@ -164,7 +177,8 @@ export const en = {
   status: {
     title: 'Status',
     articles: 'Articles',
-    articlesLine: '{{total}} stored, {{shown}} shown, {{opened}} opened',
+    articlesLine:
+      '{{total}} stored, {{shown}} shown, {{opened}} opened, {{briefs_opened}} briefs read',
     sources: 'Sources',
     lastDigest: 'Last digest',
     none: 'none yet',

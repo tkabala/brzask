@@ -20,7 +20,7 @@ const TODAY = 'getTodayDigest'
 const SAVED = new Set([SESSION, TODAY])
 
 /** The generated query keys start with `{ _id: operation id, baseUrl, … }`. */
-function operationId(key: QueryKey): unknown {
+export function operationId(key: QueryKey): unknown {
   const first: unknown = key[0]
   return typeof first === 'object' && first !== null ? (first as { _id?: unknown })._id : undefined
 }

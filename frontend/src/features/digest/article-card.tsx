@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import { type ReactNode, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,12 +15,14 @@ interface Props {
   renderWhy?: () => ReactNode
 }
 
-/** One article of a digest: its link goes through `open_url`, which records the open. */
+/** One article of a digest. Its title leads to the article's brief when there
+ * is one, otherwise to the original through `open_url`, which records the open. */
 export function ArticleCard({ article, onOpen, renderWhy }: Props) {
   const { t } = useTranslation()
   const [showWhy, setShowWhy] = useState(false)
   const whyId = useId()
-  const opened = article.opened_at !== null
+  // Reading the brief counts as much as opening the original.
+  const opened = article.opened_at !== null || article.brief_opened_at !== null
   const open = () => onOpen?.(article)
 
   return (
@@ -31,19 +34,29 @@ export function ArticleCard({ article, onOpen, renderWhy }: Props) {
           ) : null}
           <div className="min-w-0 flex-1">
             <h2 className="text-lg leading-snug font-semibold">
-              <a
-                href={article.open_url}
-                target="_blank"
-                rel="noopener"
-                className="hover:underline"
-                onClick={open}
-                onAuxClick={(event) => {
-                  // The middle button opens a tab; others (a right click) only show a menu.
-                  if (event.button === 1) open()
-                }}
-              >
-                {article.title}
-              </a>
+              {article.has_brief ? (
+                <Link
+                  to="/articles/$id"
+                  params={{ id: String(article.id) }}
+                  className="hover:underline"
+                >
+                  {article.title}
+                </Link>
+              ) : (
+                <a
+                  href={article.open_url}
+                  target="_blank"
+                  rel="noopener"
+                  className="hover:underline"
+                  onClick={open}
+                  onAuxClick={(event) => {
+                    // The middle button opens a tab; others (a right click) only show a menu.
+                    if (event.button === 1) open()
+                  }}
+                >
+                  {article.title}
+                </a>
+              )}
             </h2>
             <p className="mt-1 flex flex-wrap gap-x-2 text-sm text-muted-foreground">
               {article.source ? <span>{article.source.name}</span> : null}

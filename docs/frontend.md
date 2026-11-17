@@ -24,6 +24,7 @@ origin, as they do in production. Over plain HTTP the session cookie is not
 | Path | Screen |
 |---|---|
 | `/` | Today's digest: a card per article, "why here?" from the ranking explanation |
+| `/articles/<id>` | An article's brief: gist, points, caveats, a video's chapters, and the original |
 | `/archive`, `/archive/<day>` | Days with a digest, and any day's digest |
 | `/search?q=` | Search by meaning; the query stays in the address |
 | `/sources?show=` | Pending decisions, every source with its fetch health and 30-day counts, adding one from any page of a site |
@@ -31,9 +32,17 @@ origin, as they do in production. Over plain HTTP the session cookie is not
 | `/changes` | Changes an agent proposed: approve or reject each; the navigation counts them |
 | `/status` | Counts, the last run of each pipeline, recent runs, pausing the digest |
 
-An article's link is its signed `open_url`, opened in a new tab. Following it
-marks the card opened at once in the cached digest, while the server records
-the open as the browser passes through `/open`.
+A card's title leads to the article's brief in the app when it has one
+(`has_brief`), and otherwise to its signed `open_url` in a new tab. The brief
+page says what text the brief was written from, lists a video's chapters as
+links that start it at that point, and keeps "Open original" at the bottom of
+the screen. Showing a brief records one view (`POST
+/articles/{id}/brief-open`), which counts like an open; the card's opened mark
+shows for either. Following an original or a chapter marks the article opened
+at once in every cached digest, while the server records the open as the
+browser passes through `/open`. A brief that is not written yet, or an article
+that is gone, gets a short note and the original's link when the article is
+still known.
 
 Each screen is a route that fetches and changes data (`src/routes/`) and a view
 that only takes props (`src/features/<screen>/`).
@@ -57,6 +66,9 @@ end-to-end tests and screenshots therefore all show the same articles.
   against the demo API in the browser. A story replaces single endpoints with
   `parameters: withApi(http.get(...))`. The service worker is in
   `.storybook/public`, so the app never ships it.
+- The demo API has briefs for three articles of today's digest: one from the
+  full text, a video with chapters, and one from the feed's description only.
+  The seeded database has none.
 - **Tests** (`pnpm test`): `msw/node` answers every request the app makes; a
   request no handler answers fails the test. `fakeApi({...})` overrides
   endpoints for one test and records what was sent.

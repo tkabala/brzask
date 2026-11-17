@@ -23,6 +23,15 @@ export function formatMoment(moment: string, language: string): string {
   )
 }
 
+/** A point in a video, as players show it: "1:35", "12:34", "1:02:05". */
+export function formatOffset(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = String(total % 60).padStart(2, '0')
+  return h > 0 ? `${String(h)}:${String(m).padStart(2, '0')}:${s}` : `${String(m)}:${s}`
+}
+
 /** How long a run took, once it finished. */
 export function seconds(start: string, end: string | null): number | null {
   return end === null ? null : Math.round((Date.parse(end) - Date.parse(start)) / 1000)

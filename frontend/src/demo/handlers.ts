@@ -48,6 +48,7 @@ function fresh() {
   return structuredClone({
     session: loggedInSession,
     articles: demo.allArticles,
+    briefs: demo.briefs,
     digest: demo.digest,
     days: demo.days,
     sources: [...demo.pendingSources, ...demo.sources],
@@ -128,6 +129,25 @@ export const handlers = [
     const article = allArticles().find((a) => String(a.id) === params.id)
     if (!article) return problem(404, 'Not Found', `no article ${String(params.id)}`)
     return HttpResponse.json(demo.rankingOf(article))
+  }),
+  http.get(`${API}/articles/:id/brief`, ({ params }) => {
+    const brief = db.briefs.find((b) => String(b.article.id) === params.id)
+    const article = allArticles().find((a) => String(a.id) === params.id)
+    if (!brief || !article)
+      return problem(404, 'Not Found', `no brief of article ${String(params.id)}`)
+    return HttpResponse.json({ ...brief, article })
+  }),
+  http.post(`${API}/articles/:id/brief-open`, ({ params }) => {
+    if (!db.briefs.some((b) => String(b.article.id) === params.id)) {
+      return problem(404, 'Not Found', `no brief of article ${String(params.id)}`)
+    }
+    const first = !allArticles().some((a) => String(a.id) === params.id && a.brief_opened_at)
+    const now = new Date().toISOString()
+    for (const article of [...db.articles, ...db.digest.articles]) {
+      if (String(article.id) === params.id) article.brief_opened_at ??= now
+    }
+    if (first) db.status.articles.briefs_opened += 1
+    return new HttpResponse(null, { status: 204 })
   }),
   http.get(`${API}/articles/:id`, ({ params }) => {
     const article = allArticles().find((a) => String(a.id) === params.id)

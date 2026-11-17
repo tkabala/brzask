@@ -51,6 +51,19 @@ export const pl: Resources = {
     hideWhy: 'Ukryj',
     whyItMatters: 'Dlaczego to ważne',
   },
+  brief: {
+    back: 'Wróć do przeglądu',
+    basis: {
+      full_text: 'Na podstawie pełnego tekstu',
+      transcript: 'Na podstawie transkrypcji',
+      partial: 'Na podstawie części tekstu',
+      description: 'Tylko na podstawie opisu',
+    },
+    caveats: 'Zastrzeżenia',
+    chapters: 'Rozdziały',
+    openOriginal: 'Otwórz oryginał',
+    missing: 'Ten artykuł nie ma streszczenia.',
+  },
   ranking: {
     title: 'Jak tu trafił',
     position: 'Miejsce {{position}} w przeglądzie',
@@ -170,7 +183,8 @@ export const pl: Resources = {
   status: {
     title: 'Stan',
     articles: 'Artykuły',
-    articlesLine: 'zapisane {{total}}, pokazane {{shown}}, otwarte {{opened}}',
+    articlesLine:
+      'zapisane {{total}}, pokazane {{shown}}, otwarte {{opened}}, przeczytane streszczenia {{briefs_opened}}',
     sources: 'Źródła',
     lastDigest: 'Ostatni przegląd',
     none: 'jeszcze żaden',

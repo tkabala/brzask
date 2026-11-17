@@ -21,10 +21,10 @@ describe('status', () => {
     })
     renderApp('/status')
 
-    const { total, shown, opened } = status.articles
+    const { total, shown, opened, briefs_opened } = status.articles
     expect(
       await screen.findByText(
-        `${String(total)} stored, ${String(shown)} shown, ${String(opened)} opened`,
+        `${String(total)} stored, ${String(shown)} shown, ${String(opened)} opened, ${String(briefs_opened)} briefs read`,
       ),
     ).toBeInTheDocument()
     const pipelines = screen.getByRole('region', { name: 'Pipelines' })

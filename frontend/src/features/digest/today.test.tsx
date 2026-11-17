@@ -8,7 +8,7 @@ import { nth } from '@/test/nth'
 import { renderApp } from '@/test/render'
 import { loggedInApi } from '@/test/setup-screens'
 
-const [first, second, third, fourth] = [0, 1, 2, 3].map((i) => nth(articles, i)) as [
+const [first, second, third, fifth] = [0, 1, 2, 4].map((i) => nth(articles, i)) as [
   ArticleOut,
   ArticleOut,
   ArticleOut,
@@ -29,9 +29,9 @@ describe('today', () => {
 
     const items = await screen.findAllByRole('listitem')
     expect(items).toHaveLength(digest.articles.length)
-    expect(within(nth(items, 0)).getByRole('link', { name: titled(first.title) })).toHaveAttribute(
+    expect(within(nth(items, 1)).getByRole('link', { name: titled(second.title) })).toHaveAttribute(
       'href',
-      `/open?id=${String(first.id)}&sig=demo`,
+      `/open?id=${String(second.id)}&sig=demo`,
     )
     expect(third.opened_at).not.toBeNull()
     expect(within(nth(items, 2)).getByText('Opened')).toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('today', () => {
       return { link, card: within(found) }
     }
     const menu = await card(second.title)
-    const tab = await card(fourth.title)
+    const tab = await card(fifth.title)
     expect(tab.card.queryByText('Opened')).not.toBeInTheDocument()
 
     fireEvent(menu.link, new MouseEvent('auxclick', { bubbles: true, button: 2 }))
@@ -73,6 +73,38 @@ describe('today', () => {
 
     expect(await tab.card.findByText('Opened')).toBeInTheDocument()
     expect(menu.card.queryByText('Opened')).not.toBeInTheDocument()
+  })
+
+  it('card title links to the brief when there is one', async () => {
+    loggedInApi({ 'GET /api/v1/digests/today': () => json(digest) })
+    renderApp('/')
+
+    expect(first.has_brief).toBe(true)
+    const link = await screen.findByRole('link', { name: titled(first.title) })
+    expect(link).toHaveAttribute('href', `/articles/${String(first.id)}`)
+    expect(link).not.toHaveAttribute('target')
+  })
+
+  it('card title links to the original when there is no brief', async () => {
+    loggedInApi({ 'GET /api/v1/digests/today': () => json(digest) })
+    renderApp('/')
+
+    expect(second.has_brief).toBe(false)
+    const link = await screen.findByRole('link', { name: titled(second.title) })
+    expect(link).toHaveAttribute('href', second.open_url)
+    expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('card shows opened for a brief view', async () => {
+    const read = { ...first, opened_at: null, brief_opened_at: '2026-10-21T07:00:00Z' }
+    loggedInApi({
+      'GET /api/v1/digests/today': () =>
+        json({ ...digest, articles: [read, ...digest.articles.slice(1)] }),
+    })
+    renderApp('/')
+
+    const items = await screen.findAllByRole('listitem')
+    expect(within(nth(items, 0)).getByText('Opened')).toBeInTheDocument()
   })
 
   it('explains why an article is where it is', async () => {

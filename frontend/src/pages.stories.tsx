@@ -4,7 +4,7 @@ import { createMemoryHistory } from '@tanstack/react-router'
 import { http } from 'msw'
 
 import { App } from '@/app'
-import { emptyDigest } from '@/demo/data'
+import { briefs, emptyDigest } from '@/demo/data'
 import { logOutDemo, problem, withApi } from '@/demo/handlers'
 import { createQueryClient } from '@/lib/query'
 
@@ -43,6 +43,7 @@ export const Login: Story = {
 
 export const Archive: Story = { args: { path: '/archive' } }
 export const ArchivedDay: Story = { args: { path: '/archive/2026-10-21' } }
+export const Brief: Story = { args: { path: `/articles/${String(briefs[0]?.article.id)}` } }
 export const Search: Story = { args: { path: '/search?q=postgres release' } }
 export const Sources: Story = { args: { path: '/sources' } }
 export const Interests: Story = { args: { path: '/interests' } }

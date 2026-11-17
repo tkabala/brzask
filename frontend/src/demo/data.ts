@@ -5,6 +5,8 @@
  */
 import type {
   ArticleOut,
+  BriefBasis,
+  BriefOut,
   ChangeOut,
   DigestDayOut,
   DigestOut,
@@ -29,6 +31,17 @@ function must<T>(item: T | undefined, what: string): T {
 
 const sourceNames = new Map(instance.sources.map((s) => [s.id, s.name]))
 
+/** What the briefs of today's digest were written from, by place in the digest. */
+const BRIEFED = new Map<number, BriefBasis>([
+  [1, 'full_text'],
+  [4, 'description'],
+  [7, 'transcript'],
+])
+
+function briefBasis(a: (typeof instance.articles)[number]): BriefBasis | undefined {
+  return a.digest_date === DAY ? BRIEFED.get(a.position) : undefined
+}
+
 /** Every stored article, oldest first. */
 export const allArticles: ArticleOut[] = instance.articles.map((a) => ({
   id: a.id,
@@ -47,7 +60,7 @@ export const allArticles: ArticleOut[] = instance.articles.map((a) => ({
   position: a.position,
   shown_at: a.shown_at,
   opened_at: a.opened_at,
-  has_brief: false,
+  has_brief: briefBasis(a) !== undefined,
   brief_opened_at: null,
 }))
 
@@ -114,6 +127,72 @@ export function rankingOf(article: ArticleOut): RankingOut {
     run_id: run?.id ?? null,
   }
 }
+
+/** What each brief says, by its basis: a written article, a video with
+ * chapters, and an article known only by its feed's description. */
+type BriefText = Omit<BriefOut, 'article' | 'basis' | 'chapters'> & {
+  chapters: { start: number; title: string }[]
+}
+
+const BRIEF_TEXT: Partial<Record<BriefBasis, BriefText>> = {
+  full_text: {
+    gist: 'The next major release removes the oldest wire protocol; clients older than five years must upgrade first.',
+    points: [
+      'The old protocol has been deprecated since version 3 and carries 2% of connections on the hosted service.',
+      'Version 7 refuses it at the handshake with an error naming the minimum client version.',
+      'A compatibility proxy stays available for one more year for clients that cannot be upgraded.',
+    ],
+    caveats: ['The 2% figure is from the hosted service only; self-hosted fleets may differ.'],
+    chapters: [],
+  },
+  description: {
+    gist: 'The design notes of the borrow checker, with the alternatives considered and why each was rejected.',
+    points: ['Covers the original proposal and the rejected alternatives.'],
+    caveats: ['Written from the feed’s description only; the notes themselves were not available.'],
+    chapters: [],
+  },
+  transcript: {
+    gist: 'Cobble can now show every change an action would make before it makes any of them.',
+    points: [
+      'A dry run lists files, commands and requests, and stops before the first one runs.',
+      'Plans that touch more than ten files ask for a dry run by default.',
+      'The demo shows a migration caught deleting a table it meant to rename.',
+    ],
+    caveats: ['The speaker works on Cobble.'],
+    chapters: [
+      { start: 0, title: 'Why actions need a preview' },
+      { start: 95, title: 'Running a dry run' },
+      { start: 754, title: 'The migration that went wrong' },
+      { start: 3725, title: 'Questions' },
+    ],
+  },
+}
+
+function briefOf(article: ArticleOut): BriefOut | null {
+  const basis = briefBasis(
+    must(
+      instance.articles.find((a) => a.id === article.id),
+      'article',
+    ),
+  )
+  if (basis === undefined) return null
+  const text = must(BRIEF_TEXT[basis], `brief from ${basis}`)
+  return {
+    article,
+    basis,
+    ...text,
+    chapters: text.chapters.map((chapter) => ({
+      ...chapter,
+      open_url: `/open?id=${String(article.id)}&t=${String(chapter.start)}&sig=demo`,
+    })),
+  }
+}
+
+/** The briefs of today's digest. */
+export const briefs: BriefOut[] = articles.flatMap((article) => {
+  const brief = briefOf(article)
+  return brief ? [brief] : []
+})
 
 export const ranking = rankingOf(must(articles[1], 'second article today'))
 

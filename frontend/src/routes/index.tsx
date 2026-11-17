@@ -13,12 +13,10 @@ function TodayPage() {
   const { t } = useTranslation()
   // Fetched here, not in a route loader: loaders run before the session gate
   // knows whether the reader is logged in.
-  const options = getTodayDigestOptions()
-  const digest = useQuery(options)
+  const digest = useQuery(getTodayDigestOptions())
   return (
     <DigestPage
       digest={digest}
-      queryKey={options.queryKey}
       title={t('today.title')}
       empty={
         <>

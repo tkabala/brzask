@@ -1,4 +1,4 @@
-import type { QueryKey, UseQueryResult } from '@tanstack/react-query'
+import type { UseQueryResult } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 import type { DigestOut } from '@/client/types.gen'
@@ -14,16 +14,14 @@ import { useMarkOpened } from './use-mark-opened'
 /** A digest from the API: cards that mark themselves opened, with "why here?". */
 export function DigestPage({
   digest,
-  queryKey,
   title,
   empty,
 }: {
   digest: UseQueryResult<DigestOut, unknown>
-  queryKey: QueryKey
   title: string
   empty: ReactNode
 }) {
-  const markOpened = useMarkOpened(queryKey)
+  const markOpened = useMarkOpened()
   const online = useOnline()
 
   if (digest.isPending) return <Pending query={digest} />

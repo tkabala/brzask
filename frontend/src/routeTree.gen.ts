@@ -17,6 +17,7 @@ import { Route as SourcesRouteImport } from './routes/sources'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as ArchiveIndexRouteImport } from './routes/archive/index'
 import { Route as ArchiveDayRouteImport } from './routes/archive/$day'
+import { Route as ArticlesIdRouteImport } from './routes/articles.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +59,11 @@ const ArchiveDayRoute = ArchiveDayRouteImport.update({
   path: '/archive/$day',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArticlesIdRoute = ArticlesIdRouteImport.update({
+  id: '/articles/$id',
+  path: '/articles/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/sources': typeof SourcesRoute
   '/status': typeof StatusRoute
   '/archive/$day': typeof ArchiveDayRoute
+  '/articles/$id': typeof ArticlesIdRoute
   '/archive/': typeof ArchiveIndexRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/sources': typeof SourcesRoute
   '/status': typeof StatusRoute
   '/archive/$day': typeof ArchiveDayRoute
+  '/articles/$id': typeof ArticlesIdRoute
   '/archive': typeof ArchiveIndexRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/sources': typeof SourcesRoute
   '/status': typeof StatusRoute
   '/archive/$day': typeof ArchiveDayRoute
+  '/articles/$id': typeof ArticlesIdRoute
   '/archive/': typeof ArchiveIndexRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/sources'
     | '/status'
     | '/archive/$day'
+    | '/articles/$id'
     | '/archive/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/sources'
     | '/status'
     | '/archive/$day'
+    | '/articles/$id'
     | '/archive'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/sources'
     | '/status'
     | '/archive/$day'
+    | '/articles/$id'
     | '/archive/'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   SourcesRoute: typeof SourcesRoute
   StatusRoute: typeof StatusRoute
   ArchiveDayRoute: typeof ArchiveDayRoute
+  ArticlesIdRoute: typeof ArticlesIdRoute
   ArchiveIndexRoute: typeof ArchiveIndexRoute
 }
 
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArchiveDayRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/articles/$id': {
+      id: '/articles/$id'
+      path: '/articles/$id'
+      fullPath: '/articles/$id'
+      preLoaderRoute: typeof ArticlesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   SourcesRoute: SourcesRoute,
   StatusRoute: StatusRoute,
   ArchiveDayRoute: ArchiveDayRoute,
+  ArticlesIdRoute: ArticlesIdRoute,
   ArchiveIndexRoute: ArchiveIndexRoute,
 }
 export const routeTree = rootRouteImport
