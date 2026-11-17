@@ -7,6 +7,7 @@ import struct
 import threading
 import time
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import httpx2
@@ -125,10 +126,12 @@ def _serve(handler: type[socketserver.BaseRequestHandler], script: Script) -> It
     server = Server(handler, script)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    yield server
-    script.released.set()
-    server.shutdown()
-    server.server_close()
+    try:
+        yield server
+    finally:
+        script.released.set()
+        server.shutdown()
+        server.server_close()
 
 
 @pytest.fixture
@@ -257,12 +260,12 @@ def test_proxy_refusal_is_a_connect_error(
     handler = HttpProxy if scheme == "http" else SocksProxy
     script.reply = reply
     script.behaviour = behaviour
-    for proxy in _serve(handler, script):
-        with (
-            client(f"{scheme}://127.0.0.1:{proxy.port}") as http,
-            pytest.raises(httpx2.ConnectError),
-        ):
-            http.get("http://example.test/")
+    with (
+        contextmanager(_serve)(handler, script) as proxy,
+        client(f"{scheme}://127.0.0.1:{proxy.port}") as http,
+        pytest.raises(httpx2.ConnectError),
+    ):
+        http.get("http://example.test/")
 
 
 def test_silent_proxy_times_out(http_proxy: Server, script: Script) -> None:
