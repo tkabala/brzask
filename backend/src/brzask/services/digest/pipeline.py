@@ -128,7 +128,8 @@ def _write_briefs(context: RunContext, clients: DigestClients, day: date) -> Non
         briefs.write_missing(context, clients.llm, clients.language, day)
     except Exception as error:
         log.warning("briefs stage failed", error=f"{type(error).__name__}: {error}")
-        context.stats["briefs"] = {"error": f"{type(error).__name__}: {error}"}
+        # Keep the counts of the briefs written before the error.
+        context.stats.setdefault("briefs", {})["error"] = f"{type(error).__name__}: {error}"
 
 
 def run_digest(context: RunContext) -> None:
@@ -146,11 +147,8 @@ def run_digest(context: RunContext) -> None:
     with ExitStack() as stack:
         feeds = FeedFetcher.from_settings(settings.fetch)
         stack.callback(feeds.close)
-        pages = public_client(
-            PAGE_TIMEOUT,
-            settings.fetch.allowed_private_networks,
-            proxy=settings.fetch.proxy_target(),
-        )
+        proxy = settings.fetch.proxy_target()
+        pages = public_client(PAGE_TIMEOUT, settings.fetch.allowed_private_networks, proxy=proxy)
         stack.callback(pages.close)
         services = new_client(PAGE_TIMEOUT)
         stack.callback(services.close)
@@ -168,9 +166,7 @@ def run_digest(context: RunContext) -> None:
             DigestClients(
                 feeds=feeds,
                 llm=llm,
-                extractor=build_chain(
-                    settings.extractors, pages, services, settings.fetch.proxy_target()
-                ),
+                extractor=build_chain(settings.extractors, pages, services, proxy),
                 embedder=embedder,
                 language=prompts.language(settings.digest.language),
                 timezone=settings.scheduler.timezone,

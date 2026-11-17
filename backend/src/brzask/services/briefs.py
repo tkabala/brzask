@@ -118,10 +118,14 @@ def parse_brief(answer: Any, kind: ContentKind, last_second: int | None) -> Brie
     """
     if not isinstance(answer, dict):
         raise BriefError(f"the answer is not an object: {type(answer).__name__}")
-    points = _texts(answer, "points")
-    # Only an explicit empty list: an answer without the field is malformed, not empty.
-    if not points and isinstance(answer.get("points"), list):
+    # Only a list with no text in it: an answer without the field, or with
+    # items that are not text (objects instead of strings), is malformed, not empty.
+    raw_points = answer.get("points")
+    if isinstance(raw_points, list) and all(
+        isinstance(item, str) and not item.strip() for item in raw_points
+    ):
         raise NothingToBriefError(_text(answer.get("gist")))
+    points = _texts(answer, "points")
     gist = _text(answer.get("gist"))
     if not gist:
         raise BriefError("the answer has no gist")

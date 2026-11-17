@@ -72,8 +72,16 @@ def test_no_points_means_nothing_to_brief(points: list[str]) -> None:
         )
 
 
+def test_points_that_are_not_text_are_an_error_not_an_empty_brief() -> None:
+    # Asked again, rather than taken for a page with nothing to brief.
+    points = [{"claim": "io_method = worker is the default"}, {"claim": "2-3x faster"}]
+
+    with pytest.raises(BriefError):
+        parse_brief(answer(points=points), ContentKind.PAGE, None)
+
+
 def test_an_answer_without_a_points_list_is_an_error_not_an_empty_brief() -> None:
-    # Seen from a provider that echoed the request's response format.
+    # E.g. a provider echoing the request's response format instead of an answer.
     with pytest.raises(BriefError):
         parse_brief({"type": "json_object"}, ContentKind.PAGE, None)
 
@@ -92,7 +100,7 @@ def test_whitespace_points_are_dropped() -> None:
     assert brief.points == ["first", "second", "third"]
 
 
-def test_three_points_left_after_dropping_empties_still_count() -> None:
+def test_empty_points_do_not_count_toward_the_minimum() -> None:
     with pytest.raises(BriefError):
         parse_brief(answer(points=["one", " ", "two", ""]), ContentKind.PAGE, None)
 

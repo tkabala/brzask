@@ -58,6 +58,9 @@ benches, do not count.
 A pipeline checks the limits when it starts. A run that starts under them
 runs in full, so one run can go past a limit by its own cost: about $0.02 for
 a digest and $0.05 for discovery with the defaults, measured in daily use.
+The digest's briefs add about $0.005 to it (five days of digests, 34 briefs,
+cost $0.024). Their cost counts from the next run on, since the run's own
+spending is not checked again.
 Once a limit is reached:
 
 - **the digest** still publishes its picks with summaries, but ranks the
@@ -65,7 +68,9 @@ Once a limit is reached:
   duplicates by similarity alone. That leaves out about half of a digest's
   cost (ranking was 52% of it over 13 daily digests); the selection, which
   stays, varies most from run to run ($0.0004 to $0.0098). The picks fit your
-  interests less well, since the selection sees fewer, unranked candidates;
+  interests less well, since the selection sees fewer, unranked candidates.
+  It writes no briefs; a digest of the day before still gets them from the
+  next run under the limit;
 - **discovery** is skipped, because nearly all of its cost is the web search.
 
 The run's statistics record the limits, what was spent and what was
