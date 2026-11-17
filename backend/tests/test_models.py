@@ -19,6 +19,7 @@ def test_all_tables_are_registered() -> None:
         "interests",
         "articles",
         "article_embeddings",
+        "article_contents",
         "runs",
         "settings",
         "change_log",

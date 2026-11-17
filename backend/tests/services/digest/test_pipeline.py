@@ -16,7 +16,15 @@ from brzask.clients.feeds import FeedEntry, FeedResult, FetchStatus
 from brzask.clients.llm import Completion
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import BudgetSettings
-from brzask.db.models import Article, ArticleState, RunKind, RunStatus, Source
+from brzask.db.models import (
+    Article,
+    ArticleContent,
+    ArticleState,
+    ContentKind,
+    RunKind,
+    RunStatus,
+    Source,
+)
 from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.services.digest import pipeline
 from brzask.services.digest.dedup import Deduplicated, Drop
@@ -237,6 +245,36 @@ def test_a_dry_run_writes_nothing_but_the_run(
     assert shown(session) == []
     assert session.scalar(select(func.count()).select_from(Article)) == 0
     assert all(source.fetched_at is None for source in sources)
+
+
+def test_digest_stores_content_for_picks_only(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+    link = "https://1.example/0"
+    digest = clients(feeds_for(sources))
+    digest = replace(digest, extractor=FakeExtractor({link: "word " * 3000}))
+
+    finished = run(sessions, digest)
+
+    assert finished.status is RunStatus.OK, finished.error
+    picked = shown(session)
+    stored = session.scalars(select(ArticleContent)).all()
+    assert {c.article_id for c in stored} == {a.id for a in picked}
+    assert all(a.extracted_text is None or len(a.extracted_text) <= 4000 for a in picked)
+    assert all(c.text for c in stored)
+    long = [c for c in stored if len(c.text) > 4000]
+    assert all(c.kind is ContentKind.PAGE for c in long)
+
+
+def test_dry_run_stores_no_content(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    sources = [make.source() for _ in range(6)]
+
+    run(sessions, clients(feeds_for(sources)), dry_run=True)
+
+    assert session.scalar(select(func.count()).select_from(ArticleContent)) == 0
 
 
 def test_no_candidates_skips_the_run(sessions: sessionmaker[Session]) -> None:

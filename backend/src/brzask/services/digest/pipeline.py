@@ -17,11 +17,16 @@ from brzask.config import get_settings
 from brzask.config.settings import BudgetSettings
 from brzask.log import get_logger
 from brzask.prompts import Language
-from brzask.repositories import ArticleRepository
+from brzask.repositories import ArticleRepository, ContentRepository
 from brzask.repositories.articles import DigestEntry
 from brzask.services.budget import check_budget
 from brzask.services.digest.dedup import Deduplicated, deduplicate_candidates
-from brzask.services.digest.extraction import DocumentEmbedder, TextExtractor, extract_and_embed
+from brzask.services.digest.extraction import (
+    DocumentEmbedder,
+    TextExtractor,
+    content_kind,
+    extract_and_embed,
+)
 from brzask.services.digest.pool import Candidate, FeedReader, gather_candidates
 from brzask.services.digest.ranking import ChatModel, rank_candidates
 from brzask.services.digest.selection import Pick, select_digest
@@ -94,6 +99,16 @@ def build_digest(context: RunContext, clients: DigestClients) -> None:
             offset = articles.last_digest_position(day) or 0
             articles.mark_shown(day, [_entry(pick, offset) for pick in picks], shown_at=now)
             articles.mark_repeats(repeats(extracted, deduplicated, picks))
+            contents = ContentRepository(session)
+            for pick in picks:
+                candidate = pick.candidate
+                if candidate.article_id is not None and candidate.full_text:
+                    contents.save(
+                        candidate.article_id,
+                        candidate.full_text,
+                        content_kind(candidate.extracted_by),
+                        candidate.extracted_by,
+                    )
 
 
 def run_digest(context: RunContext) -> None:

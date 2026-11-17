@@ -10,9 +10,10 @@ from dataclasses import replace
 from typing import Protocol
 
 from brzask.clients.embeddings import EmbeddingKind
-from brzask.clients.extractors import ExtractionInput, ExtractionResult
+from brzask.clients.extractors import SNIPPET, ExtractionInput, ExtractionResult
 from brzask.clients.usage import UsageMeter
 from brzask.concurrency import ContextThreadPoolExecutor
+from brzask.db.models import ContentKind
 from brzask.log import get_logger
 from brzask.repositories import ArticleRepository
 from brzask.repositories.articles import Extraction
@@ -27,6 +28,10 @@ TEXT_CHARS = 4000
 # Characters stored: the text that was embedded, so `brzask reembed` gives
 # another model the same input.
 STORED_CHARS = TEXT_CHARS
+# Characters of the full text kept for picked articles; the longest picked text
+# seen, a two-hour video's transcript, was 115k characters (measured on 14
+# digest videos).
+CONTENT_CHARS = 200_000
 # Pages extracted at once for the top 15.
 WORKERS = 5
 
@@ -68,7 +73,12 @@ def extract_and_embed(
     with context.stage("extraction"), ContextThreadPoolExecutor(max_workers=WORKERS) as pool:
         results = list(pool.map(extractor.extract, [_input(c) for c in candidates]))
     extracted = [
-        replace(c, text=_text(result), extracted_by=result.extracted_by)
+        replace(
+            c,
+            text=_text(result),
+            extracted_by=result.extracted_by,
+            full_text=_full_text(result),
+        )
         for c, result in zip(candidates, results, strict=True)
     ]
 
@@ -113,6 +123,20 @@ def _input(candidate: Candidate) -> ExtractionInput:
 def _text(result: ExtractionResult) -> str | None:
     text = (result.text or "").strip()[:TEXT_CHARS].strip()
     return text or None
+
+
+def _full_text(result: ExtractionResult) -> str | None:
+    text = (result.text or "").strip()[:CONTENT_CHARS].strip()
+    return text or None
+
+
+def content_kind(extracted_by: str | None) -> ContentKind:
+    """What kind of text an extractor produced."""
+    if extracted_by == "youtube":
+        return ContentKind.TRANSCRIPT
+    if extracted_by in (SNIPPET, None):
+        return ContentKind.DESCRIPTION
+    return ContentKind.PAGE
 
 
 def _extraction(article_id: int, candidate: Candidate, model: str) -> Extraction:

@@ -80,6 +80,7 @@ class Candidate:
     # Set by extraction, for the top candidates only.
     text: str | None = None  # article text for embeddings and prompts, cut to length
     extracted_by: str | None = None
+    full_text: str | None = None  # the extracted text before cutting, up to CONTENT_CHARS
     embedding: list[float] | None = None
 
 

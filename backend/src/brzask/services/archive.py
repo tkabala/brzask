@@ -37,6 +37,7 @@ TABLES: tuple[Table, ...] = tuple(
         "interests",
         "articles",
         "article_embeddings",
+        "article_contents",
         "runs",
         "settings",
         "change_log",

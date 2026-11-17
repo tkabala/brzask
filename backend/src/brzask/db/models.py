@@ -203,6 +203,26 @@ class ArticleEmbedding(Base):
     __table_args__ = (Index(None, "model", "article_id"),)
 
 
+class ContentKind(StrEnum):
+    PAGE = "page"  # the extracted article page
+    TRANSCRIPT = "transcript"  # a video's captions
+    DESCRIPTION = "description"  # only the feed's snippet was usable
+
+
+class ArticleContent(Base):
+    """The untruncated text of a picked article, kept for reading it in full."""
+
+    __tablename__ = "article_contents"
+
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True
+    )
+    text: Mapped[str] = mapped_column(comment="The full text or transcript.")
+    kind: Mapped[ContentKind] = mapped_column(text_enum(ContentKind, "content_kind"))
+    extracted_by: Mapped[str | None] = mapped_column(comment="Extractor that produced the text.")
+    fetched_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 # --- Runs ------------------------------------------------------------------------
 
 

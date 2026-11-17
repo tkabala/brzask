@@ -6,9 +6,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from brzask.clients.embeddings import EmbeddingError
 from brzask.clients.extractors import SNIPPET, ExtractionInput, ExtractionResult
-from brzask.db.models import Article
+from brzask.db.models import Article, ContentKind
 from brzask.repositories import EmbeddingRepository
-from brzask.services.digest.extraction import STORED_CHARS, TEXT_CHARS, extract_and_embed
+from brzask.services.digest.extraction import (
+    CONTENT_CHARS,
+    STORED_CHARS,
+    TEXT_CHARS,
+    content_kind,
+    extract_and_embed,
+)
 from brzask.services.digest.pool import Candidate
 from tests.factories import TEST_MODEL, Factories
 from tests.services.digest.fakes import NOW, FakeEmbedder, FakeExtractor, context
@@ -138,3 +144,43 @@ def test_an_embedding_failure_fails_the_stage(sessions: sessionmaker[Session]) -
             FakeExtractor({}),
             FakeEmbedder(EmbeddingError("down")),
         )
+
+
+def test_extract_and_embed_keeps_the_full_text(sessions: sessionmaker[Session]) -> None:
+    link = "https://example.com/long"
+    extractor = FakeExtractor({link: "a" * 10_000})
+
+    [result] = extract_and_embed(
+        context(sessions, dry_run=True), [candidate(link)], extractor, FakeEmbedder()
+    )
+
+    assert result.text is not None
+    assert len(result.text) == TEXT_CHARS
+    assert result.full_text is not None
+    assert len(result.full_text) == 10_000
+
+
+def test_full_text_is_capped(sessions: sessionmaker[Session]) -> None:
+    link = "https://example.com/huge"
+    extractor = FakeExtractor({link: "a" * 250_000})
+
+    [result] = extract_and_embed(
+        context(sessions, dry_run=True), [candidate(link)], extractor, FakeEmbedder()
+    )
+
+    assert result.full_text is not None
+    assert len(result.full_text) == CONTENT_CHARS == 200_000
+
+
+@pytest.mark.parametrize(
+    ("extracted_by", "kind"),
+    [
+        ("youtube", ContentKind.TRANSCRIPT),
+        (SNIPPET, ContentKind.DESCRIPTION),
+        (None, ContentKind.DESCRIPTION),
+        ("trafilatura", ContentKind.PAGE),
+        ("feed", ContentKind.PAGE),
+    ],
+)
+def test_content_kind(extracted_by: str | None, kind: ContentKind) -> None:
+    assert content_kind(extracted_by) is kind

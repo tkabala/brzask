@@ -11,6 +11,7 @@ what the states mean and why some columns exist.
 | `sources` | RSS/Atom feeds, whether they are fetched, and where they came from |
 | `interests` | Topics you care about: keywords and free-text reader notes |
 | `articles` | Every fetched entry, its ranking, embedding, digest text and whether you opened it |
+| `article_contents` | The untruncated text of picked articles: page text, video transcript or feed description |
 | `runs` | One row per pipeline run: status, stats, timings, error |
 | `settings` | Values changed at runtime, such as a pause (configuration lives in environment variables) |
 | `change_log` | Every change to sources, interests or configuration, by a person, a pipeline or an agent |
@@ -65,6 +66,12 @@ earlier models stay, so switching back costs nothing.
 `extracted_text` holds the first 4000 characters, the text that was embedded;
 rows holding only 2000 characters are embedded again from those, so their new
 vectors come from a shorter input than the rest of the history.
+
+Picked articles also keep their whole text in `article_contents`, written in
+the transaction that marks them shown: the extracted page, a video's transcript
+or, when only the feed's snippet was usable, that description (`kind` says
+which). The text is cut at 200,000 characters. A forced run never replaces
+a stored text, and deleting an article deletes its content.
 
 ## Sources
 

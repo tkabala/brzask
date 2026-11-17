@@ -12,8 +12,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from brzask.db.migrations import head_revision
 from brzask.db.models import (
     ApiToken,
+    ArticleContent,
     Change,
     ChangeStatus,
+    ContentKind,
     Interest,
     LoginSession,
     RunKind,
@@ -41,7 +43,7 @@ def fill_every_table(session: Session, make: Factories) -> None:
     make.source(name="Muted", status=SourceStatus.MUTED, fetch_failures=3, failing_since=NOW)
     make.interest(topic="AI", keywords=["llm", "agents"], notes="want: evals")
     make.article(feed, first_seen_at=NOW, embedding=[0.25] * 768)
-    make.article(
+    picked = make.article(
         feed,
         first_seen_at=NOW,
         digest_date=date(2026, 11, 6),
@@ -53,6 +55,7 @@ def fill_every_table(session: Session, make: Factories) -> None:
     make.run(NOW, cost=0.0042)
     session.add_all(
         [
+            ArticleContent(article_id=picked.id, text="The whole text.", kind=ContentKind.PAGE),
             Setting(key="embedding_model", value={"model": "test/model"}),
             Change(
                 actor="user",
@@ -117,7 +120,7 @@ def test_rows_are_ordered_by_primary_key(session: Session, make: Factories) -> N
 
 def test_rows_hold_every_column_as_plain_json(session: Session, make: Factories) -> None:
     fill_every_table(session, make)
-    run_id = session.scalars(select(TABLES[4].c.id)).one()
+    run_id = session.scalars(select(TABLES[5].c.id)).one()
 
     rows = {line["table"]: line["row"] for line in export_lines(session) if "table" in line}
 
