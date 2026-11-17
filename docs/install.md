@@ -87,28 +87,87 @@ notifications) are always reached directly.
 
 YouTube captions are the exception to the address check: they are fetched by
 a library that hands the proxy the host name (`www.youtube.com`, a public
-site). From daily use, captions came through for 14 of 14 recent digest
-videos from a home connection and for none of them from a hosted server,
-which YouTube answered with "request blocked"; without a proxy, videos on
-such a server keep their feed description as text.
+site). Measured in November 2026: captions came through for 14 of 14 recent
+digest videos from a home connection and for none of them from a hosted
+server, which YouTube answered with "request blocked". A home address is not
+a guarantee, though: the same month it was itself refused for hours after
+many caption requests in a row. Videos whose captions are refused fall back
+to the feed description as text, with or without a proxy.
 
 Keep the proxy off your LAN: the address check in brzask is the first line,
 a firewall on the proxy host that drops connections to private networks is
-the second. A LAN feed listed in `ALLOWED_PRIVATE_NETWORKS` is then reached
-through the proxy, which needs to reach that address.
+the second (see below). A LAN feed listed in `ALLOWED_PRIVATE_NETWORKS` is
+then reached through the proxy, which needs to reach that address.
 
-[tinyproxy](https://tinyproxy.github.io/) on a home machine, accepting only
-the brzask server:
+### A proxy with tinyproxy
+
+[tinyproxy](https://tinyproxy.github.io/) on a machine at home. Add or change
+these lines in the packaged `/etc/tinyproxy/tinyproxy.conf` (keep its
+`User`, `Group`, `LogFile` and `PidFile`; a short replacement file drops
+them). tinyproxy rejects a comment at the end of a directive line and does
+not start, so comments go on their own lines:
 
 ```text
-# /etc/tinyproxy/tinyproxy.conf
 Port 8888
-Allow 203.0.113.10   # the brzask server's address (or its tailnet address)
+# The proxy host's private address; without Listen, every interface.
+Listen 192.168.1.20
+# The address the proxy sees the brzask server's connections come from.
+Allow 192.168.1.6
 ConnectPort 443
 ConnectPort 80
 ```
 
-Or, without installing anything at home, an SSH SOCKS tunnel started on the
+`Allow` must name the address as the proxy sees it. Through a VPN subnet
+router such as Tailscale that is the router's LAN address, not the brzask
+server's VPN address, and every node routed through that router is then
+admitted too. If unsure, try a request and read `Unauthorized connection
+from "..."` in the tinyproxy log.
+
+`ConnectPort` restricts `CONNECT` only. tinyproxy still forwards a plain
+`GET http://192.168.1.1/` to any host, your router's web page included.
+brzask never sends that (it always tunnels to an address its own check
+passed), but anyone else allowed to use the proxy could. So block private
+destinations for the proxy's user. This nftables table does it and keeps DNS
+to the LAN resolver (here `192.168.1.8`) open:
+
+```text
+# /etc/tinyproxy/no-lan.nft
+table inet tinyproxy_guard
+delete table inet tinyproxy_guard
+table inet tinyproxy_guard {
+	chain output {
+		type filter hook output priority filter; policy accept;
+		meta skuid != "tinyproxy" accept
+		ct state established,related accept
+		ip daddr 192.168.1.8 meta l4proto { udp, tcp } th dport 53 accept
+		ip daddr { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/3 } reject
+		ip6 daddr { ::1, fc00::/7, fe80::/10, ff00::/8 } reject
+	}
+}
+```
+
+Load it whenever the service starts, with a drop-in
+(`systemctl edit tinyproxy`):
+
+```ini
+[Unit]
+# Listen names a private address: wait for the network at boot. Where
+# nftables.service flushes the ruleset on start, load the table after it.
+Wants=network-online.target
+After=network-online.target nftables.service
+
+[Service]
+ExecStartPre=/usr/sbin/nft -f /etc/tinyproxy/no-lan.nft
+```
+
+Reloading `nftables.service` later drops the table until tinyproxy restarts.
+systemd's `IPAddressDeny=` is the shorter route, but it may not be enforced
+inside containers such as LXC (it was not in a test), so check with a plain
+`curl -x http://192.168.1.20:8888 http://192.168.1.1/`: it must fail.
+
+### An SSH tunnel instead
+
+Without installing anything at home, an SSH SOCKS tunnel started on the
 brzask server, bound to an address the containers reach (the Docker bridge,
 `172.17.0.1` by default):
 
