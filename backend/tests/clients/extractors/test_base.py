@@ -31,6 +31,8 @@ def test_exactly_the_minimum_is_usable() -> None:
         "# towardsdatascience.com\n\n## Performing security verification\n\nThis website uses a"
         " security service to protect against malicious bots. This page is displayed while the"
         " website verifies you are not a bot.",
+        "You signed in with another tab or window. Reload to refresh your session.You signed"
+        " out in another tab or window. Reload to refresh your session.Dismiss alert",
     ],
 )
 def test_block_pages_are_not_usable(page: str) -> None:

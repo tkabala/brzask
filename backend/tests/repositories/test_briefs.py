@@ -72,10 +72,19 @@ def test_missing_lists_recent_digest_articles_with_content_and_no_brief(
     repository = BriefRepository(session)
     repository.save(briefed, BRIEF, BriefBasis.FULL_TEXT, "test/model")
 
-    missing = repository.missing(since=date(2026, 11, 15))
+    missing = repository.missing(since=date(2026, 11, 15), until=DAY)
 
     assert [article.id for article, _ in missing] == [yesterday, earlier, later]
     assert all(content.article_id == article.id for article, content in missing)
+
+
+def test_missing_stops_at_until(session: Session, make: Factories) -> None:
+    yesterday = with_content(make, date(2026, 11, 15))
+    with_content(make, DAY)  # after `until`
+
+    missing = BriefRepository(session).missing(since=date(2026, 11, 15), until=date(2026, 11, 15))
+
+    assert [article.id for article, _ in missing] == [yesterday]
 
 
 def test_ids_with_brief(session: Session, make: Factories) -> None:

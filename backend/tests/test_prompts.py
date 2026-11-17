@@ -318,6 +318,13 @@ def test_brief_marks_the_article_and_asks_for_the_language() -> None:
     assert "cut short" not in text
 
 
+def test_brief_never_adds_a_date_and_may_find_nothing() -> None:
+    text = prompts.render("brief", **SAMPLES["brief"])
+
+    assert "Never add a date or year the text does not state" in text
+    assert 'an empty "points" list' in text
+
+
 def test_brief_of_a_page_asks_for_no_chapters() -> None:
     text = prompts.render("brief", **{**SAMPLES["brief"], "kind": "page", "partial": True})
 

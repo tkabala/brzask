@@ -34,6 +34,8 @@ Rules:
 - "chapters": [] (only videos have chapters).
 {% endif %}
 - Keep product names, company names, commands and other proper nouns as they are.
+- Write dates as the text gives them. Never add a date or year the text does not state.
+- A text with no substance to brief (an error page, a login or cookie notice, site navigation only) gets an empty "points" list; never pad it with points about the page itself.
 {% if kind == "transcript" %}
 
 The article is a video; the text is its transcript.

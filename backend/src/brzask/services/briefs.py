@@ -6,7 +6,10 @@ specifics, caveats and, for videos, chapters with timestamps. The model's
 answer is checked against that shape and cleaned to it (empty items dropped,
 lists cut to their maximum, chapters outside the video dropped); an answer
 that cannot be cleaned is asked for once more, then the article is counted as
-failed and tried again by the next run while it is recent. Nothing in the
+failed and tried again by the next run while it is recent. An answer with no
+points at all is the model saying the text has nothing to brief (an error or
+notice page); it is not asked again in that run and nothing is stored, so
+the next run asks once more while the article is recent. Nothing in the
 stage ever fails the digest run.
 """
 
@@ -32,6 +35,7 @@ __all__ = [
     "Brief",
     "BriefError",
     "Chapter",
+    "NothingToBriefError",
     "basis",
     "clip",
     "last_marker",
@@ -61,18 +65,25 @@ class BriefError(Exception):
     """The model's answer cannot be cleaned into a brief."""
 
 
+class NothingToBriefError(Exception):
+    """The model answered with no points: the text has nothing to brief."""
+
+
 def clip(text: str, limit: int = BRIEF_INPUT_CHARS) -> tuple[str, bool]:
     """`text` cut to at most `limit` characters, and whether it was cut.
 
     The cut is at the last blank line before the limit, so it never splits a
-    paragraph; a text without one there is cut at the limit itself.
+    paragraph. Texts carried by feeds often have no blank lines: then the cut
+    is at the last line break, else after the last sentence (". "), else at
+    the limit itself.
     """
     if len(text) <= limit:
         return text, False
-    end = text.rfind("\n\n", 0, limit)
-    if end <= 0:
-        return text[:limit], True
-    return text[:end].rstrip(), True
+    for separator, keep in (("\n\n", 0), ("\n", 0), (". ", 1)):
+        end = text.rfind(separator, 0, limit)
+        if end > 0:
+            return text[: end + keep].rstrip(), True
+    return text[:limit], True
 
 
 def last_marker(text: str) -> int | None:
@@ -95,6 +106,7 @@ def basis(kind: ContentKind, clipped: bool) -> BriefBasis:
 def parse_brief(answer: Any, kind: ContentKind, last_second: int | None) -> Brief:
     """The brief in `answer`, cleaned to the contract; raises `BriefError`.
 
+    A `points` list with nothing in it raises `NothingToBriefError`. Otherwise
     `gist` must be non-empty text and at least `MIN_POINTS` points must be
     left once empty ones are dropped; points over `MAX_POINTS` and caveats
     over `MAX_CAVEATS` are cut. Chapters are kept for a transcript only: each
@@ -106,10 +118,13 @@ def parse_brief(answer: Any, kind: ContentKind, last_second: int | None) -> Brie
     """
     if not isinstance(answer, dict):
         raise BriefError(f"the answer is not an object: {type(answer).__name__}")
+    points = _texts(answer, "points")
+    # Only an explicit empty list: an answer without the field is malformed, not empty.
+    if not points and isinstance(answer.get("points"), list):
+        raise NothingToBriefError(_text(answer.get("gist")))
     gist = _text(answer.get("gist"))
     if not gist:
         raise BriefError("the answer has no gist")
-    points = _texts(answer, "points")
     if len(points) < MIN_POINTS:
         raise BriefError(f"the answer has {len(points)} points, fewer than {MIN_POINTS}")
     caveats = _texts(answer, "caveats")
@@ -134,7 +149,8 @@ def write_brief(
 
     One call, asked once more when the answer is not JSON or cannot be
     cleaned into a brief; raises `BriefError` or `InvalidJSONError` when the
-    second answer fails too, and lets other errors of the call through.
+    second answer fails too, and lets other errors of the call through. An
+    answer with no points raises `NothingToBriefError` at once, without asking again.
     """
     text, clipped = clip(content.text, BRIEF_INPUT_CHARS)
     prompt = prompts.render(
@@ -166,14 +182,16 @@ def write_missing(context: RunContext, llm: ChatModel, language: Language, day: 
 
     The day before is included so an article whose brief failed is tried once
     more by the next day's run, and not later. Each brief is stored in its own
-    transaction, so one failure loses only that brief; a text under
-    `MIN_CHARS` gets none. Counts go to `context.stats["briefs"]`.
+    transaction, so one failure loses only that brief. Counts go to
+    `context.stats["briefs"]`: `written`; `failed` (the call or both answers
+    failed); `skipped` (a text under `MIN_CHARS`, never sent to the model);
+    `empty` (the model found nothing to brief in the text; nothing is stored).
     """
-    stats = {"written": 0, "failed": 0, "skipped": 0}
+    stats = {"written": 0, "failed": 0, "skipped": 0, "empty": 0}
     context.stats["briefs"] = stats
     with context.stage("briefs"):
         with context.sessions.begin() as session:
-            missing = BriefRepository(session).missing(since=day - timedelta(days=1))
+            missing = BriefRepository(session).missing(since=day - timedelta(days=1), until=day)
             interests = interest_context(session)
         for article, content in missing:
             if len(content.text.strip()) < MIN_CHARS:
@@ -185,6 +203,10 @@ def write_missing(context: RunContext, llm: ChatModel, language: Language, day: 
                 )
                 with context.sessions.begin() as session:
                     BriefRepository(session).save(article.id, brief, written_on, model)
+            except NothingToBriefError as nothing:
+                log.info("nothing to brief", article_id=article.id, gist=str(nothing))
+                stats["empty"] += 1
+                continue
             except Exception as error:
                 # One article's failure, whatever it is, must not cost the others theirs.
                 log.warning(

@@ -496,7 +496,12 @@ def test_a_run_writes_a_brief_per_picked_article(
 
     assert finished.status is RunStatus.OK, finished.error
     assert {b.article_id for b in stored_briefs(session)} == {a.id for a in shown(session)}
-    assert finished.stats["briefs"] == {"written": DIGEST_SIZE, "failed": 0, "skipped": 0}
+    assert finished.stats["briefs"] == {
+        "written": DIGEST_SIZE,
+        "failed": 0,
+        "skipped": 0,
+        "empty": 0,
+    }
     assert model.purposes == ["ranking", "selection"] + ["brief"] * DIGEST_SIZE
     assert "briefs" in finished.timings
 
@@ -512,7 +517,12 @@ def test_brief_failure_does_not_fail_the_digest(
     assert finished.status is RunStatus.OK, finished.error
     assert len(shown(session)) == DIGEST_SIZE
     assert stored_briefs(session) == []
-    assert finished.stats["briefs"] == {"written": 0, "failed": DIGEST_SIZE, "skipped": 0}
+    assert finished.stats["briefs"] == {
+        "written": 0,
+        "failed": DIGEST_SIZE,
+        "skipped": 0,
+        "empty": 0,
+    }
 
 
 def test_an_error_around_the_briefs_is_recorded_not_raised(

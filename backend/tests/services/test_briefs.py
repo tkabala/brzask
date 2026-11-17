@@ -17,6 +17,7 @@ from brzask.services.briefs import (
     Brief,
     BriefError,
     Chapter,
+    NothingToBriefError,
     basis,
     clip,
     last_marker,
@@ -61,6 +62,20 @@ def test_a_valid_text_article() -> None:
 def test_two_points_is_an_error() -> None:
     with pytest.raises(BriefError):
         parse_brief(answer(points=["one", "two"]), ContentKind.PAGE, None)
+
+
+@pytest.mark.parametrize("points", [[], ["", "  "]])
+def test_no_points_means_nothing_to_brief(points: list[str]) -> None:
+    with pytest.raises(NothingToBriefError):
+        parse_brief(
+            answer(points=points, gist="Only GitHub session notices."), ContentKind.PAGE, None
+        )
+
+
+def test_an_answer_without_a_points_list_is_an_error_not_an_empty_brief() -> None:
+    # Seen from a provider that echoed the request's response format.
+    with pytest.raises(BriefError):
+        parse_brief({"type": "json_object"}, ContentKind.PAGE, None)
 
 
 def test_twenty_points_are_cut_to_seven() -> None:
@@ -200,6 +215,22 @@ def test_clip_cuts_at_the_last_paragraph_before_the_limit() -> None:
     assert (clipped, cut) == ("first paragraph\n\nsecond paragraph", True)
 
 
+def test_clip_without_blank_lines_cuts_at_the_last_line_break() -> None:
+    text = "first line here\nsecond line here\nthird line here"
+
+    clipped, cut = clip(text, limit=40)
+
+    assert (clipped, cut) == ("first line here\nsecond line here", True)
+
+
+def test_clip_of_one_line_cuts_after_the_last_sentence() -> None:
+    text = "First sentence here. Second sentence here. Third sentence here."
+
+    clipped, cut = clip(text, limit=50)
+
+    assert (clipped, cut) == ("First sentence here. Second sentence here.", True)
+
+
 def test_clip_cuts_one_giant_paragraph_at_the_limit() -> None:
     clipped, cut = clip("x" * 100, limit=40)
 
@@ -288,11 +319,22 @@ def test_write_brief_retries_an_answer_that_is_not_json(make: Factories) -> None
 
 def test_write_brief_gives_up_after_two_invalid_answers(make: Factories) -> None:
     article = make.article()
-    llm = FakeLLM(lambda _, __: {"points": []})
+    llm = FakeLLM(lambda _, __: answer(points=["one", "two"]))
 
     with pytest.raises(BriefError):
         write_brief(llm, page(), article, [], ENGLISH, None)
     assert len(llm.prompts) == 2
+
+
+def test_write_brief_takes_no_points_as_nothing_to_brief_without_asking_again(
+    make: Factories,
+) -> None:
+    article = make.article()
+    llm = FakeLLM(lambda _, __: answer(points=[]))
+
+    with pytest.raises(NothingToBriefError):
+        write_brief(llm, page(), article, [], ENGLISH, None)
+    assert len(llm.prompts) == 1
 
 
 def test_write_brief_clips_a_long_text_and_marks_it_partial(
@@ -364,7 +406,7 @@ def test_write_missing_writes_a_brief_per_digest_article(
 
     stored = briefs_by_article(session)
     assert set(stored) == {ids[0], ids[2]}
-    assert run.stats["briefs"] == {"written": 2, "failed": 1, "skipped": 0}
+    assert run.stats["briefs"] == {"written": 2, "failed": 1, "skipped": 0, "empty": 0}
     assert "briefs" in run.timings
     first = stored[ids[0]]
     assert (first.gist, first.points, first.caveats) == (
@@ -387,7 +429,7 @@ def test_write_missing_writes_a_brief_per_digest_article(
 
     stored = briefs_by_article(session)
     assert set(stored) == set(ids)
-    assert again.stats["briefs"] == {"written": 1, "failed": 0, "skipped": 0}
+    assert again.stats["briefs"] == {"written": 1, "failed": 0, "skipped": 0, "empty": 0}
     assert len(second_llm.prompts) == 1
     assert stored[ids[1]].gist == "Another gist."
     assert {i: stored[i].created_at for i in (ids[0], ids[2])} == created
@@ -419,7 +461,38 @@ def test_write_missing_skips_a_text_too_short_to_brief(
 
     assert llm.prompts == []
     assert briefs_by_article(session) == {}
-    assert run.stats["briefs"] == {"written": 0, "failed": 0, "skipped": 1}
+    assert run.stats["briefs"] == {"written": 0, "failed": 0, "skipped": 1, "empty": 0}
+
+
+def test_write_missing_stores_nothing_for_a_text_with_nothing_to_brief(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    kept = digest_article(make, "Release notes", DAY)
+    digest_article(make, "Session notice", DAY)
+    run = context(sessions)
+    llm = FakeLLM(
+        lambda prompt, _: (
+            answer(points=[]) if "<untrusted>Session notice</untrusted>" in prompt else VALID
+        )
+    )
+
+    write_missing(run, llm, ENGLISH, DAY)
+
+    assert set(briefs_by_article(session)) == {kept}
+    assert run.stats["briefs"] == {"written": 1, "failed": 0, "skipped": 0, "empty": 1}
+    assert len(llm.prompts) == 2
+
+
+def test_write_missing_leaves_later_days_alone(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    today = digest_article(make, "Today", DAY)
+    digest_article(make, "Tomorrow", DAY + timedelta(days=1))
+    llm = FakeLLM(lambda _, __: VALID)
+
+    write_missing(context(sessions), llm, ENGLISH, DAY)
+
+    assert set(briefs_by_article(session)) == {today}
 
 
 def test_write_missing_counts_a_raising_model_as_failed(
@@ -433,7 +506,7 @@ def test_write_missing_counts_a_raising_model_as_failed(
     write_missing(run, llm, ENGLISH, DAY)
 
     assert briefs_by_article(session) == {}
-    assert run.stats["briefs"] == {"written": 0, "failed": 2, "skipped": 0}
+    assert run.stats["briefs"] == {"written": 0, "failed": 2, "skipped": 0, "empty": 0}
 
 
 def test_write_missing_ignores_articles_without_content(

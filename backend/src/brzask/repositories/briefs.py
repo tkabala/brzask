@@ -31,8 +31,8 @@ class BriefRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def missing(self, since: date) -> Sequence[tuple[Article, ArticleContent]]:
-        """Digest articles from `since` on with a stored text and no brief, in digest order.
+    def missing(self, since: date, until: date) -> Sequence[tuple[Article, ArticleContent]]:
+        """Digest articles from `since` to `until` with a stored text and no brief, in digest order.
 
         Each article comes with its source loaded.
         """
@@ -40,7 +40,11 @@ class BriefRepository:
             select(Article, ArticleContent)
             .join(ArticleContent, ArticleContent.article_id == Article.id)
             .outerjoin(ArticleBrief, ArticleBrief.article_id == Article.id)
-            .where(Article.digest_date >= since, ArticleBrief.article_id.is_(None))
+            .where(
+                Article.digest_date >= since,
+                Article.digest_date <= until,
+                ArticleBrief.article_id.is_(None),
+            )
             .order_by(Article.digest_date, Article.digest_position, Article.id)
             .options(joinedload(Article.source))
         )
