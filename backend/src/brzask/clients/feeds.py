@@ -16,6 +16,7 @@ import httpx2
 
 from brzask.clients.extractors.base import is_block_page
 from brzask.clients.http import REQUEST_ERRORS, is_refused_address, public_client, read_limited
+from brzask.clients.tunnel import ProxyTarget
 from brzask.concurrency import ContextThreadPoolExecutor
 from brzask.config.settings import FetchSettings, Network
 from brzask.log import get_logger
@@ -102,16 +103,19 @@ class FeedFetcher:
         client: httpx2.Client | None = None,
         *,
         allowed: Sequence[Network] = (),
+        proxy: ProxyTarget | None = None,
         workers: int = WORKERS,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
-        self.client = client or public_client(TIMEOUT, allowed, headers={"Accept": ACCEPT})
+        self.client = client or public_client(
+            TIMEOUT, allowed, headers={"Accept": ACCEPT}, proxy=proxy
+        )
         self.workers = workers
         self._now = now
 
     @classmethod
     def from_settings(cls, settings: FetchSettings) -> "FeedFetcher":
-        return cls(allowed=settings.allowed_private_networks)
+        return cls(allowed=settings.allowed_private_networks, proxy=settings.proxy_target())
 
     def close(self) -> None:
         self.client.close()

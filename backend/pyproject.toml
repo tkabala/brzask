@@ -31,6 +31,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.11",
     "sentry-sdk>=2.72",
+    "socksio>=1.0.0",
     "sqlalchemy>=2.0.40",
     "structlog>=25.4",
     "trafilatura>=2.0",

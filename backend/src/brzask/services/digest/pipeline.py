@@ -111,7 +111,11 @@ def run_digest(context: RunContext) -> None:
     with ExitStack() as stack:
         feeds = FeedFetcher.from_settings(settings.fetch)
         stack.callback(feeds.close)
-        pages = public_client(PAGE_TIMEOUT, settings.fetch.allowed_private_networks)
+        pages = public_client(
+            PAGE_TIMEOUT,
+            settings.fetch.allowed_private_networks,
+            proxy=settings.fetch.proxy_target(),
+        )
         stack.callback(pages.close)
         services = new_client(PAGE_TIMEOUT)
         stack.callback(services.close)

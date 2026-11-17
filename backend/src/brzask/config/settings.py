@@ -36,6 +36,8 @@ from pydantic_settings import (
 )
 from sqlalchemy.engine import URL
 
+from brzask.clients.tunnel import ProxyTarget, parse_proxy
+
 # --- Helpers -----------------------------------------------------------------
 
 
@@ -289,6 +291,9 @@ def _parse_networks(value: object) -> object:
 class FetchSettings(SettingsGroup):
     """Fetching feeds and the pages they link to."""
 
+    # FETCH_PROXY may carry credentials: a validation error must not quote it.
+    model_config = SettingsConfigDict(hide_input_in_errors=True)
+
     allowed_private_networks: Annotated[
         list[Network], NoDecode, BeforeValidator(_parse_networks)
     ] = Field(
@@ -300,6 +305,28 @@ class FetchSettings(SettingsGroup):
         "network, or one served by another container of the same compose project "
         "(usually inside 172.16.0.0/12), needs its network listed here.",
     )
+    proxy: OptionalSecret = Field(
+        None,
+        validation_alias="FETCH_PROXY",
+        description="Proxy for every fetch of a third-party site (feeds, article pages, "
+        "robots.txt), e.g. http://proxy.lan:3128 or socks5://user:password@proxy.lan:1080; "
+        "only http:// and socks5:// proxies are supported (not https://). brzask still "
+        "resolves each host and refuses non-public addresses itself, then asks the proxy "
+        "for a tunnel to the checked IP address, so the proxy must allow CONNECT to ports "
+        "80 and 443. Services you configure (LLM, embeddings, search, extraction services, "
+        "notifications) are always reached directly. Empty: no proxy.",
+    )
+
+    @field_validator("proxy")
+    @classmethod
+    def _valid_proxy(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None:
+            parse_proxy(value.get_secret_value())
+        return value
+
+    def proxy_target(self) -> ProxyTarget | None:
+        """The proxy third-party fetches go through, if any."""
+        return None if self.proxy is None else parse_proxy(self.proxy.get_secret_value())
 
 
 class ExtractorSettings(SettingsGroup):

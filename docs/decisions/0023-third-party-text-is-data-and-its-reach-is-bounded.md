@@ -104,8 +104,10 @@ The whole measurement cost about $0.26.
 - Good, because an agent that goes wrong can only make logged, reversible
   changes and a bounded number of paid runs.
 - Bad, because a feed or page on the owner's network needs
-  `ALLOWED_PRIVATE_NETWORKS`, and URLs from third parties are fetched
-  directly: `HTTP_PROXY` and `HTTPS_PROXY` apply only to configured services.
+  `ALLOWED_PRIVATE_NETWORKS`, and URLs from third parties ignore
+  `HTTP_PROXY` and `HTTPS_PROXY`, which apply only to configured services.
+  They go direct, or through `FETCH_PROXY` with the address check still
+  made by brzask ([0024](0024-third-party-fetches-may-go-through-one-proxy.md)).
 - Bad, because marking text is not a boundary: a model may still follow an
   injected instruction within what the structure allows.
 

@@ -551,3 +551,47 @@ def test_agent_runs_per_day(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENT_RUNS_PER_DAY", "-1")
     with pytest.raises(ValidationError):
         BudgetSettings()
+
+
+def test_fetch_proxy_is_off_by_default() -> None:
+    assert FetchSettings().proxy is None
+    assert FetchSettings().proxy_target() is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["https://h:1", "http://h", "socks4://h:1080", "h:3128", "http://:3128"],
+)
+def test_fetch_proxy_rejects(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("FETCH_PROXY", value)
+
+    with pytest.raises(ValidationError):
+        FetchSettings()
+
+
+def test_fetch_proxy_accepts_socks5(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FETCH_PROXY", "socks5://h:1080")
+
+    target = FetchSettings().proxy_target()
+
+    assert target is not None
+    assert (target.scheme, target.host, target.port) == ("socks5", "h", 1080)
+
+
+def test_fetch_proxy_is_a_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FETCH_PROXY", "http://user:hunter2@h:3128")
+
+    settings = FetchSettings()
+
+    assert "hunter2" not in repr(settings)
+    target = settings.proxy_target()
+    assert target is not None
+    assert (target.username, target.password) == ("user", "hunter2")
+
+
+def test_fetch_proxy_errors_do_not_quote_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FETCH_PROXY", "https://user:hunter2@h:3128")
+
+    with pytest.raises(ValidationError) as error:
+        FetchSettings()
+    assert "hunter2" not in str(error.value)

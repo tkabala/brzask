@@ -66,6 +66,56 @@ Several at once: `COMPOSE_PROFILES=crawler,search`. Their secrets come from
 `setup` too. The Crawl4AI image is large (about 8 GB) and wants 2 GB of
 memory.
 
+## Fetching through a proxy
+
+Some sites refuse requests from data-centre addresses. Set `FETCH_PROXY` to
+send every fetch of a third-party site (feeds, article pages, robots.txt,
+discovery) through a forward proxy on another network, for example at home:
+
+```bash
+FETCH_PROXY=http://proxy.home.example:8888
+# or with credentials, or SOCKS5:
+FETCH_PROXY=socks5://user:password@proxy.home.example:1080
+```
+
+brzask still resolves every host and refuses non-public addresses itself,
+then asks the proxy for a tunnel to the checked IP address, never a host
+name; plain-HTTP pages go through a tunnel too. So the proxy must allow
+`CONNECT` to ports 80 and 443. `https://` proxies are not supported.
+Services you configured (LLM, embeddings, search, extraction services,
+notifications) are always reached directly.
+
+Keep the proxy off your LAN: the address check in brzask is the first line,
+a firewall on the proxy host that drops connections to private networks is
+the second. A LAN feed listed in `ALLOWED_PRIVATE_NETWORKS` is then reached
+through the proxy, which needs to reach that address.
+
+[tinyproxy](https://tinyproxy.github.io/) on a home machine, accepting only
+the brzask server:
+
+```text
+# /etc/tinyproxy/tinyproxy.conf
+Port 8888
+Allow 203.0.113.10   # the brzask server's address (or its tailnet address)
+ConnectPort 443
+ConnectPort 80
+```
+
+Or, without installing anything at home, an SSH SOCKS tunnel started on the
+brzask server, bound to an address the containers reach (the Docker bridge,
+`172.17.0.1` by default):
+
+```bash
+ssh -N -D 172.17.0.1:1080 user@home.example
+```
+
+```bash
+FETCH_PROXY=socks5://172.17.0.1:1080
+```
+
+Why the address check stays in brzask is recorded in
+[ADR 0024](decisions/0024-third-party-fetches-may-go-through-one-proxy.md).
+
 ## Images
 
 Releases are published to `ghcr.io/tkabala/brzask` for amd64 and arm64,

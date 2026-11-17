@@ -9,6 +9,7 @@ import httpcore2
 import httpx2
 
 from brzask import PROJECT_URL, __version__
+from brzask.clients.tunnel import ProxyTarget, open_tunnel
 from brzask.config.settings import Network
 
 USER_AGENT = f"brzask/{__version__} (+{PROJECT_URL})"
@@ -73,11 +74,22 @@ class PublicOnlyBackend(httpcore2.SyncBackend):
     the connection goes to the checked addresses only, so a DNS answer that changes
     between the check and the connection cannot lead elsewhere. TLS still
     verifies the host name.
+
+    With a `proxy`, the connection goes to the proxy, which is asked for a
+    tunnel to the checked address (never the host name). The proxy's own
+    address is not checked: the owner configured it, and it usually is a
+    private one.
     """
 
-    def __init__(self, allowed: Sequence[Network], resolve: Resolver = _resolve) -> None:
+    def __init__(
+        self,
+        allowed: Sequence[Network],
+        resolve: Resolver = _resolve,
+        proxy: ProxyTarget | None = None,
+    ) -> None:
         self.allowed = tuple(allowed)
         self.resolve = resolve
+        self.proxy = proxy
 
     def connect_tcp(
         self,
@@ -99,10 +111,30 @@ class PublicOnlyBackend(httpcore2.SyncBackend):
         # Like a connection by name: each address in turn, until one answers.
         for address in addresses[:-1]:
             try:
-                return super().connect_tcp(address, port, timeout, local_address, socket_options)
+                return self._connect(address, port, timeout, local_address, socket_options)
             except (httpcore2.ConnectError, httpcore2.ConnectTimeout):
                 continue
-        return super().connect_tcp(addresses[-1], port, timeout, local_address, socket_options)
+        return self._connect(addresses[-1], port, timeout, local_address, socket_options)
+
+    def _connect(
+        self,
+        address: str,
+        port: int,
+        timeout: float | None,
+        local_address: str | None,
+        socket_options: Iterable[httpcore2.SOCKET_OPTION] | None,
+    ) -> httpcore2.NetworkStream:
+        if self.proxy is None:
+            return super().connect_tcp(address, port, timeout, local_address, socket_options)
+        stream = super().connect_tcp(
+            self.proxy.host, self.proxy.port, timeout, local_address, socket_options
+        )
+        try:
+            open_tunnel(stream, self.proxy, address, port, timeout)
+        except BaseException:
+            stream.close()
+            raise
+        return stream
 
 
 class _PublicTransport(httpx2.HTTPTransport):
@@ -125,17 +157,19 @@ def public_client(
     *,
     headers: Mapping[str, str] | None = None,
     resolve: Resolver = _resolve,
+    proxy: ProxyTarget | None = None,
 ) -> httpx2.Client:
     """For URLs third parties name (feeds, article pages, robots.txt): refuses
     every non-public address outside `allowed`, on every redirect too.
 
-    It goes direct: HTTP(S)_PROXY from the environment is not used.
+    It goes direct, or through `proxy` (`FETCH_PROXY`) when one is given;
+    HTTP(S)_PROXY from the environment is not used.
     """
     return httpx2.Client(
         timeout=timeout,
         follow_redirects=True,
         headers={"User-Agent": USER_AGENT, **(headers or {})},
-        transport=_PublicTransport(PublicOnlyBackend(allowed, resolve)),
+        transport=_PublicTransport(PublicOnlyBackend(allowed, resolve, proxy)),
     )
 
 

@@ -9,6 +9,7 @@ import httpx2
 import pytest
 
 from brzask.clients.http import REQUEST_ERRORS, PublicOnlyBackend, is_allowed, public_client
+from brzask.clients.tunnel import parse_proxy
 
 TIMEOUT = httpx2.Timeout(5.0)
 LOOPBACK = [ip_network("127.0.0.0/8")]
@@ -169,3 +170,51 @@ def test_backend_raises_when_no_checked_address_answers(monkeypatch: pytest.Monk
     backend = PublicOnlyBackend([], resolve=answers({"down.test": ["93.184.215.14", "8.8.8.8"]}))
     with pytest.raises(httpcore2.ConnectError, match=r"8\.8\.8\.8 unreachable"):
         backend.connect_tcp("down.test", 443)
+
+
+def test_backend_with_a_proxy_tunnels_to_the_next_checked_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connected: list[str] = []
+    tunnels: list[str] = []
+    closed: list[bool] = []
+
+    class Stream:
+        def close(self) -> None:
+            closed.append(True)
+
+    def connect(self: Any, host: str, port: int, *args: Any, **kwargs: Any) -> Any:
+        connected.append(f"{host}:{port}")
+        return Stream()
+
+    def tunnel(stream: Any, proxy: Any, address: str, port: int, timeout: Any) -> None:
+        tunnels.append(f"{address}:{port}")
+        if address == "2606:4700::1":
+            raise httpcore2.ConnectError("proxy refused the tunnel")
+
+    monkeypatch.setattr(httpcore2.SyncBackend, "connect_tcp", connect)
+    monkeypatch.setattr("brzask.clients.http.open_tunnel", tunnel)
+    backend = PublicOnlyBackend(
+        [],
+        resolve=answers({"dual.test": ["2606:4700::1", "93.184.215.14"]}),
+        proxy=parse_proxy("http://proxy.lan:3128"),
+    )
+    backend.connect_tcp("dual.test", 443)
+
+    assert connected == ["proxy.lan:3128", "proxy.lan:3128"]
+    assert tunnels == ["2606:4700::1:443", "93.184.215.14:443"]
+    assert closed == [True]
+
+
+def test_backend_with_a_proxy_checks_before_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
+    def connect(self: Any, host: str, port: int, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("the proxy must not be contacted")
+
+    monkeypatch.setattr(httpcore2.SyncBackend, "connect_tcp", connect)
+    backend = PublicOnlyBackend(
+        [],
+        resolve=answers({"intranet.test": ["10.0.0.5"]}),
+        proxy=parse_proxy("socks5://proxy.lan:1080"),
+    )
+    with pytest.raises(httpcore2.ConnectError, match=r"10\.0\.0\.5 is not public"):
+        backend.connect_tcp("intranet.test", 443)

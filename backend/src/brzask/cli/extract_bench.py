@@ -80,10 +80,12 @@ def extract_bench_command(
         err=True,
     )
     with ExitStack() as stack:
-        allowed = get_settings().fetch.allowed_private_networks
-        feeds = FeedFetcher(allowed=allowed)
+        fetch = get_settings().fetch
+        feeds = FeedFetcher.from_settings(fetch)
         stack.callback(feeds.close)
-        client = public_client(PAGE_TIMEOUT, allowed)
+        client = public_client(
+            PAGE_TIMEOUT, fetch.allowed_private_networks, proxy=fetch.proxy_target()
+        )
         stack.callback(client.close)
         services = new_client(PAGE_TIMEOUT)
         stack.callback(services.close)
