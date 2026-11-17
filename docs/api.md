@@ -211,7 +211,8 @@ answers 400; start again without one.
 
 Opening an article is a preference signal, so every link to an article
 goes through `/open?id=<article>&sig=<signature>`; each article in the API
-carries it as `open_url`. The signature is an HMAC of the article ID under
+carries it as `open_url`. The signature is an HMAC of the article ID (with `t`
+for a chapter link, below) under
 `AUTH_SESSION_SECRET`: the link works from feed readers and mail, which send no
 cookie, while an ID alone needs a session. It answers `302 Found` with the article's address in `Location`
 and records the first open. Following it again, from the digest, a feed reader

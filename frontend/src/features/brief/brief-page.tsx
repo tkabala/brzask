@@ -23,7 +23,9 @@ export function BriefPage({ articleId }: { articleId: number }) {
   useMarkBriefOpened(articleId, brief.isSuccess)
 
   if (missing) {
-    if (valid && article.isPending && article.fetchStatus !== 'idle') return null
+    if (valid && article.isPending && article.fetchStatus !== 'idle') {
+      return <Pending query={article} />
+    }
     return <BriefMissing article={article.data ?? null} onOpen={markOpened} />
   }
   if (brief.isPending) return <Pending query={brief} />

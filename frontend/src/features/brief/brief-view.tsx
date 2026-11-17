@@ -1,4 +1,5 @@
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router'
+import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { ArticleOut, BriefOut } from '@/client/types.gen'
@@ -37,13 +38,24 @@ function ArticleHeading({ article }: { article: ArticleOut }) {
   )
 }
 
+/** The middle button opens a tab; others (a right click) only show a menu. */
+const onMiddleClick = (open?: () => void) => (event: MouseEvent) => {
+  if (event.button === 1) open?.()
+}
+
 /** The way to the original, through `open_url`; it stays at the bottom of the screen. */
 function OpenOriginal({ article, onOpen }: { article: ArticleOut; onOpen?: () => void }) {
   const { t } = useTranslation()
   return (
     <div className="sticky bottom-0 mt-8 bg-background pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <Button asChild size="lg" className="h-11 w-full text-base">
-        <a href={article.open_url} target="_blank" rel="noopener" onClick={onOpen}>
+        <a
+          href={article.open_url}
+          target="_blank"
+          rel="noopener"
+          onClick={onOpen}
+          onAuxClick={onMiddleClick(onOpen)}
+        >
           {t('brief.openOriginal')}
         </a>
       </Button>
@@ -70,8 +82,9 @@ export function BriefView({ brief, onOpen }: Props) {
       <p className="mt-5 text-lg leading-relaxed">{brief.gist}</p>
       {brief.points.length > 0 ? (
         <ul className="mt-4 grid list-disc gap-2 pl-5 leading-relaxed">
-          {brief.points.map((point) => (
-            <li key={point}>{point}</li>
+          {/* A brief never changes once written, and two items may read the same. */}
+          {brief.points.map((point, index) => (
+            <li key={index}>{point}</li>
           ))}
         </ul>
       ) : null}
@@ -79,8 +92,8 @@ export function BriefView({ brief, onOpen }: Props) {
         <section className="mt-6">
           <h2 className="text-sm font-medium text-muted-foreground">{t('brief.caveats')}</h2>
           <ul className="mt-2 grid list-disc gap-1 pl-5 text-sm leading-relaxed">
-            {brief.caveats.map((caveat) => (
-              <li key={caveat}>{caveat}</li>
+            {brief.caveats.map((caveat, index) => (
+              <li key={index}>{caveat}</li>
             ))}
           </ul>
         </section>
@@ -97,6 +110,7 @@ export function BriefView({ brief, onOpen }: Props) {
                   rel="noopener"
                   className="inline-flex items-baseline gap-2 py-1 hover:underline"
                   onClick={open}
+                  onAuxClick={onMiddleClick(open)}
                 >
                   <span className="font-mono text-sm text-muted-foreground tabular-nums">
                     {formatOffset(chapter.start)}
