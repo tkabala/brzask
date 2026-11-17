@@ -149,7 +149,7 @@ def propose_visited(context: RunContext, finder: FindsFeeds) -> None:
                 origin=SourceOrigin.VISITED,
                 actor=ACTOR,
                 origin_detail=candidate.link,
-                note=f'You opened "{candidate.title}" from this site; it is not a source yet.',
+                note=f'You read "{candidate.title}" from this site; it is not a source yet.',
             )
             if source is not None:
                 proposed.append({"host": candidate.host, "url": source.url, "name": source.name})

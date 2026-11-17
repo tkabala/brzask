@@ -161,7 +161,7 @@ def test_propose_visited_adds_pending_sources_for_new_sites(
         SourceOrigin.VISITED,
     )
     assert (added.site_url, added.origin_detail) == ("https://newsite.dev", "https://newsite.dev/a")
-    assert added.note == 'You opened "A good post" from this site; it is not a source yet.'
+    assert added.note == 'You read "A good post" from this site; it is not a source yet.'
     (change,) = ChangeRepository(session).find(
         limit=5, entity_type="source", entity_id=str(added.id)
     )
