@@ -185,7 +185,8 @@ def status() -> None:
         current = get_status(session, datetime.now(UTC), get_settings().embedding.model)
     articles = current.articles
     typer.echo(
-        f"Articles: {articles.total} stored, {articles.shown} shown, {articles.opened} opened"
+        f"Articles: {articles.total} stored, {articles.shown} shown, {articles.opened} opened, "
+        f"{articles.briefs_opened} briefs entered"
     )
     typer.echo(
         "Sources: "

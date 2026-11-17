@@ -210,6 +210,8 @@ export type DigestDayOut = {
     articles: number;
     /**
      * Opened
+     *
+     * Articles whose original was opened or whose brief was entered.
      */
     opened: number;
 };

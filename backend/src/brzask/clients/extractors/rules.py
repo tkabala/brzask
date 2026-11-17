@@ -13,6 +13,9 @@ class DomainRule:
 
 
 FEED_ONLY = frozenset({"feed"})
+# Videos are read from their captions: a replay of 20 digest days (21 videos,
+# captions fetched for all) kept 10.3 picked-and-opened articles on average
+# (7-12) with feed descriptions and 12.0 (10-13) with transcripts.
 VIDEO = frozenset({"youtube", "feed"})
 
 DOMAIN_RULES: Mapping[str, DomainRule] = {

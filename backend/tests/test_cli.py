@@ -591,7 +591,7 @@ def test_status_shows_counts_and_runs(cli: Invoke, make: Factories) -> None:
 
     assert result.exit_code == 0, result.output
     lines = result.stdout.splitlines()
-    assert lines[0] == "Articles: 1 stored, 0 shown, 1 opened"
+    assert lines[0] == "Articles: 1 stored, 0 shown, 1 opened, 0 briefs entered"
     assert lines[1].startswith("Sources: 1 active, 1 pending, 0 rejected")
     assert lines[2] == "Embedding model: google/gemini-embedding-001"
     assert lines[3] == "Vectors: 1 test/embedding"

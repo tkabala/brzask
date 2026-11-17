@@ -38,7 +38,9 @@ class DigestOut(BaseModel):
 class DigestDayOut(BaseModel):
     date: date
     articles: int
-    opened: int
+    opened: int = Field(
+        description="Articles whose original was opened or whose brief was entered."
+    )
 
 
 def _digest(session: DbSession, links: Auth, day: date) -> DigestOut:

@@ -108,7 +108,9 @@ class Digest(BaseModel):
 class DigestDayItem(BaseModel):
     date: date
     articles: int
-    opened: int
+    opened: int = Field(
+        description="Articles whose original was opened or whose brief was entered."
+    )
 
 
 class Ranking(BaseModel):

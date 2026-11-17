@@ -48,9 +48,9 @@ reader that treats an open as "the reader wanted this" uses that one rule:
 the opened history given to the ranking prompt (still bounded by the run's
 start), the source review's and source statistics' opened counts, the
 digests' opened counts and the open-rate gauges, the visited-sites proposals,
-`brzask replay` and `brzask judge-bench`. What still means "the original was
-opened" keeps `opened_at`: recording an open through `/open` and showing an
-article as opened. The open statistics (the `/status` counts and the
+`brzask replay` and `brzask judge-bench`. Recording an open through `/open`
+still writes `opened_at` only, and both timestamps stay visible separately
+(`opened_at`, `brief_opened_at`); the web app's opened mark shows either. The open statistics (the `/status` counts and the
 `open_stats` agent tool) show the two as separate numbers: originals opened
 and briefs entered.
 

@@ -2967,7 +2967,8 @@
           },
           "opened": {
             "type": "integer",
-            "title": "Opened"
+            "title": "Opened",
+            "description": "Articles whose original was opened or whose brief was entered."
           }
         },
         "type": "object",
