@@ -1,16 +1,16 @@
 """Articles, and why one was ranked where it was."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from http import HTTPStatus
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
 from brzask.api import problems
 from brzask.api.auth import Auth, AuthConfig
 from brzask.api.deps import DbSession, Id
-from brzask.db.models import Article, ArticleState
-from brzask.services import digests
+from brzask.db.models import Article, ArticleState, BriefBasis
+from brzask.services import digests, opens
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
@@ -40,9 +40,11 @@ class ArticleOut(BaseModel):
     position: int | None = Field(description="1-based place in its digest.")
     shown_at: datetime | None
     opened_at: datetime | None = Field(description="First open.")
+    has_brief: bool = Field(description="Whether `/articles/{id}/brief` has a brief to show.")
+    brief_opened_at: datetime | None = Field(description="First view of the brief.")
 
     @classmethod
-    def of(cls, article: Article, links: Auth) -> "ArticleOut":
+    def of(cls, article: Article, links: Auth, has_brief: bool) -> "ArticleOut":
         source = article.source
         return cls(
             id=article.id,
@@ -61,7 +63,29 @@ class ArticleOut(BaseModel):
             position=article.digest_position,
             shown_at=article.shown_at,
             opened_at=article.opened_at,
+            has_brief=has_brief,
+            brief_opened_at=article.brief_opened_at,
         )
+
+
+class ChapterOut(BaseModel):
+    start: int = Field(description="Seconds from the start of the video.")
+    title: str
+    open_url: str = Field(
+        description="Opens the video at `start` and records the open, like the article's "
+        "`open_url`."
+    )
+
+
+class BriefOut(BaseModel):
+    """What an article says, written ahead from its text."""
+
+    article: ArticleOut
+    gist: str = Field(description="What it says, in a sentence or two.")
+    points: list[str] = Field(description="Its main points, with their specifics.")
+    caveats: list[str] = Field(description="What to keep in mind when reading it.")
+    chapters: list[ChapterOut] = Field(description="Of a video; empty for anything else.")
+    basis: BriefBasis = Field(description="What text the brief was written from.")
 
 
 class RankingOut(BaseModel):
@@ -89,7 +113,47 @@ class RankingOut(BaseModel):
     responses=problems.responses(HTTPStatus.NOT_FOUND),
 )
 def get_article(session: DbSession, config: AuthConfig, article_id: Id) -> ArticleOut:
-    return ArticleOut.of(digests.get_article(session, article_id), config)
+    article = digests.get_article(session, article_id)
+    return ArticleOut.of(article, config, article.id in digests.briefed(session, [article]))
+
+
+@router.get(
+    "/{article_id}/brief",
+    summary="Get an article's brief",
+    responses=problems.responses(HTTPStatus.NOT_FOUND),
+)
+def get_brief(session: DbSession, config: AuthConfig, article_id: Id) -> BriefOut:
+    """404 when the article is unknown or has no brief (yet)."""
+    article, brief = digests.get_brief(session, article_id)
+    return BriefOut(
+        article=ArticleOut.of(article, config, has_brief=True),
+        gist=brief.gist,
+        points=brief.points,
+        caveats=brief.caveats,
+        chapters=[
+            ChapterOut(
+                start=chapter["start"],
+                title=chapter["title"],
+                open_url=config.open_url(article.id, chapter["start"]),
+            )
+            for chapter in brief.chapters
+        ],
+        basis=brief.basis,
+    )
+
+
+@router.post(
+    "/{article_id}/brief-open",
+    summary="Record a view of an article's brief",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=problems.responses(HTTPStatus.NOT_FOUND),
+)
+def record_brief_open(session: DbSession, article_id: Id) -> None:
+    """Keeps the first view only, a preference signal like opening the original.
+
+    404, recording nothing, when the article is unknown or has no brief.
+    """
+    opens.open_brief(session, article_id, datetime.now(UTC))
 
 
 @router.get(

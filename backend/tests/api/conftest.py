@@ -75,18 +75,31 @@ def password_hash() -> str:
 
 
 @pytest.fixture
-def auth_settings() -> AuthSettings:
-    """No login, so tests of the endpoints need none; auth tests switch to password."""
-    return AuthSettings(mode="none")
-
-
-@pytest.fixture
 def password_auth(password_hash: str) -> AuthSettings:
     return AuthSettings(
         mode="password",
         password_hash=SecretStr(password_hash),
         session_secret=SecretStr(SECRET),
     )
+
+
+@pytest.fixture
+def auth_settings(request: pytest.FixtureRequest) -> AuthSettings:
+    """No login, so tests of the endpoints need none; auth tests switch to password,
+    or a single test with `@pytest.mark.parametrize("auth_settings", ["password"], indirect=True)`.
+    """
+    if getattr(request, "param", "none") == "password":
+        settings: AuthSettings = request.getfixturevalue("password_auth")
+        return settings
+    return AuthSettings(mode="none")
+
+
+def log_in(client: TestClient) -> str:
+    """Log in with the password; the CSRF token for changing requests."""
+    response = client.post("/api/v1/auth/login", json={"password": PASSWORD})
+    assert response.status_code == 200
+    token: str = response.json()["csrf_token"]
+    return token
 
 
 @pytest.fixture

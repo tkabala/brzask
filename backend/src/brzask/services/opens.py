@@ -1,4 +1,4 @@
-"""Opening an article: the only preference signal."""
+"""Opening an article or entering its brief: the preference signals."""
 
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Article
-from brzask.repositories import ArticleRepository
+from brzask.repositories import ArticleRepository, BriefRepository
 from brzask.services.errors import NotFoundError, ServiceError
 
 
@@ -29,3 +29,14 @@ def open_article(session: Session, article_id: int, now: datetime) -> str:
     link = article_link(session, article_id)
     ArticleRepository(session).record_open(article_id, now)
     return link
+
+
+def open_brief(session: Session, article_id: int, now: datetime) -> None:
+    """Record that the article's brief was viewed; only the first view is kept.
+
+    NotFoundError when there is no such article or it has no brief, e.g. a
+    page that still thinks it has one; nothing is recorded then.
+    """
+    if BriefRepository(session).get(article_id) is None:
+        raise NotFoundError(f"article {article_id} has no brief")
+    ArticleRepository(session).record_brief_open(article_id, now)

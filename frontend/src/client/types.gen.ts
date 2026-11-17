@@ -107,12 +107,66 @@ export type ArticleOut = {
      * First open.
      */
     opened_at: string | null;
+    /**
+     * Has Brief
+     *
+     * Whether `/articles/{id}/brief` has a brief to show.
+     */
+    has_brief: boolean;
+    /**
+     * Brief Opened At
+     *
+     * First view of the brief.
+     */
+    brief_opened_at: string | null;
 };
 
 /**
  * ArticleState
  */
 export type ArticleState = 'seen' | 'shown' | 'repeat';
+
+/**
+ * BriefBasis
+ */
+export type BriefBasis = 'full_text' | 'transcript' | 'partial' | 'description';
+
+/**
+ * BriefOut
+ *
+ * What an article says, written ahead from its text.
+ */
+export type BriefOut = {
+    article: ArticleOut;
+    /**
+     * Gist
+     *
+     * What it says, in a sentence or two.
+     */
+    gist: string;
+    /**
+     * Points
+     *
+     * Its main points, with their specifics.
+     */
+    points: Array<string>;
+    /**
+     * Caveats
+     *
+     * What to keep in mind when reading it.
+     */
+    caveats: Array<string>;
+    /**
+     * Chapters
+     *
+     * Of a video; empty for anything else.
+     */
+    chapters: Array<ChapterOut>;
+    /**
+     * What text the brief was written from.
+     */
+    basis: BriefBasis;
+};
 
 /**
  * ChangeOut
@@ -185,6 +239,28 @@ export type ChangeOut = {
  * ChangeStatus
  */
 export type ChangeStatus = 'proposed' | 'applied' | 'rejected' | 'reverted';
+
+/**
+ * ChapterOut
+ */
+export type ChapterOut = {
+    /**
+     * Start
+     *
+     * Seconds from the start of the video.
+     */
+    start: number;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Open Url
+     *
+     * Opens the video at `start` and records the open, like the article's `open_url`.
+     */
+    open_url: string;
+};
 
 /**
  * Credentials
@@ -1138,6 +1214,90 @@ export type GetArticleResponses = {
 };
 
 export type GetArticleResponse = GetArticleResponses[keyof GetArticleResponses];
+
+export type GetBriefData = {
+    body?: never;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/brief';
+};
+
+export type GetBriefErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type GetBriefError = GetBriefErrors[keyof GetBriefErrors];
+
+export type GetBriefResponses = {
+    /**
+     * Successful Response
+     */
+    200: BriefOut;
+};
+
+export type GetBriefResponse = GetBriefResponses[keyof GetBriefResponses];
+
+export type RecordBriefOpenData = {
+    body?: never;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/brief-open';
+};
+
+export type RecordBriefOpenErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type RecordBriefOpenError = RecordBriefOpenErrors[keyof RecordBriefOpenErrors];
+
+export type RecordBriefOpenResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RecordBriefOpenResponse = RecordBriefOpenResponses[keyof RecordBriefOpenResponses];
 
 export type GetArticleRankingData = {
     body?: never;
@@ -2122,6 +2282,12 @@ export type OpenLinkData = {
          * Article ID.
          */
         id: number;
+        /**
+         * T
+         *
+         * Second of the video to start at, from a chapter's `open_url`.
+         */
+        t?: number | null;
         /**
          * Sig
          *

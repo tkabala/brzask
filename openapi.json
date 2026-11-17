@@ -326,6 +326,171 @@
         }
       }
     },
+    "/api/v1/articles/{article_id}/brief": {
+      "get": {
+        "tags": [
+          "articles"
+        ],
+        "summary": "Get an article's brief",
+        "description": "404 when the article is unknown or has no brief (yet).",
+        "operationId": "get_brief",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/articles/{article_id}/brief-open": {
+      "post": {
+        "tags": [
+          "articles"
+        ],
+        "summary": "Record a view of an article's brief",
+        "description": "Keeps the first view only, a preference signal like opening the original.\n\n404, recording nothing, when the article is unknown or has no brief.",
+        "operationId": "record_brief_open",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/articles/{article_id}/ranking": {
       "get": {
         "tags": [
@@ -2360,7 +2525,7 @@
           "articles"
         ],
         "summary": "Open an article",
-        "description": "Redirects to the article and records its first open; later opens change nothing.\n\nWorks with the signature from the article's `open_url` or with a session.",
+        "description": "Redirects to the article and records its first open; later opens change nothing.\n\nWorks with the signature from the article's `open_url` or with a session.\nWith `t`, a video opens at that second; the signature covers it.",
         "operationId": "open_link",
         "security": [
           {
@@ -2380,6 +2545,26 @@
               "title": "Id"
             },
             "description": "Article ID."
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 86400,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Second of the video to start at, from a chapter's `open_url`.",
+              "title": "T"
+            },
+            "description": "Second of the video to start at, from a chapter's `open_url`."
           },
           {
             "name": "sig",
@@ -2777,6 +2962,24 @@
             ],
             "title": "Opened At",
             "description": "First open."
+          },
+          "has_brief": {
+            "type": "boolean",
+            "title": "Has Brief",
+            "description": "Whether `/articles/{id}/brief` has a brief to show."
+          },
+          "brief_opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief Opened At",
+            "description": "First view of the brief."
           }
         },
         "type": "object",
@@ -2796,7 +2999,9 @@
           "digest_date",
           "position",
           "shown_at",
-          "opened_at"
+          "opened_at",
+          "has_brief",
+          "brief_opened_at"
         ],
         "title": "ArticleOut"
       },
@@ -2808,6 +3013,67 @@
           "repeat"
         ],
         "title": "ArticleState"
+      },
+      "BriefBasis": {
+        "type": "string",
+        "enum": [
+          "full_text",
+          "transcript",
+          "partial",
+          "description"
+        ],
+        "title": "BriefBasis"
+      },
+      "BriefOut": {
+        "properties": {
+          "article": {
+            "$ref": "#/components/schemas/ArticleOut"
+          },
+          "gist": {
+            "type": "string",
+            "title": "Gist",
+            "description": "What it says, in a sentence or two."
+          },
+          "points": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "Its main points, with their specifics."
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats",
+            "description": "What to keep in mind when reading it."
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterOut"
+            },
+            "type": "array",
+            "title": "Chapters",
+            "description": "Of a video; empty for anything else."
+          },
+          "basis": {
+            "$ref": "#/components/schemas/BriefBasis",
+            "description": "What text the brief was written from."
+          }
+        },
+        "type": "object",
+        "required": [
+          "article",
+          "gist",
+          "points",
+          "caveats",
+          "chapters",
+          "basis"
+        ],
+        "title": "BriefOut",
+        "description": "What an article says, written ahead from its text."
       },
       "ChangeOut": {
         "properties": {
@@ -2937,6 +3203,31 @@
           "reverted"
         ],
         "title": "ChangeStatus"
+      },
+      "ChapterOut": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start",
+            "description": "Seconds from the start of the video."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "open_url": {
+            "type": "string",
+            "title": "Open Url",
+            "description": "Opens the video at `start` and records the open, like the article's `open_url`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "title",
+          "open_url"
+        ],
+        "title": "ChapterOut"
       },
       "Credentials": {
         "properties": {

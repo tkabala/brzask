@@ -47,6 +47,8 @@ export const allArticles: ArticleOut[] = instance.articles.map((a) => ({
   position: a.position,
   shown_at: a.shown_at,
   opened_at: a.opened_at,
+  has_brief: false,
+  brief_opened_at: null,
 }))
 
 /** The digest of `day`, empty when there was none. */

@@ -11,6 +11,7 @@ from brzask.api.articles import ArticleOut
 from brzask.api.auth import AuthConfig
 from brzask.api.deps import NO_NUL, Clients, DbSession
 from brzask.config import get_settings
+from brzask.services import digests
 from brzask.services.embeddings import active_model
 from brzask.services.search import search_articles
 
@@ -50,10 +51,14 @@ def search(
     """
     embedder = clients.embedder(active_model(session, get_settings().embedding.model))
     hits = search_articles(session, embedder, q, limit)
+    briefed = digests.briefed(session, [h.article for h in hits])
     return SearchResults(
         model=embedder.model,
         items=[
-            SearchHit(article=ArticleOut.of(h.article, config), similarity=h.similarity)
+            SearchHit(
+                article=ArticleOut.of(h.article, config, h.article.id in briefed),
+                similarity=h.similarity,
+            )
             for h in hits
         ],
     )

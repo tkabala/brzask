@@ -75,13 +75,20 @@ def same_token(expected: str, sent: str | None) -> bool:
     return sent is not None and hmac.compare_digest(expected.encode(), sent.encode())
 
 
-def link_signature(secret: str, article_id: int) -> str:
-    """Signs `/open` links; 16 hex characters are 64 bits, plenty against guessing."""
-    return _sign(secret, "open", str(article_id))[:16]
+def link_signature(secret: str, article_id: int, t: int | None = None) -> str:
+    """Signs `/open` links; 16 hex characters are 64 bits, plenty against guessing.
+
+    A link to a moment of a video signs the second too, so the signature of one
+    link opens neither another moment nor the plain link.
+    """
+    value = str(article_id) if t is None else f"{article_id}:{t}"
+    return _sign(secret, "open", value)[:16]
 
 
-def link_signature_matches(secret: str, article_id: int, sent: str | None) -> bool:
-    return same_token(link_signature(secret, article_id), sent)
+def link_signature_matches(
+    secret: str, article_id: int, sent: str | None, t: int | None = None
+) -> bool:
+    return same_token(link_signature(secret, article_id, t), sent)
 
 
 def is_trusted(peer: str | None, proxies: Sequence[IPv4Network | IPv6Network]) -> bool:

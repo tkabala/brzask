@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addInterest, addSource, approveChange, changeInterest, changeSource, deletePause, exportSources, getArticle, getArticleRanking, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listChanges, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, rejectChange, search, setPause } from '../sdk.gen';
-import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
+import { addInterest, addSource, approveChange, changeInterest, changeSource, deletePause, exportSources, getArticle, getArticleRanking, getBrief, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listChanges, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, recordBriefOpen, rejectChange, search, setPause } from '../sdk.gen';
+import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetBriefData, GetBriefError, GetBriefResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RecordBriefOpenData, RecordBriefOpenError, RecordBriefOpenResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -177,6 +177,47 @@ export const getArticleOptions = (options: Options<GetArticleData>) => queryOpti
     },
     queryKey: getArticleQueryKey(options)
 });
+
+export const getBriefQueryKey = (options: Options<GetBriefData>) => createQueryKey('getBrief', options);
+
+/**
+ * Get an article's brief
+ *
+ * 404 when the article is unknown or has no brief (yet).
+ */
+export const getBriefOptions = (options: Options<GetBriefData>) => queryOptions<GetBriefResponse, GetBriefError, GetBriefResponse, ReturnType<typeof getBriefQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBrief({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBriefQueryKey(options)
+});
+
+/**
+ * Record a view of an article's brief
+ *
+ * Keeps the first view only, a preference signal like opening the original.
+ *
+ * 404, recording nothing, when the article is unknown or has no brief.
+ */
+export const recordBriefOpenMutation = (options?: Partial<Options<RecordBriefOpenData>>): UseMutationOptions<RecordBriefOpenResponse, RecordBriefOpenError, Options<RecordBriefOpenData>> => {
+    const mutationOptions: UseMutationOptions<RecordBriefOpenResponse, RecordBriefOpenError, Options<RecordBriefOpenData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await recordBriefOpen({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const getArticleRankingQueryKey = (options: Options<GetArticleRankingData>) => createQueryKey('getArticleRanking', options);
 
@@ -716,6 +757,7 @@ export const openLinkQueryKey = (options: Options<OpenLinkData>) => createQueryK
  * Redirects to the article and records its first open; later opens change nothing.
  *
  * Works with the signature from the article's `open_url` or with a session.
+ * With `t`, a video opens at that second; the signature covers it.
  */
 export const openLinkOptions = (options: Options<OpenLinkData>) => queryOptions<unknown, OpenLinkError, unknown, ReturnType<typeof openLinkQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

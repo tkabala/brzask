@@ -5,7 +5,7 @@ Links come from feeds and pages, where malformed ones (`http://[oops`) occur;
 """
 
 import re
-from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 
 def host_of(url: str) -> str:
@@ -97,3 +97,16 @@ def youtube_video_id(url: str) -> str | None:
         elif match := _VIDEO_PATH.match(parts.path):
             candidate = match.group(1)
     return candidate if candidate and _VIDEO_ID.fullmatch(candidate) else None
+
+
+def at_second(link: str, seconds: int) -> str:
+    """A YouTube video link that starts playing at `seconds` (`t=754s`, replacing
+    any `t` it had); any other link unchanged."""
+    if youtube_video_id(link) is None:
+        return link
+    parts = urlsplit(link.strip())
+    query = [
+        (key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key != "t"
+    ]
+    query.append(("t", f"{seconds}s"))
+    return urlunsplit(parts._replace(query=urlencode(query)))

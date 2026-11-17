@@ -81,13 +81,15 @@ class Auth:
             raise RuntimeError("AUTH_MODE=password without AUTH_PASSWORD_HASH")
         return self.settings.password_hash.get_secret_value()
 
-    def open_url(self, article_id: int) -> str:
-        """The path that opens an article, prefix included; signed, so it works without
-        a session."""
+    def open_url(self, article_id: int, t: int | None = None) -> str:
+        """The path that opens an article, prefix included, at second `t` of a video
+        when given; signed, so it works without a session."""
         path = f"{self.root_path}/open?id={article_id}"
+        if t is not None:
+            path = f"{path}&t={t}"
         if self.secret is None:
             return path
-        return f"{path}&sig={auth.link_signature(self.secret, article_id)}"
+        return f"{path}&sig={auth.link_signature(self.secret, article_id, t)}"
 
 
 def get_auth(request: Request) -> Auth:

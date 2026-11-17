@@ -105,6 +105,8 @@ describe('logged in', () => {
           position: 1,
           shown_at: '2026-10-21T07:00:00Z',
           opened_at: null,
+          has_brief: false,
+          brief_opened_at: null,
         },
       ],
     }

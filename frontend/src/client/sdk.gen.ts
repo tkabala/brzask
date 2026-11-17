@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
+import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetBriefData, GetBriefErrors, GetBriefResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RecordBriefOpenData, RecordBriefOpenErrors, RecordBriefOpenResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -73,6 +73,38 @@ export const getArticle = <ThrowOnError extends boolean = false>(options: Option
             type: 'apiKey'
         }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/articles/{article_id}',
+    ...options
+});
+
+/**
+ * Get an article's brief
+ *
+ * 404 when the article is unknown or has no brief (yet).
+ */
+export const getBrief = <ThrowOnError extends boolean = false>(options: Options<GetBriefData, ThrowOnError>): RequestResult<GetBriefResponses, GetBriefErrors, ThrowOnError> => (options.client ?? client).get<GetBriefResponses, GetBriefErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/brief',
+    ...options
+});
+
+/**
+ * Record a view of an article's brief
+ *
+ * Keeps the first view only, a preference signal like opening the original.
+ *
+ * 404, recording nothing, when the article is unknown or has no brief.
+ */
+export const recordBriefOpen = <ThrowOnError extends boolean = false>(options: Options<RecordBriefOpenData, ThrowOnError>): RequestResult<RecordBriefOpenResponses, RecordBriefOpenErrors, ThrowOnError> => (options.client ?? client).post<RecordBriefOpenResponses, RecordBriefOpenErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/brief-open',
     ...options
 });
 
@@ -454,6 +486,7 @@ export const getSessionState = <ThrowOnError extends boolean = false>(options?: 
  * Redirects to the article and records its first open; later opens change nothing.
  *
  * Works with the signature from the article's `open_url` or with a session.
+ * With `t`, a video opens at that second; the signature covers it.
  */
 export const openLink = <ThrowOnError extends boolean = false>(options: Options<OpenLinkData, ThrowOnError>): RequestResult<unknown, OpenLinkErrors, ThrowOnError> => (options.client ?? client).get<unknown, OpenLinkErrors, ThrowOnError>({
     security: [{

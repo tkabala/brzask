@@ -44,8 +44,10 @@ class DigestDayOut(BaseModel):
 
 
 def _digest(session: DbSession, links: Auth, day: date) -> DigestOut:
+    articles = digests.digest_for(session, day)
+    briefed = digests.briefed(session, articles)
     return DigestOut(
-        date=day, articles=[ArticleOut.of(a, links) for a in digests.digest_for(session, day)]
+        date=day, articles=[ArticleOut.of(a, links, a.id in briefed) for a in articles]
     )
 
 

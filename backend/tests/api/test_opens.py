@@ -6,6 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Article
+from brzask.services.auth import link_signature
+from tests.api.conftest import SECRET
 from tests.factories import Factories
 
 
@@ -97,3 +99,55 @@ def test_open_url_carries_the_prefix(client: TestClient, make: Factories) -> Non
 
     assert body["articles"][0]["open_url"] == f"/brzask/open?id={article.id}"
     assert client.get(body["articles"][0]["open_url"], follow_redirects=False).status_code == 302
+
+
+VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+
+def test_open_with_t_redirects_to_the_timestamp(
+    no_redirects: TestClient, make: Factories, session: Session
+) -> None:
+    article = make.article(link=VIDEO, digest_date=date(2026, 11, 16))
+    session.commit()
+
+    response = no_redirects.get("/open", params={"id": article.id, "t": 754})
+
+    assert response.status_code == 302
+    assert response.headers["location"] == f"{VIDEO}&t=754s"
+    assert opened_at(session, article) is not None
+
+
+def test_t_is_within_a_day(no_redirects: TestClient, make: Factories, session: Session) -> None:
+    article = make.article(link=VIDEO)
+    session.commit()
+
+    for t in (-1, 86_401, "x"):
+        assert no_redirects.get("/open", params={"id": article.id, "t": t}).status_code == 422
+    assert opened_at(session, article) is None
+
+
+@pytest.mark.parametrize("auth_settings", ["password"], indirect=True)
+def test_signature_for_one_t_does_not_open_another(
+    no_redirects: TestClient, make: Factories, session: Session
+) -> None:
+    article = make.article(link=VIDEO)
+    session.commit()
+    sig = link_signature(SECRET, article.id, 754)
+
+    assert no_redirects.get(f"/open?id={article.id}&t=754&sig={sig}").status_code == 302
+    assert no_redirects.get(f"/open?id={article.id}&t=755&sig={sig}").status_code == 401
+    assert no_redirects.get(f"/open?id={article.id}&sig={sig}").status_code == 401
+
+
+@pytest.mark.parametrize("auth_settings", ["password"], indirect=True)
+def test_signature_without_t_does_not_accept_a_t(
+    no_redirects: TestClient, make: Factories, session: Session
+) -> None:
+    article = make.article(link=VIDEO)
+    session.commit()
+    sig = link_signature(SECRET, article.id)
+
+    assert no_redirects.get(f"/open?id={article.id}&t=754&sig={sig}").status_code == 401
+    assert no_redirects.head(f"/open?id={article.id}&t=754&sig={sig}").status_code == 401
+    assert opened_at(session, article) is None
+    assert no_redirects.get(f"/open?id={article.id}&sig={sig}").status_code == 302

@@ -123,6 +123,8 @@ The interactive documentation lists every field; in short:
 | `GET /digests/{date}` | A day's digest (`YYYY-MM-DD`); empty when that day had none |
 | `GET /digests` | Days with a digest, newest first, with article and open counts |
 | `GET /articles/{id}` | One article |
+| `GET /articles/{id}/brief` | Its brief: gist, points, caveats, chapters of a video (each with a link that opens the video at that moment) and what text it was written from; 404 when it has none |
+| `POST /articles/{id}/brief-open` | Records the first view of the brief; 404, recording nothing, when it has none |
 | `GET /articles/{id}/ranking` | Why it was ranked where it was: its place in the ranking, the pool it came from, the methods used and the selection's reason |
 | `GET /search?q=` | Articles closest in meaning to `q` |
 | `GET /sources` | Sources by name, with fetch health and what each published in the last 30 days; `?status=pending` lists the ones waiting for a decision |
@@ -207,7 +209,7 @@ answers 400; start again without one.
 
 ## Opening articles
 
-Opening an article is the only preference signal, so every link to an article
+Opening an article is a preference signal, so every link to an article
 goes through `/open?id=<article>&sig=<signature>`; each article in the API
 carries it as `open_url`. The signature is an HMAC of the article ID under
 `AUTH_SESSION_SECRET`: the link works from feed readers and mail, which send no
@@ -222,6 +224,15 @@ or a bookmark, changes nothing, so the link can be shared and reused.
 - `HEAD` answers the same redirect without recording it, so link checkers and
   previews that only look do not count as reading.
 - Only `http` and `https` links are followed; any other link answers 400.
+- A chapter of a brief links to `/open?id=<article>&t=<second>&sig=<signature>`,
+  which opens a YouTube video at that second (`t` from 0 to 86400). The
+  signature covers `t`: a link's signature opens neither another second nor
+  the plain link, and the plain link's signature takes no `t`.
+
+Entering an article's brief is a preference signal next to opening it: the
+web app sends `POST /api/v1/articles/{id}/brief-open`, which keeps the first
+view as `brief_opened_at`. Articles carry `has_brief` to tell whether there
+is a brief to show.
 
 ## Probes and metrics
 

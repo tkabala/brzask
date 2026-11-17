@@ -1,14 +1,14 @@
 """Reading digests: a day's articles, the archive, and why an article was ranked where it was."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from brzask.db.models import Article, Run
-from brzask.repositories import ArticleRepository, RunRepository
+from brzask.db.models import Article, ArticleBrief, Run
+from brzask.repositories import ArticleRepository, BriefRepository, RunRepository
 from brzask.repositories.articles import DigestDay
 from brzask.services.errors import NotFoundError
 
@@ -39,6 +39,20 @@ def get_article(session: Session, article_id: int) -> Article:
     if article is None:
         raise NotFoundError(f"no article {article_id}")
     return article
+
+
+def get_brief(session: Session, article_id: int) -> tuple[Article, ArticleBrief]:
+    """An article with its brief; NotFoundError when either is missing."""
+    article = get_article(session, article_id)
+    brief = BriefRepository(session).get(article_id)
+    if brief is None:
+        raise NotFoundError(f"article {article_id} has no brief")
+    return article, brief
+
+
+def briefed(session: Session, articles: Iterable[Article]) -> set[int]:
+    """IDs of those of `articles` that have a brief."""
+    return BriefRepository(session).ids_with_brief(article.id for article in articles)
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,14 @@
 import pytest
 
-from brzask.urls import feed_key, host_matches, host_of, is_http_url, item_key, youtube_video_id
+from brzask.urls import (
+    at_second,
+    feed_key,
+    host_matches,
+    host_of,
+    is_http_url,
+    item_key,
+    youtube_video_id,
+)
 
 
 @pytest.mark.parametrize(
@@ -127,3 +135,27 @@ def test_an_item_key_of_a_malformed_link_is_the_link() -> None:
 )
 def test_youtube_video_id(url: str, video_id: str | None) -> None:
     assert youtube_video_id(url) == video_id
+
+
+@pytest.mark.parametrize(
+    ("link", "expected"),
+    [
+        (
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=754s",
+        ),
+        (
+            "https://www.youtube.com/shorts/EMIRXv2iE_Q",
+            "https://www.youtube.com/shorts/EMIRXv2iE_Q?t=754s",
+        ),
+        ("https://youtu.be/CKFUx7COIwQ?si=x", "https://youtu.be/CKFUx7COIwQ?si=x&t=754s"),
+        (
+            "https://www.youtube.com/watch?t=5&v=dQw4w9WgXcQ&feature=share",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=share&t=754s",
+        ),
+        ("https://news.example/story?t=5", "https://news.example/story?t=5"),
+        ("https://www.youtube.com/@example/videos", "https://www.youtube.com/@example/videos"),
+    ],
+)
+def test_at_second(link: str, expected: str) -> None:
+    assert at_second(link, 754) == expected

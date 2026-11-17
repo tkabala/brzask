@@ -22,6 +22,16 @@ export const zArticleState = z.enum([
 ]);
 
 /**
+ * BriefBasis
+ */
+export const zBriefBasis = z.enum([
+    'full_text',
+    'transcript',
+    'partial',
+    'description'
+]);
+
+/**
  * ChangeStatus
  */
 export const zChangeStatus = z.enum([
@@ -47,6 +57,15 @@ export const zChangeOut = z.object({
     reason: z.string().nullable(),
     status: zChangeStatus,
     decided_at: z.iso.datetime().nullable()
+});
+
+/**
+ * ChapterOut
+ */
+export const zChapterOut = z.object({
+    start: z.int(),
+    title: z.string(),
+    open_url: z.string()
 });
 
 /**
@@ -335,7 +354,23 @@ export const zArticleOut = z.object({
     digest_date: z.iso.date().nullable(),
     position: z.int().nullable(),
     shown_at: z.iso.datetime().nullable(),
-    opened_at: z.iso.datetime().nullable()
+    opened_at: z.iso.datetime().nullable(),
+    has_brief: z.boolean(),
+    brief_opened_at: z.iso.datetime().nullable()
+});
+
+/**
+ * BriefOut
+ *
+ * What an article says, written ahead from its text.
+ */
+export const zBriefOut = z.object({
+    article: zArticleOut,
+    gist: z.string(),
+    points: z.array(z.string()),
+    caveats: z.array(z.string()),
+    chapters: z.array(zChapterOut),
+    basis: zBriefBasis
 });
 
 /**
@@ -473,6 +508,24 @@ export const zGetArticlePath = z.object({
  * Successful Response
  */
 export const zGetArticleResponse = zArticleOut;
+
+export const zGetBriefPath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zGetBriefResponse = zBriefOut;
+
+export const zRecordBriefOpenPath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRecordBriefOpenResponse = z.void();
 
 export const zGetArticleRankingPath = z.object({
     article_id: z.int().gte(1).lte(9007199254740991)
@@ -670,6 +723,7 @@ export const zGetSessionStateResponse = zSessionOut;
 
 export const zOpenLinkQuery = z.object({
     id: z.int().gte(1).lte(9007199254740991),
+    t: z.int().gte(0).lte(86400).nullish(),
     sig: z.string().max(64).regex(/^[^\x00]*$/).nullish()
 });
 

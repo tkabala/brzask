@@ -17,6 +17,7 @@ from brzask.api.deps import MAX_API_ID, NO_NUL, DbSession
 from brzask.api.problems import ProblemError
 from brzask.services import auth
 from brzask.services.opens import article_link, open_article
+from brzask.urls import at_second
 
 router = APIRouter(tags=["articles"])
 
@@ -25,6 +26,18 @@ ArticleId = Annotated[int, Query(alias="id", ge=1, le=MAX_API_ID, description="A
 Signature = Annotated[
     str | None,
     Query(max_length=64, pattern=NO_NUL, description="From the article's `open_url`."),
+]
+
+# A day: longer than nearly any video, and keeps the number small.
+MAX_SECOND = 86_400
+
+Second = Annotated[
+    int | None,
+    Query(
+        ge=0,
+        le=MAX_SECOND,
+        description="Second of the video to start at, from a chapter's `open_url`.",
+    ),
 ]
 
 # Every open must reach the server; a cached redirect would skip recording it.
@@ -50,15 +63,17 @@ def open_link(
     config: AuthConfig,
     token: SessionCookie,
     article_id: ArticleId,
+    t: Second = None,
     sig: Signature = None,
 ) -> RedirectResponse:
     """Redirects to the article and records its first open; later opens change nothing.
 
     Works with the signature from the article's `open_url` or with a session.
+    With `t`, a video opens at that second; the signature covers it.
     """
-    _check_access(request, session, config, token, article_id, sig)
+    _check_access(request, session, config, token, article_id, t, sig)
     link = open_article(session, article_id, datetime.now(UTC))
-    return RedirectResponse(link, status_code=HTTPStatus.FOUND, headers=NO_STORE)
+    return _redirect(link, t)
 
 
 @router.head("/open", include_in_schema=False)
@@ -68,13 +83,18 @@ def peek_link(
     config: AuthConfig,
     token: SessionCookie,
     article_id: ArticleId,
+    t: Second = None,
     sig: Signature = None,
 ) -> RedirectResponse:
     """The same redirect without recording, so link checkers and previews that
     only look do not count as reading."""
-    _check_access(request, session, config, token, article_id, sig)
-    link = article_link(session, article_id)
-    return RedirectResponse(link, status_code=HTTPStatus.FOUND, headers=NO_STORE)
+    _check_access(request, session, config, token, article_id, t, sig)
+    return _redirect(article_link(session, article_id), t)
+
+
+def _redirect(link: str, t: int | None) -> RedirectResponse:
+    target = link if t is None else at_second(link, t)
+    return RedirectResponse(target, status_code=HTTPStatus.FOUND, headers=NO_STORE)
 
 
 def _check_access(
@@ -83,13 +103,14 @@ def _check_access(
     config: AuthConfig,
     token: str | None,
     article_id: int,
+    t: int | None,
     sig: str | None,
 ) -> None:
     """Links are opened from feed readers and mail, which send no session: a
     valid signature is enough, and an authenticated request works without one."""
     if config.mode == "none":
         return
-    if auth.link_signature_matches(config.signing_secret(), article_id, sig):
+    if auth.link_signature_matches(config.signing_secret(), article_id, sig, t):
         return
     if identify(request, session, config, token) is not None:
         return
