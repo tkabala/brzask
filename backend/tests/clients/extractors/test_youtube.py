@@ -16,6 +16,7 @@ from brzask.clients.extractors import ExtractionBlockedError, ExtractionError, E
 from brzask.clients.extractors.youtube import (
     Line,
     YouTubeExtractor,
+    _Session,
     captions,
     choose_track,
     format_transcript,
@@ -155,6 +156,17 @@ def test_non_video_url_is_empty(url: str) -> None:
 )
 def test_proxy_url(proxy: ProxyTarget, url: str) -> None:
     assert proxy_url(proxy) == url
+
+
+def test_captions_ignore_proxies_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HTTPS_PROXY", "http://env-proxy.lan:3128")
+    configured = proxy_url(ProxyTarget("http", "proxy.lan", 3128))
+    session = _Session()
+    session.proxies = {"http": configured, "https": configured}
+
+    settings = session.merge_environment_settings(VIDEO, {}, None, None, None)
+
+    assert settings["proxies"]["https"] == configured
 
 
 # What a video page carries about its caption tracks, in the shape the library parses.

@@ -83,14 +83,13 @@ def extract_bench_command(
         fetch = get_settings().fetch
         feeds = FeedFetcher.from_settings(fetch)
         stack.callback(feeds.close)
-        client = public_client(
-            PAGE_TIMEOUT, fetch.allowed_private_networks, proxy=fetch.proxy_target()
-        )
+        proxy = fetch.proxy_target()
+        client = public_client(PAGE_TIMEOUT, fetch.allowed_private_networks, proxy=proxy)
         stack.callback(client.close)
         services = new_client(PAGE_TIMEOUT)
         stack.callback(services.close)
         items = with_feed_content(items, feeds)
-        chain = build_chain(bench_settings, client, services, fetch.proxy_target())
+        chain = build_chain(bench_settings, client, services, proxy)
         intervals = {"jina": JINA_KEYLESS_INTERVAL} if settings.jina_api_key is None else {}
         attempts = run_bench(items, chain.extractors, RobotsPolicy(client), workers, intervals)
 

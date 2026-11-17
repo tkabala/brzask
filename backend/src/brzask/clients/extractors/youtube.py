@@ -118,7 +118,16 @@ def proxy_url(proxy: ProxyTarget) -> str:
 
 
 class _Session(requests.Session):
-    """A requests session with a default timeout."""
+    """A requests session with a default timeout that ignores the environment.
+
+    Like every third-party fetch, captions never use HTTP(S)_PROXY: requests
+    would let it override `FETCH_PROXY`, or send captions through a proxy
+    meant for the owner's services when no `FETCH_PROXY` is set.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.trust_env = False
 
     def request(self, *args: Any, **kwargs: Any) -> requests.Response:
         kwargs.setdefault("timeout", TIMEOUT_SECONDS)

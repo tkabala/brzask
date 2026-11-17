@@ -69,7 +69,7 @@ def build_chain(
     (`FETCH_PROXY`) when one is set. The captions reader comes first whatever
     `EXTRACTORS` says, since it reads no other site.
     """
-    pages = pages or public_client(PAGE_TIMEOUT, ())
+    pages = pages or public_client(PAGE_TIMEOUT, (), proxy=proxy)
     services = services or new_client(PAGE_TIMEOUT)
 
     jina_key = settings.jina_api_key.get_secret_value() if settings.jina_api_key else None
