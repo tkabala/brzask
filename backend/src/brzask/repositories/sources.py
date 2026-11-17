@@ -225,14 +225,14 @@ class SourceRepository:
 
 
 def _article_counts(*where: ColumnElement[bool]) -> Subquery:
-    """Per source: articles, ranked, shown and opened, of the articles matching `where`."""
+    """Per source: articles, ranked, shown and engaged with, of the articles matching `where`."""
     return (
         select(
             Article.source_id,
             func.count().label("articles"),
             func.count(Article.rank).label("ranked"),
             func.count().filter(Article.state == ArticleState.SHOWN).label("shown"),
-            func.count(Article.opened_at).label("opened"),
+            func.count(Article.engaged_at).label("opened"),  # the original or the brief
         )
         .where(*where)
         .group_by(Article.source_id)

@@ -8,7 +8,8 @@ import * as z from 'zod';
 export const zArticleCountsOut = z.object({
     total: z.int(),
     shown: z.int(),
-    opened: z.int()
+    opened: z.int(),
+    briefs_opened: z.int()
 });
 
 /**

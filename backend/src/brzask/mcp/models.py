@@ -212,7 +212,8 @@ class Survival(BaseModel):
 class OpenCountItem(BaseModel):
     key: str
     shown: int
-    opened: int
+    opened: int = Field(description="Originals opened.")
+    briefs_opened: int = Field(description="Briefs entered; either counts as interest.")
 
 
 class OpenStatsExternal(BaseModel):
@@ -223,7 +224,8 @@ class OpenStatsResult(BaseModel):
     days: int
     since: date
     shown: int
-    opened: int
+    opened: int = Field(description="Originals opened.")
+    briefs_opened: int = Field(description="Briefs entered; either counts as interest.")
     by_topic: list[OpenCountItem]
     external: OpenStatsExternal
 
@@ -284,7 +286,8 @@ class RunSummary(BaseModel):
 class ArticleCounts(BaseModel):
     total: int
     shown: int
-    opened: int
+    opened: int = Field(description="Originals opened.")
+    briefs_opened: int = Field(description="Briefs entered; either counts as interest.")
 
 
 class StatusResult(BaseModel):

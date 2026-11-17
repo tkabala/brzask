@@ -21,7 +21,8 @@ router = APIRouter(tags=["status"])
 class ArticleCountsOut(BaseModel):
     total: int
     shown: int
-    opened: int
+    opened: int = Field(description="Originals opened.")
+    briefs_opened: int = Field(description="Briefs entered; either counts as interest.")
 
 
 class StatusOut(BaseModel):
@@ -50,7 +51,10 @@ def read_status(session: DbSession) -> StatusOut:
     articles = current.articles
     return StatusOut(
         articles=ArticleCountsOut(
-            total=articles.total, shown=articles.shown, opened=articles.opened
+            total=articles.total,
+            shown=articles.shown,
+            opened=articles.opened,
+            briefs_opened=articles.briefs_opened,
         ),
         sources=current.sources,
         last_digest=current.last_digest,

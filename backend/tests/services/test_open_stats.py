@@ -23,18 +23,32 @@ def test_counts_shown_and_opened_by_source_and_topic(session: Session, make: Fac
     stats = open_stats(session, TODAY, days=3)
 
     assert (stats.days, stats.since, stats.shown, stats.opened) == (3, date(2026, 11, 10), 4, 2)
-    assert stats.by_source == [OpenCount("Blog", 2, 1), OpenCount("News", 2, 1)]
+    assert stats.by_source == [OpenCount("Blog", 2, 1, 0), OpenCount("News", 2, 1, 0)]
     assert stats.by_topic == [
-        OpenCount("AI", 2, 1),
-        OpenCount("(none)", 1, 0),
-        OpenCount("Rust", 1, 1),
+        OpenCount("AI", 2, 1, 0),
+        OpenCount("(none)", 1, 0, 0),
+        OpenCount("Rust", 1, 1, 0),
     ]
+
+
+def test_originals_and_briefs_are_two_numbers(session: Session, make: Factories) -> None:
+    blog = make.source("Blog")
+    make.article(blog, digest_date=TODAY, topic="AI", opened_at=OPENED)
+    make.article(blog, digest_date=TODAY, topic="AI", brief_opened_at=OPENED)
+    make.article(blog, digest_date=TODAY, topic="AI")
+
+    stats = open_stats(session, TODAY, days=1)
+
+    assert (stats.shown, stats.opened, stats.briefs_opened) == (3, 1, 1)
+    assert stats.by_source == [OpenCount("Blog", 3, 1, 1)]
+    assert stats.by_topic == [OpenCount("AI", 3, 1, 1)]
 
 
 def test_nothing_shown(session: Session) -> None:
     stats = open_stats(session, TODAY, days=7)
 
-    assert (stats.shown, stats.opened, stats.by_source, stats.by_topic) == (0, 0, [], [])
+    assert (stats.shown, stats.opened, stats.briefs_opened) == (0, 0, 0)
+    assert (stats.by_source, stats.by_topic) == ([], [])
 
 
 @pytest.mark.parametrize("days", [0, 91])

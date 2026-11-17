@@ -22,7 +22,7 @@ export const NewInstance: Story = {
   args: {
     status: {
       ...status,
-      articles: { total: 0, shown: 0, opened: 0 },
+      articles: { total: 0, shown: 0, opened: 0, briefs_opened: 0 },
       last_digest: null,
       last_runs: { digest: null, review: null, visited: null, discovery: null },
       embeddings: {},

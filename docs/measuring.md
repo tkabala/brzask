@@ -86,6 +86,7 @@ With `[deduplication] method = "judge"`, the same-day pass does not choose a thr
 
 ### Reading the result
 
+- **Opened means engaged.** An article counts as opened when the reader opened the original or entered its brief in the web app, whichever came first ([ADR 0025](decisions/0025-entering-the-brief-counts-with-opening-the-original.md)). Brief views are recorded from the day the brief shipped, so the open rate steps up on that date; compare days on the same side of it.
 - **Only shown articles could be opened.** A pick that was never shown counts as not opened, even if the reader would have liked it. A replay matches the real digest by picking the articles that were opened; it can hardly beat it, and a clear drop means a change loses what the reader reads.
 - **The model is not deterministic.** Replaying the same setup twice gives different picks. Run the current setup more than once to see the spread before reading anything into a difference.
 - **Text and vectors exist only for articles a real run extracted** (its top 15). Other candidates reach deduplication and selection with their feed snippet.
@@ -114,7 +115,7 @@ $ brzask reembed --model provider/new-model               # embed what came in s
 
 ## Judge models: judge-bench
 
-`brzask judge-bench` scores every article the digests showed with one or more judges, using the questions of the composite ranking. It then reports how well each score tells the articles the reader opened from those they did not, as an AUC: the chance that an opened article scores above one that was not opened. 0.5 is chance. Because every scored article was shown, each could be opened, so the measure does not favour the ranking that chose the digests, as `replay` does.
+`brzask judge-bench` scores every article the digests showed with one or more judges, using the questions of the composite ranking. It then reports how well each score tells the articles the reader opened from those they did not, as an AUC: the chance that an opened article scores above one that was not opened. 0.5 is chance. Because every scored article was shown, each could be opened, so the measure does not favour the ranking that chose the digests, as `replay` does. "Opened" is the same engaged rule as in replay: the original opened or the brief entered.
 
 ```console
 $ brzask judge-bench --days 30 --model typesafe/jev-1.13 --model liquid/d1 --model llm --json bench.json

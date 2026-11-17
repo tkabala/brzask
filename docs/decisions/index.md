@@ -29,6 +29,7 @@ Significant decisions are recorded as Architecture Decision Records (ADRs) in th
 | [0022](0022-one-embedding-model-at-a-time-with-thresholds-per-model.md) | One embedding model at a time, 768 dimensions, thresholds per model | Accepted |
 | [0023](0023-third-party-text-is-data-and-its-reach-is-bounded.md) | Third-party text is data, and what it can reach is bounded | Accepted |
 | [0024](0024-third-party-fetches-may-go-through-one-proxy.md) | Third-party fetches may go through one proxy; the address guard stays in brzask | Accepted |
+| [0025](0025-entering-the-brief-counts-with-opening-the-original.md) | Entering the brief counts with opening the original | Accepted |
 
 To add a decision, copy the [template](0000-template.md) to the next free number,
 fill it in and add it to this table and to the `nav` in `mkdocs.yml`.

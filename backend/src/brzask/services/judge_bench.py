@@ -117,7 +117,7 @@ def score_shown(
                     day=run.day,
                     article_id=candidate.article_id,
                     title=candidate.title,
-                    opened=by_id[candidate.article_id].opened_at is not None,
+                    opened=by_id[candidate.article_id].engaged_at is not None,
                     scores={name: scoring.scaled(answer) for name, answer in item.answers.items()},
                 )
             )

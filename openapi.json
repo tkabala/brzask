@@ -2621,14 +2621,21 @@
           },
           "opened": {
             "type": "integer",
-            "title": "Opened"
+            "title": "Opened",
+            "description": "Originals opened."
+          },
+          "briefs_opened": {
+            "type": "integer",
+            "title": "Briefs Opened",
+            "description": "Briefs entered; either counts as interest."
           }
         },
         "type": "object",
         "required": [
           "total",
           "shown",
-          "opened"
+          "opened",
+          "briefs_opened"
         ],
         "title": "ArticleCountsOut"
       },

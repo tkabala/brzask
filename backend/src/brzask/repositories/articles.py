@@ -63,14 +63,14 @@ class OpenedArticle:
     title: str
     topic: str | None
     source_name: str | None
-    opened_at: datetime
+    opened_at: datetime  # `Article.engaged_at`: an open of the original or of the brief
 
 
 @dataclass(frozen=True, slots=True)
 class DigestDay:
     day: date
     articles: int
-    opened: int
+    opened: int  # engaged: the original or the brief opened
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +83,8 @@ class SimilarArticle:
 class ArticleCounts:
     total: int
     shown: int
-    opened: int
+    opened: int  # originals opened
+    briefs_opened: int  # briefs entered, whether the original was opened or not
 
 
 class ArticleRepository:
@@ -183,24 +184,29 @@ class ArticleRepository:
     def recent_opens(
         self, since: datetime, limit: int, before: datetime | None = None
     ) -> list[OpenedArticle]:
-        """Articles opened at or after `since` (and before `before`), most recent first."""
+        """Articles engaged with (original or brief opened) at or after `since`, and
+        before `before`, most recent first.
+        """
         query = (
-            select(Article.title, Article.topic, Source.name, Article.opened_at)
+            select(Article.title, Article.topic, Source.name, Article.engaged_at)
             .outerjoin(Source, Article.source_id == Source.id)
-            .where(Article.opened_at >= since)
-            .order_by(Article.opened_at.desc())
+            .where(Article.engaged_at >= since)
+            .order_by(Article.engaged_at.desc())
             .limit(limit)
         )
         if before is not None:
-            query = query.where(Article.opened_at < before)
+            query = query.where(Article.engaged_at < before)
         return [
-            OpenedArticle(title, topic, source_name, opened_at)
-            for title, topic, source_name, opened_at in self.session.execute(query)
-            if opened_at is not None
+            OpenedArticle(title, topic, source_name, engaged_at)
+            for title, topic, source_name, engaged_at in self.session.execute(query)
+            if engaged_at is not None
         ]
 
     def opened_since(self, since: datetime) -> Sequence[Article]:
-        query = select(Article).where(Article.opened_at >= since).order_by(Article.opened_at.desc())
+        """Articles engaged with at or after `since`, most recent first."""
+        query = (
+            select(Article).where(Article.engaged_at >= since).order_by(Article.engaged_at.desc())
+        )
         return self.session.scalars(query).all()
 
     def first_seen_since(self, since: datetime) -> Sequence[Article]:
@@ -365,22 +371,32 @@ class ArticleRepository:
 
     def shown_and_opened(
         self, first: date, last: date, by: Literal["source", "topic"]
-    ) -> list[tuple[str | None, int, int]]:
-        """(source name or topic, shown, opened) over the digests of `first`..`last`."""
+    ) -> list[tuple[str | None, int, int, int]]:
+        """(source name or topic, shown, originals opened, briefs entered) over the
+        digests of `first`..`last`.
+        """
         key = Source.name if by == "source" else Article.topic
         query = (
-            select(key, func.count(), func.count(Article.opened_at))
+            select(
+                key,
+                func.count(),
+                func.count(Article.opened_at),
+                func.count(Article.brief_opened_at),
+            )
             .select_from(Article)
             .outerjoin(Source, Article.source_id == Source.id)
             .where(Article.digest_date.between(first, last))
             .group_by(key)
         )
-        return [(name, shown, opened) for name, shown, opened in self.session.execute(query)]
+        return [
+            (name, shown, opened, briefs)
+            for name, shown, opened, briefs in self.session.execute(query)
+        ]
 
     def digest_days(self, limit: int, before: date | None = None) -> list[DigestDay]:
         """Days with a digest, newest first; `before` continues a previous page."""
         query = (
-            select(Article.digest_date, func.count(), func.count(Article.opened_at))
+            select(Article.digest_date, func.count(), func.count(Article.engaged_at))
             .where(Article.digest_date.is_not(None))
             .group_by(Article.digest_date)
             .order_by(Article.digest_date.desc())
@@ -403,6 +419,16 @@ class ArticleRepository:
             .returning(Article.link)
         )
         return self.session.scalar(statement)
+
+    def record_brief_open(self, article_id: int, at: datetime) -> bool:
+        """Keep the first view of the brief only; False for an unknown ID."""
+        statement = (
+            update(Article)
+            .where(Article.id == article_id)
+            .values(brief_opened_at=func.coalesce(Article.brief_opened_at, at))
+            .returning(Article.id)
+        )
+        return self.session.scalar(statement) is not None
 
     # --- Search ------------------------------------------------------------------
 
@@ -446,6 +472,7 @@ class ArticleRepository:
             func.count(),
             func.count().filter(Article.state == ArticleState.SHOWN),
             func.count(Article.opened_at),
+            func.count(Article.brief_opened_at),
         ).select_from(Article)
-        total, shown, opened = self.session.execute(query).one()
-        return ArticleCounts(total, shown, opened)
+        total, shown, opened, briefs_opened = self.session.execute(query).one()
+        return ArticleCounts(total, shown, opened, briefs_opened)

@@ -26,13 +26,14 @@ def test_counts_pause_and_last_runs(session: Session, make: Factories) -> None:
     source = make.source()
     make.source(status=SourceStatus.MUTED)
     make.article(source, digest_date=date(2026, 10, 17), opened_at=NOW)
-    make.article(source, embedding=unit_vector(1))
+    make.article(source, embedding=unit_vector(1), brief_opened_at=NOW)
     run = RunRepository(session).start(uuid.uuid4(), RunKind.DIGEST, NOW)
     pause(session, NOW + timedelta(days=2), NOW, actor="user")
 
     status = get_status(session, NOW, TEST_MODEL)
 
-    assert (status.articles.total, status.articles.shown, status.articles.opened) == (2, 1, 1)
+    articles = status.articles
+    assert (articles.total, articles.shown, articles.opened, articles.briefs_opened) == (2, 1, 1, 1)
     assert status.embeddings == {TEST_MODEL: 1}
     assert status.sources[SourceStatus.ACTIVE] == 1
     assert status.sources[SourceStatus.MUTED] == 1

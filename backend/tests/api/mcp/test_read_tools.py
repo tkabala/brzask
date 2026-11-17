@@ -139,13 +139,15 @@ async def test_source_survival(connect: Connect, read_token: str, make: Factorie
 async def test_open_stats(connect: Connect, read_token: str, make: Factories) -> None:
     blog = make.source("Blog")
     make.article(blog, digest_date=date.today(), topic="AI", opened_at=SEEN)
+    make.article(blog, digest_date=date.today(), topic="AI", brief_opened_at=SEEN)
 
     async with connect(read_token) as client:
         stats = data(await client.call_tool("open_stats", {"days": 7}))
 
-    assert (stats["shown"], stats["opened"]) == (1, 1)
-    assert stats["by_topic"] == [{"key": "AI", "shown": 1, "opened": 1}]
-    assert stats["external"]["by_source"] == [{"key": "Blog", "shown": 1, "opened": 1}]
+    assert (stats["shown"], stats["opened"], stats["briefs_opened"]) == (2, 1, 1)
+    row = {"shown": 2, "opened": 1, "briefs_opened": 1}
+    assert stats["by_topic"] == [{"key": "AI"} | row]
+    assert stats["external"]["by_source"] == [{"key": "Blog"} | row]
 
 
 async def test_open_stats_window_is_bounded(connect: Connect, read_token: str) -> None:
@@ -235,10 +237,12 @@ async def test_interests(connect: Connect, read_token: str, make: Factories) -> 
 
 async def test_get_status(connect: Connect, read_token: str, make: Factories) -> None:
     make.run(SEEN, stats={"secret": "stays out"}, kind=RunKind.DIGEST)
+    make.article(digest_date=date.today(), brief_opened_at=SEEN)
 
     async with connect(read_token) as client:
         status = data(await client.call_tool("get_status", {}))
 
+    assert status["articles"] == {"total": 1, "shown": 1, "opened": 0, "briefs_opened": 1}
     assert status["last_runs"]["digest"]["status"] == "ok"
     assert "stats" not in status["last_runs"]["digest"]
 

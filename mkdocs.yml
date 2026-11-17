@@ -84,6 +84,7 @@ nav:
       - decisions/0022-one-embedding-model-at-a-time-with-thresholds-per-model.md
       - decisions/0023-third-party-text-is-data-and-its-reach-is-bounded.md
       - decisions/0024-third-party-fetches-may-go-through-one-proxy.md
+      - decisions/0025-entering-the-brief-counts-with-opening-the-original.md
       - Template: decisions/0000-template.md
 
 validation:

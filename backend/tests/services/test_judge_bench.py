@@ -90,6 +90,26 @@ def test_shown_articles_of_each_first_run_are_scored_with_the_opens_before_it(
     assert len(data["models"][0]["rows"]) == 4
 
 
+def test_a_brief_view_counts_as_opened(sessions: sessionmaker[Session], make: Factories) -> None:
+    source = make.source()
+    make.article(
+        source,
+        title="Brief",
+        first_seen_at=NOW - timedelta(hours=1),
+        digest_date=TODAY,
+        shown_at=NOW,
+        brief_opened_at=NOW + timedelta(hours=1),
+    )
+    make.article(source, title="Ignored", digest_date=TODAY, shown_at=NOW)
+
+    result = score_shown(sessions, FakeJudge(), TODAY)
+
+    assert sorted((row.title, row.opened) for row in result.rows) == [
+        ("Brief", True),
+        ("Ignored", False),
+    ]
+
+
 def test_articles_the_judge_cannot_answer_are_counted(
     sessions: sessionmaker[Session], make: Factories
 ) -> None:

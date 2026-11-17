@@ -210,6 +210,24 @@ def test_stats_count_by_source_id_within_the_window(session: Session, make: Fact
     assert (stats[quiet.id].articles, stats[quiet.id].opened) == (0, 0)
 
 
+def test_source_stats_count_a_brief_view_as_opened(session: Session, make: Factories) -> None:
+    source = make.source("Blog")
+    recent = NOW - timedelta(days=3)
+    make.article(source, first_seen_at=recent, digest_date=recent.date(), brief_opened_at=NOW)
+    make.article(source, first_seen_at=recent, digest_date=recent.date(), opened_at=NOW)
+    make.article(
+        source, first_seen_at=recent, digest_date=recent.date(), opened_at=NOW, brief_opened_at=NOW
+    )
+    make.article(source, first_seen_at=recent, digest_date=recent.date())
+    repository = SourceRepository(session)
+
+    stats = repository.stats(since=NOW - timedelta(days=30))
+    [record] = [r for r in repository.records() if r.source_id == source.id]
+
+    assert (stats[source.id].shown, stats[source.id].opened) == (4, 3)
+    assert record.opened == 3
+
+
 def test_stats_of_some_sources_only(session: Session, make: Factories) -> None:
     wanted = make.source("Wanted")
     quiet = make.source("Quiet")

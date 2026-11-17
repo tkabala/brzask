@@ -43,7 +43,7 @@ only on a machine nobody else can reach.
 | `search_articles` | read | Articles closest in meaning to a question (one embedding call) |
 | `list_sources`, `get_source` | read | Status, note, fetch health and the last 30 days of each source |
 | `source_survival` | read | Per origin and search adapter, how many sources stayed and were read |
-| `open_stats` | read | Shown and opened articles over the last days, by source and by topic |
+| `open_stats` | read | Shown articles, originals opened and briefs entered over the last days, by source and by topic |
 | `dedup_decisions` | read | What deduplication dropped in a digest run, with the judge's probability for grey-zone pairs |
 | `costs` | read | Spending today and this month against the budget, cost of recent runs |
 | `list_runs`, `get_run` | read | Pipeline runs and what each did |

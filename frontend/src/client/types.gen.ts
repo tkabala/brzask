@@ -18,8 +18,16 @@ export type ArticleCountsOut = {
     shown: number;
     /**
      * Opened
+     *
+     * Originals opened.
      */
     opened: number;
+    /**
+     * Briefs Opened
+     *
+     * Briefs entered; either counts as interest.
+     */
+    briefs_opened: number;
 };
 
 /**

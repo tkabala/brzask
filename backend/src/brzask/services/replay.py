@@ -309,14 +309,14 @@ def replay_day(
         run_at=run_at,
         pool=len(candidates),
         opened_in_pool=sum(
-            by_id[c.article_id].opened_at is not None for c in candidates if c.article_id
+            by_id[c.article_id].engaged_at is not None for c in candidates if c.article_id
         ),
         shown=len(shown),
-        shown_opened=sum(article.opened_at is not None for article in shown),
+        shown_opened=sum(article.engaged_at is not None for article in shown),
         lost=[
             {"title": article.title, "source_id": article.source_id}
             for article in shown
-            if article.opened_at is not None and article.source_id in config.pool.exclude_sources
+            if article.engaged_at is not None and article.source_id in config.pool.exclude_sources
         ],
     )
     if not candidates:
@@ -365,7 +365,7 @@ def replay_day(
                 article_id=article_id,
                 link=pick.candidate.link,
                 title=pick.title,
-                opened=by_id[article_id].opened_at is not None,
+                opened=by_id[article_id].engaged_at is not None,
                 shown=article_id in shown_ids,
             )
             for pick in picks

@@ -2,10 +2,10 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
-from brzask.db.models import ArticleState, Run, RunKind
+from brzask.db.models import Article, ArticleState, Run, RunKind
 from brzask.repositories import ArticleRepository, EmbeddingRepository
 from brzask.repositories.articles import DigestEntry, DigestRun, Extraction, NewArticle
 from tests.factories import TEST_MODEL, Factories, unit_vector
@@ -168,6 +168,23 @@ def test_recent_opens_newest_first_with_source_names(session: Session, make: Fac
     assert everything[-1].topic == "Rust"
 
 
+def test_recent_opens_include_a_brief_view(session: Session, make: Factories) -> None:
+    make.article(title="Original", opened_at=NOW - timedelta(days=2))
+    make.article(title="Brief", brief_opened_at=NOW - timedelta(days=1))
+    make.article(
+        title="Both", opened_at=NOW - timedelta(hours=1), brief_opened_at=NOW - timedelta(hours=3)
+    )
+    make.article(title="Brief too late", brief_opened_at=NOW + timedelta(hours=1))
+
+    opens = ArticleRepository(session).recent_opens(NOW - timedelta(days=90), 10, before=NOW)
+
+    assert [(o.title, o.opened_at) for o in opens] == [
+        ("Both", NOW - timedelta(hours=3)),
+        ("Brief", NOW - timedelta(days=1)),
+        ("Original", NOW - timedelta(days=2)),
+    ]
+
+
 def test_history_reads_can_stop_at_a_moment(session: Session, make: Factories) -> None:
     make.article(title="Before", opened_at=NOW - timedelta(hours=1))
     make.article(title="After", opened_at=NOW + timedelta(hours=1))
@@ -266,6 +283,39 @@ def test_opened_since(session: Session, make: Factories) -> None:
     make.article()
 
     assert list(ArticleRepository(session).opened_since(NOW - timedelta(days=30))) == [opened]
+
+
+def test_opened_since_includes_a_brief_view(session: Session, make: Factories) -> None:
+    brief = make.article(brief_opened_at=NOW - timedelta(days=1))
+    original = make.article(opened_at=NOW - timedelta(days=2))
+    make.article(brief_opened_at=NOW - timedelta(days=31))
+
+    found = ArticleRepository(session).opened_since(NOW - timedelta(days=30))
+
+    assert list(found) == [brief, original]
+
+
+@pytest.mark.parametrize(
+    ("opened", "brief", "engaged"),
+    [
+        (None, None, None),
+        (NOW, None, NOW),
+        (None, NOW, NOW),
+        (NOW + timedelta(hours=1), NOW, NOW),
+    ],
+)
+def test_engaged_at_is_the_earlier_signal(
+    session: Session,
+    make: Factories,
+    opened: datetime | None,
+    brief: datetime | None,
+    engaged: datetime | None,
+) -> None:
+    article = make.article(opened_at=opened, brief_opened_at=brief)
+
+    assert article.engaged_at == engaged
+    stored = session.scalar(select(Article.engaged_at).where(Article.id == article.id))
+    assert stored == engaged
 
 
 # --- Pipeline results ----------------------------------------------------------
@@ -380,6 +430,33 @@ def test_record_open_of_an_unknown_article(session: Session) -> None:
     assert ArticleRepository(session).record_open(123456, NOW) is None
 
 
+def test_record_brief_open_keeps_the_first_view(session: Session, make: Factories) -> None:
+    article = make.article(opened_at=NOW - timedelta(days=1))
+    articles = ArticleRepository(session)
+
+    assert articles.record_brief_open(article.id, NOW) is True
+    assert articles.record_brief_open(article.id, NOW + timedelta(hours=1)) is True
+
+    session.refresh(article)
+    assert article.brief_opened_at == NOW
+    assert article.opened_at == NOW - timedelta(days=1)
+
+
+def test_record_brief_open_of_an_unknown_article(session: Session) -> None:
+    assert ArticleRepository(session).record_brief_open(123456, NOW) is False
+
+
+def test_digest_days_count_a_brief_view_as_opened(session: Session, make: Factories) -> None:
+    make.article(digest_date=TODAY, opened_at=NOW)
+    make.article(digest_date=TODAY, brief_opened_at=NOW)
+    make.article(digest_date=TODAY, opened_at=NOW, brief_opened_at=NOW)
+    make.article(digest_date=TODAY)
+
+    [day] = ArticleRepository(session).digest_days(limit=1)
+
+    assert (day.articles, day.opened) == (4, 3)
+
+
 # --- Search --------------------------------------------------------------------
 
 
@@ -424,7 +501,8 @@ def test_counts(session: Session, make: Factories) -> None:
     make.article()
     make.article(digest_date=TODAY)
     make.article(digest_date=TODAY, opened_at=NOW)
+    make.article(digest_date=TODAY, brief_opened_at=NOW)
 
     counts = ArticleRepository(session).counts()
 
-    assert (counts.total, counts.shown, counts.opened) == (3, 2, 1)
+    assert (counts.total, counts.shown, counts.opened, counts.briefs_opened) == (4, 3, 1, 1)

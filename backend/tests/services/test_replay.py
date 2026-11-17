@@ -140,6 +140,23 @@ def test_each_day_is_chosen_again_from_what_it_could_see(
     assert summary.usage["calls"] == 4
 
 
+def test_a_brief_view_counts_as_opened(
+    sessions: sessionmaker[Session], session: Session, history: dict[str, Article]
+) -> None:
+    opened = history["opened"]
+    opened.brief_opened_at, opened.opened_at = opened.opened_at, None
+    session.flush()
+    model = FakeModel()
+
+    first, _ = replay(sessions, clients(model), since=YESTERDAY)
+
+    pick = next(pick for pick in first.picks if pick.article_id == opened.id)
+    assert pick.opened is True
+    assert (first.opened_in_pool, first.shown_opened, first.picked_opened) == (1, 1, 1)
+    _, today_prompt = model.prompts["ranking"]
+    assert "- Opened" in today_prompt
+
+
 def test_a_replay_writes_nothing(
     sessions: sessionmaker[Session], session: Session, history: dict[str, Article]
 ) -> None:

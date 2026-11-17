@@ -2,7 +2,8 @@
 
 The open rate is a fact of the database, not of a process: an article shown
 today may be opened from a feed reader next week. So the gauges read it when
-they are collected, over the last digest days that exist.
+they are collected, over the last digest days that exist. An article counts
+as opened when the original was opened or its brief entered (ADR 0025).
 """
 
 import time
@@ -74,5 +75,5 @@ def register_open_rate(sessions: sessionmaker[Session], meter: metrics.Meter | N
         OPENED,
         callbacks=[observe(1)],
         unit="{article}",
-        description="Of those, articles opened.",
+        description="Of those, articles opened or whose brief was entered.",
     )

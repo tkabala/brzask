@@ -18,7 +18,7 @@ def test_status(client: TestClient, make: Factories, session: Session) -> None:
 
     body = client.get("/api/v1/status").json()
 
-    assert body["articles"] == {"total": 1, "shown": 1, "opened": 0}
+    assert body["articles"] == {"total": 1, "shown": 1, "opened": 0, "briefs_opened": 0}
     assert body["sources"]["pending"] == 1
     assert body["sources"]["active"] == 0
     assert body["last_digest"] == "2026-10-20"

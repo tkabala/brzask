@@ -9,6 +9,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    ColumnElement,
     ForeignKey,
     Identity,
     Index,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from brzask.db.base import Base, TimestampMixin, text_enum
@@ -158,6 +160,9 @@ class Article(Base):
     )
     shown_at: Mapped[datetime | None]
     opened_at: Mapped[datetime | None] = mapped_column(comment="First open; the preference signal.")
+    brief_opened_at: Mapped[datetime | None] = mapped_column(
+        comment="First view of the brief; a preference signal with opened_at."
+    )
 
     extracted_text: Mapped[str | None] = mapped_column(
         comment="The text that was embedded, so another model can embed it again."
@@ -174,6 +179,20 @@ class Article(Base):
 
     source: Mapped[Source | None] = relationship(back_populates="articles")
 
+    @hybrid_property
+    def engaged_at(self) -> datetime | None:
+        """When the reader first showed interest: the earlier of opening the original
+        and entering the brief (ADR 0025). Every "the reader wanted this" reads this.
+        """
+        signals = [at for at in (self.opened_at, self.brief_opened_at) if at is not None]
+        return min(signals, default=None)
+
+    @engaged_at.inplace.expression
+    @classmethod
+    def _engaged_at_expression(cls) -> ColumnElement[datetime | None]:
+        # Postgres' LEAST ignores nulls: null only when both are.
+        return func.least(cls.opened_at, cls.brief_opened_at)
+
     __table_args__ = (
         CheckConstraint(
             "(digest_date IS NULL) = (digest_position IS NULL)", name="digest_date_and_position"
@@ -183,6 +202,7 @@ class Article(Base):
         ),
         UniqueConstraint("digest_date", "digest_position"),
         Index(None, "opened_at", postgresql_where=text("opened_at IS NOT NULL")),
+        Index(None, "brief_opened_at", postgresql_where=text("brief_opened_at IS NOT NULL")),
         Index(None, "shown_at", postgresql_where=text("shown_at IS NOT NULL")),
     )
 

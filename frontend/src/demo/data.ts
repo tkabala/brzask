@@ -164,6 +164,7 @@ export const status: StatusOut = {
     total: allArticles.length,
     shown: shown.length,
     opened: shown.filter((a) => a.opened_at).length,
+    briefs_opened: 0,
   },
   sources: Object.fromEntries(
     (['active', 'pending', 'rejected', 'muted', 'dead'] as const).map((state) => [

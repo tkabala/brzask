@@ -5,6 +5,9 @@ date: 2026-10-21
 
 # Opening an article is the only preference signal
 
+Amended by [0025](0025-entering-the-brief-counts-with-opening-the-original.md):
+entering an article's brief in the web app counts with opening it.
+
 ## Context and problem statement
 
 To learn what the reader wants beyond their written interests, the digest

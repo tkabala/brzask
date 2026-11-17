@@ -137,13 +137,16 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
     def get_open_stats(
         days: Annotated[int, Field(ge=1, le=90)] = 30,
     ) -> models.OpenStatsResult:
-        """Articles shown and opened over the last `days` digest days, by source and topic."""
+        """Shown articles, originals opened and briefs entered, over the last `days` digest days."""
         with sessions.begin() as session, service_errors():
             stats = open_stats.open_stats(session, today(), days)
 
             def items(rows: list[open_stats.OpenCount]) -> list[models.OpenCountItem]:
                 return [
-                    models.OpenCountItem(key=r.key, shown=r.shown, opened=r.opened) for r in rows
+                    models.OpenCountItem(
+                        key=r.key, shown=r.shown, opened=r.opened, briefs_opened=r.briefs_opened
+                    )
+                    for r in rows
                 ]
 
             return models.OpenStatsResult(
@@ -151,6 +154,7 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
                 since=stats.since,
                 shown=stats.shown,
                 opened=stats.opened,
+                briefs_opened=stats.briefs_opened,
                 by_topic=items(stats.by_topic),
                 external=models.OpenStatsExternal(by_source=items(stats.by_source)),
             )
@@ -258,7 +262,10 @@ def register(server: MCPServer[Any], deps: McpDeps) -> None:
             counts = current.articles
             return models.StatusResult(
                 articles=models.ArticleCounts(
-                    total=counts.total, shown=counts.shown, opened=counts.opened
+                    total=counts.total,
+                    shown=counts.shown,
+                    opened=counts.opened,
+                    briefs_opened=counts.briefs_opened,
                 ),
                 sources=current.sources,
                 last_digest=current.last_digest,

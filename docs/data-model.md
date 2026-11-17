@@ -44,9 +44,13 @@ fetched ──► seen ──► ranked (rank set) ──► shown (in a digest)
   shown in the last days, under another link, or as a same-day duplicate of an
   article picked for that day's digest. Like a shown link, it is never a
   candidate again, so it cannot take a top slot day after day.
-- **`opened_at`**: the first time you opened the article. Opening is the only
-  preference signal brzask uses, so this column drives learning, source review
-  and measurement.
+- **`opened_at`**: the first time you opened the original article.
+- **`brief_opened_at`**: the first time you entered the article's brief in the
+  web app. Either one is the preference signal: an article is *engaged* when
+  one of the two is set, at the earlier of the two times, and that drives
+  learning, source review and measurement ([ADR
+  0025](decisions/0025-entering-the-brief-counts-with-opening-the-original.md)).
+  Both are kept, so they can be weighed differently later.
 
 `digest_title`, `summary`, `why_it_matters` and `topic` are written in the
 digest language when the article is picked.
