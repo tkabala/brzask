@@ -47,6 +47,7 @@ nav:
       - Providers: providers.md
       - Reverse proxy: reverse-proxy.md
       - Feed: feed.md
+      - Deep dives: deep-dives.md
       - Notifications: notifications.md
       - Agents (MCP): agents.md
       - Backup and restore: backup.md
@@ -85,6 +86,7 @@ nav:
       - decisions/0023-third-party-text-is-data-and-its-reach-is-bounded.md
       - decisions/0024-third-party-fetches-may-go-through-one-proxy.md
       - decisions/0025-entering-the-brief-counts-with-opening-the-original.md
+      - decisions/0026-deep-dives-follow-a-fixed-pipeline-and-cite-only-gathered-sources.md
       - Template: decisions/0000-template.md
 
 validation:

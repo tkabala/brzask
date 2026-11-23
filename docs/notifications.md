@@ -1,6 +1,6 @@
 # Notifications
 
-brzask can send two messages, through [Apprise](https://github.com/caronc/apprise)
+brzask can send three messages, through [Apprise](https://github.com/caronc/apprise)
 to almost any service: ntfy, Telegram, Matrix, Signal, Discord, Slack, Gotify,
 email and [about a hundred more](https://github.com/caronc/apprise/wiki).
 

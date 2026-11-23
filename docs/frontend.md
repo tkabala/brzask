@@ -24,7 +24,8 @@ origin, as they do in production. Over plain HTTP the session cookie is not
 | Path | Screen |
 |---|---|
 | `/` | Today's digest: a card per article, "why here?" from the ranking explanation |
-| `/articles/<id>` | An article's brief: gist, points, caveats, a video's chapters, and the original |
+| `/articles/<id>` | An article's brief: gist, points, caveats, a video's chapters, and the original; under it "Go deeper" asks for a deep dive |
+| `/deep-dives`, `/deep-dives/<id>` | Deep dives newest first, unread ones marked; a report with its numbered sources, export buttons, or its state while it is written |
 | `/archive`, `/archive/<day>` | Days with a digest, and any day's digest |
 | `/search?q=` | Search by meaning; the query stays in the address |
 | `/sources?show=` | Pending decisions, every source with its fetch health and 30-day counts, adding one from any page of a site |
@@ -43,6 +44,11 @@ at once in every cached digest, while the server records the open as the
 browser passes through `/open`. A brief that is not written yet, or an article
 that is gone, gets a short note and the original's link when the article is
 still known.
+
+The navigation counts finished deep dives not opened yet. While a deep dive
+is queued or being written, its page, the list and the count refetch every
+5 seconds; opening a finished one marks it read once. Copy and Share fetch
+the Markdown export when pressed; Download is a plain link to it.
 
 Each screen is a route that fetches and changes data (`src/routes/`) and a view
 that only takes props (`src/features/<screen>/`).
