@@ -18,6 +18,8 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as ArchiveIndexRouteImport } from './routes/archive/index'
 import { Route as ArchiveDayRouteImport } from './routes/archive/$day'
 import { Route as ArticlesIdRouteImport } from './routes/articles.$id'
+import { Route as DeepDivesIndexRouteImport } from './routes/deep-dives/index'
+import { Route as DeepDivesIdRouteImport } from './routes/deep-dives/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +66,16 @@ const ArticlesIdRoute = ArticlesIdRouteImport.update({
   path: '/articles/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeepDivesIndexRoute = DeepDivesIndexRouteImport.update({
+  id: '/deep-dives/',
+  path: '/deep-dives/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeepDivesIdRoute = DeepDivesIdRouteImport.update({
+  id: '/deep-dives/$id',
+  path: '/deep-dives/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,7 +86,9 @@ export interface FileRoutesByFullPath {
   '/status': typeof StatusRoute
   '/archive/$day': typeof ArchiveDayRoute
   '/articles/$id': typeof ArticlesIdRoute
+  '/deep-dives/$id': typeof DeepDivesIdRoute
   '/archive/': typeof ArchiveIndexRoute
+  '/deep-dives/': typeof DeepDivesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -85,7 +99,9 @@ export interface FileRoutesByTo {
   '/status': typeof StatusRoute
   '/archive/$day': typeof ArchiveDayRoute
   '/articles/$id': typeof ArticlesIdRoute
+  '/deep-dives/$id': typeof DeepDivesIdRoute
   '/archive': typeof ArchiveIndexRoute
+  '/deep-dives': typeof DeepDivesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,7 +113,9 @@ export interface FileRoutesById {
   '/status': typeof StatusRoute
   '/archive/$day': typeof ArchiveDayRoute
   '/articles/$id': typeof ArticlesIdRoute
+  '/deep-dives/$id': typeof DeepDivesIdRoute
   '/archive/': typeof ArchiveIndexRoute
+  '/deep-dives/': typeof DeepDivesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,7 +128,9 @@ export interface FileRouteTypes {
     | '/status'
     | '/archive/$day'
     | '/articles/$id'
+    | '/deep-dives/$id'
     | '/archive/'
+    | '/deep-dives/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -121,7 +141,9 @@ export interface FileRouteTypes {
     | '/status'
     | '/archive/$day'
     | '/articles/$id'
+    | '/deep-dives/$id'
     | '/archive'
+    | '/deep-dives'
   id:
     | '__root__'
     | '/'
@@ -132,7 +154,9 @@ export interface FileRouteTypes {
     | '/status'
     | '/archive/$day'
     | '/articles/$id'
+    | '/deep-dives/$id'
     | '/archive/'
+    | '/deep-dives/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -144,7 +168,9 @@ export interface RootRouteChildren {
   StatusRoute: typeof StatusRoute
   ArchiveDayRoute: typeof ArchiveDayRoute
   ArticlesIdRoute: typeof ArticlesIdRoute
+  DeepDivesIdRoute: typeof DeepDivesIdRoute
   ArchiveIndexRoute: typeof ArchiveIndexRoute
+  DeepDivesIndexRoute: typeof DeepDivesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +238,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArticlesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/deep-dives/': {
+      id: '/deep-dives/'
+      path: '/deep-dives'
+      fullPath: '/deep-dives/'
+      preLoaderRoute: typeof DeepDivesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deep-dives/$id': {
+      id: '/deep-dives/$id'
+      path: '/deep-dives/$id'
+      fullPath: '/deep-dives/$id'
+      preLoaderRoute: typeof DeepDivesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -224,7 +264,9 @@ const rootRouteChildren: RootRouteChildren = {
   StatusRoute: StatusRoute,
   ArchiveDayRoute: ArchiveDayRoute,
   ArticlesIdRoute: ArticlesIdRoute,
+  DeepDivesIdRoute: DeepDivesIdRoute,
   ArchiveIndexRoute: ArchiveIndexRoute,
+  DeepDivesIndexRoute: DeepDivesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import {
   getSessionStateQueryKey,
   listChangesOptions,
+  listDivesOptions,
   logoutMutation,
 } from '@/client/@tanstack/react-query.gen'
 import type { SessionOut } from '@/client/types.gen'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { LANGUAGES } from '@/i18n'
 import { setCsrfToken } from '@/lib/api'
 import { forgetSaved } from '@/lib/offline-cache'
+import { ACTIVE_REFETCH_MS } from '@/features/deep-dive/lib'
 import { chooseTheme, type Theme, THEMES, useTheme } from '@/lib/theme'
 
 const NAV = [
@@ -20,6 +22,7 @@ const NAV = [
   ['/search', 'search'],
   ['/sources', 'sources'],
   ['/interests', 'interests'],
+  ['/deep-dives', 'deepDives'],
   ['/changes', 'changes'],
   ['/status', 'status'],
 ] as const
@@ -29,7 +32,16 @@ export function AppHeader({ session }: { session: SessionOut }) {
   const queryClient = useQueryClient()
   const theme = useTheme()
   // Only a count: when it cannot be read (offline, an error) the link shows none.
-  const waiting = useQuery(listChangesOptions()).data?.length ?? 0
+  const changes = useQuery(listChangesOptions())
+  const waiting = changes.data?.length ?? 0
+  // Asked after the changes count: a logout drops both, and neither is asked again.
+  const dives = useQuery({
+    ...listDivesOptions(),
+    // Every 5 s while one is being written.
+    refetchInterval: (query) => ((query.state.data?.active ?? 0) > 0 ? ACTIVE_REFETCH_MS : false),
+    enabled: changes.isSuccess,
+  }).data
+  const unread = dives?.unread ?? 0
   const logout = useMutation({
     ...logoutMutation(),
     // Offline the request fails at once instead of waiting: the saved copy
@@ -70,6 +82,14 @@ export function AppHeader({ session }: { session: SessionOut }) {
                   aria-label={t('changes.waiting', { count: waiting })}
                 >
                   {waiting}
+                </span>
+              ) : null}
+              {key === 'deepDives' && unread > 0 ? (
+                <span
+                  className="ml-1 rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
+                  aria-label={t('deepDive.unreadCount', { count: unread })}
+                >
+                  {unread}
                 </span>
               ) : null}
             </Link>

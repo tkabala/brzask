@@ -8,6 +8,8 @@
 import { http, HttpResponse, type RequestHandler } from 'msw'
 
 import type {
+  DeepDiveOut,
+  DeepDiveRef,
   ArticleOut,
   InterestChange,
   InterestOut,
@@ -56,6 +58,7 @@ function fresh() {
     runs: demo.runs,
     status: demo.status,
     changes: demo.proposals,
+    deepDives: demo.deepDives,
   })
 }
 
@@ -129,6 +132,59 @@ export const handlers = [
     const article = allArticles().find((a) => String(a.id) === params.id)
     if (!article) return problem(404, 'Not Found', `no article ${String(params.id)}`)
     return HttpResponse.json(demo.rankingOf(article))
+  }),
+  http.get(`${API}/deep-dives`, () => {
+    const refs = db.deepDives.map(diveRef)
+    return HttpResponse.json({
+      items: refs,
+      next_cursor: null,
+      unread: refs.filter((d) => d.status === 'done' && d.read_at === null).length,
+      active: refs.filter((d) => d.status === 'queued' || d.status === 'running').length,
+    })
+  }),
+  http.get(`${API}/deep-dives/:id/markdown`, ({ params }) => {
+    const dive = db.deepDives.find((d) => String(d.id) === params.id)
+    if (!dive) return problem(404, 'Not Found', `no deep dive ${String(params.id)}`)
+    return new HttpResponse(`# ${dive.article.title}\n`, {
+      headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+    })
+  }),
+  http.get(`${API}/deep-dives/:id`, ({ params }) => {
+    const dive = db.deepDives.find((d) => String(d.id) === params.id)
+    if (!dive) return problem(404, 'Not Found', `no deep dive ${String(params.id)}`)
+    return HttpResponse.json(dive)
+  }),
+  http.post(`${API}/deep-dives/:id/read`, ({ params }) => {
+    const dive = db.deepDives.find((d) => String(d.id) === params.id)
+    if (!dive) return problem(404, 'Not Found', `no deep dive ${String(params.id)}`)
+    dive.read_at ??= new Date().toISOString()
+    return new HttpResponse(null, { status: 204 })
+  }),
+  http.post(`${API}/deep-dives/:id/retry`, ({ params }) => {
+    const dive = db.deepDives.find((d) => String(d.id) === params.id)
+    if (!dive) return problem(404, 'Not Found', `no deep dive ${String(params.id)}`)
+    if (dive.status !== 'failed')
+      return problem(409, 'Conflict', 'only a failed deep dive can be tried again')
+    return HttpResponse.json(diveRef(queueDive(dive.article, dive.focus, dive.article_link)), {
+      status: 202,
+    })
+  }),
+  http.get(`${API}/articles/:id/deep-dives`, ({ params }) => {
+    const briefed = db.briefs.some((b) => String(b.article.id) === params.id)
+    return HttpResponse.json({
+      items: db.deepDives.filter((d) => String(d.article.id) === params.id).map(diveRef),
+      can_start: briefed,
+      reason: briefed ? null : 'this article has no stored text to go deeper from',
+    })
+  }),
+  http.post(`${API}/articles/:id/deep-dives`, async ({ params, request }) => {
+    const brief = db.briefs.find((b) => String(b.article.id) === params.id)
+    if (!brief) return problem(409, 'Conflict', 'this article has no stored text to go deeper from')
+    const { focus = '' } = (await request.json()) as { focus?: string }
+    const article = { id: brief.article.id, title: brief.article.title }
+    return HttpResponse.json(diveRef(queueDive(article, focus.trim(), brief.article.link)), {
+      status: 202,
+    })
   }),
   http.get(`${API}/articles/:id/brief`, ({ params }) => {
     const brief = db.briefs.find((b) => String(b.article.id) === params.id)
@@ -350,4 +406,29 @@ export const handlers = [
  */
 export function withApi(...overrides: RequestHandler[]) {
   return { msw: { handlers: { api: [...overrides, ...handlers] } } }
+}
+
+function diveRef(dive: DeepDiveOut): DeepDiveRef {
+  const { id, article, focus, status, created_at, finished_at, read_at } = dive
+  return { id, article, focus, status, created_at, finished_at, read_at }
+}
+
+function queueDive(article: DeepDiveRef['article'], focus: string, link: string): DeepDiveOut {
+  const dive: DeepDiveOut = {
+    id: Math.max(0, ...db.deepDives.map((d) => d.id)) + 1,
+    article,
+    focus,
+    status: 'queued',
+    created_at: new Date().toISOString(),
+    finished_at: null,
+    read_at: null,
+    article_link: link,
+    report: null,
+    sources: [],
+    thin: false,
+    searched_web: false,
+    error: null,
+  }
+  db.deepDives.unshift(dive)
+  return dive
 }

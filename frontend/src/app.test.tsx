@@ -184,6 +184,10 @@ describe('logged in', () => {
       'GET /api/v1/digests/today': () => json(emptyDigest),
       'GET /api/v1/changes': () =>
         session.authenticated ? json([]) : problem(401, 'Unauthorized', 'Log in first.'),
+      'GET /api/v1/deep-dives': () =>
+        session.authenticated
+          ? json({ items: [], next_cursor: null, unread: 0, active: 0 })
+          : problem(401, 'Unauthorized', 'Log in first.'),
       'POST /api/v1/auth/logout': () => {
         session = loggedOut
         return new Response(null, { status: 204 })
@@ -194,6 +198,7 @@ describe('logged in', () => {
     await screen.findByRole('heading', { name: 'Today' })
     await waitFor(() => {
       expect(api.sent('GET /api/v1/changes')).toHaveLength(1)
+      expect(api.sent('GET /api/v1/deep-dives')).toHaveLength(1)
     })
 
     await user.click(screen.getByRole('button', { name: 'Log out' }))

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getArticleOptions, getBriefOptions } from '@/client/@tanstack/react-query.gen'
 import { Pending } from '@/components/pending'
 import { ProblemMessage } from '@/components/problem-message'
+import { GoDeeper } from '@/features/deep-dive/go-deeper'
 import { useMarkOpened } from '@/features/digest/use-mark-opened'
 import { ApiProblem } from '@/lib/api'
 
@@ -32,5 +33,10 @@ export function BriefPage({ articleId }: { articleId: number }) {
   if (brief.isError) {
     return <ProblemMessage error={brief.error} onRetry={() => void brief.refetch()} />
   }
-  return <BriefView brief={brief.data} onOpen={markOpened} />
+  return (
+    <>
+      <BriefView brief={brief.data} onOpen={markOpened} />
+      <GoDeeper articleId={articleId} />
+    </>
+  )
 }

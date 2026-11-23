@@ -18,6 +18,7 @@ import type {
   SourceOut,
   SourceStatus,
   StatusOut,
+  DeepDiveOut,
 } from '@/client/types.gen'
 
 import instance from './instance.gen.json'
@@ -316,3 +317,86 @@ export const proposals: ChangeOut[] = [
     decided_at: null,
   },
 ]
+
+/** Deep dives: a finished report on the first briefed article, and one being written. */
+export const deepDives: DeepDiveOut[] = (() => {
+  const first = must(briefs[0], 'a brief').article
+  const second = must(briefs[1] ?? briefs[0], 'a brief').article
+  const ref = (article: ArticleOut) => ({ id: article.id, title: article.title })
+  return [
+    {
+      id: 2,
+      article: ref(second),
+      focus: 'for a small homelab',
+      status: 'running',
+      created_at: `${DAY}T08:10:00Z`,
+      finished_at: null,
+      read_at: null,
+      article_link: second.link,
+      report: null,
+      sources: [],
+      thin: false,
+      searched_web: false,
+      error: null,
+    },
+    {
+      id: 1,
+      article: ref(first),
+      focus: '',
+      status: 'done',
+      created_at: `${DAY}T07:40:00Z`,
+      finished_at: `${DAY}T07:43:00Z`,
+      read_at: null,
+      article_link: first.link,
+      report: {
+        background: [
+          {
+            text: 'The project has shipped a release every quarter since 2023; this one finishes the storage rework announced in spring.',
+            sources: [1, 3],
+          },
+          {
+            text: 'Earlier releases in your archive covered the first half of that work.',
+            sources: [2],
+          },
+        ],
+        practice: [
+          {
+            text: 'Check that a node is ready before upgrading it.',
+            command:
+              'upgrade-check --full --verbose --include-storage-pools --report /tmp/check.txt',
+            sources: [3],
+          },
+          {
+            text: 'Read the known issues before upgrading a cluster.',
+            command: null,
+            sources: [3],
+          },
+        ],
+        further: [
+          { source: 3, why: 'The official upgrade guide, with every step.' },
+          { source: 2, why: 'What changed in the previous release.' },
+        ],
+      },
+      sources: [
+        { n: 1, url: first.link, title: first.title, origin: 'article', open_url: null },
+        {
+          n: 2,
+          url: 'https://news.example/earlier',
+          title: 'The previous release',
+          origin: 'archive',
+          open_url: `/open?id=${String(first.id)}`,
+        },
+        {
+          n: 3,
+          url: 'https://docs.example/upgrade',
+          title: 'Upgrade guide',
+          origin: 'web',
+          open_url: null,
+        },
+      ],
+      thin: false,
+      searched_web: true,
+      error: null,
+    },
+  ]
+})()
