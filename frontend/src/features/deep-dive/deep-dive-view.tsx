@@ -145,7 +145,7 @@ function Report({
       ) : (
         <ol className="mt-3 grid list-decimal gap-3 pl-5 leading-relaxed">
           {report.practice.map((step, i) => (
-            <li key={i}>
+            <li key={i} className="min-w-0">
               {step.text}
               <Cites numbers={step.sources} />
               {step.command ? (
