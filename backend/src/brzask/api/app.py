@@ -33,6 +33,7 @@ from brzask.api import (
     articles,
     auth,
     changes,
+    deep_dives,
     digests,
     feed,
     health,
@@ -77,7 +78,7 @@ def create_app(
     web_dir: Path | None = None,
     pipelines: Mapping[RunKind, Pipeline] | None = None,
     replay: Callable[[int, Sequence[int]], Pipeline] | None = None,
-    deep_dives: DeepDiveRunner | None = None,
+    deep_dive_runner: DeepDiveRunner | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
@@ -86,11 +87,11 @@ def create_app(
     unless given. `web_dir` is the built web app to serve at `/`; without it only
     the API is served. `pipelines` replaces the real ones for runs agents start,
     and `replay` the replay runs they start (days, sources left out);
-    `deep_dives` writes the deep dives readers ask for."""
+    `deep_dive_runner` writes the deep dives readers ask for."""
     server = server or get_settings().server
     clients = clients or ApiClients()
     agent_runs = BackgroundRuns(sessions, pipelines)
-    deep_dives = deep_dives or DeepDiveRunner(sessions)
+    runner = deep_dive_runner or DeepDiveRunner(sessions)
     deps = McpDeps(sessions, clients, agent_runs)
     if replay is not None:
         deps.replay = replay
@@ -105,7 +106,7 @@ def create_app(
                 yield
         finally:
             await anyio.to_thread.run_sync(agent_runs.close)
-            await anyio.to_thread.run_sync(deep_dives.close)
+            await anyio.to_thread.run_sync(app.state.deep_dives.close)
 
     app = FastAPI(
         lifespan=lifespan,
@@ -125,7 +126,7 @@ def create_app(
     app.state.sessions = sessions
     app.state.metrics_registry = metrics_registry
     app.state.clients = clients
-    app.state.deep_dives = deep_dives
+    app.state.deep_dives = runner
     app.state.auth = Auth(
         auth_settings or get_settings().auth,
         root_path=server.root_path,
@@ -143,7 +144,17 @@ def create_app(
         dependencies=[Depends(require_user)],
         responses=problems.responses(HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
     )
-    for module in (digests, articles, search, sources, interests, changes, runs, status):
+    for module in (
+        digests,
+        articles,
+        deep_dives,
+        search,
+        sources,
+        interests,
+        changes,
+        runs,
+        status,
+    ):
         api.include_router(module.router)
     app.include_router(api)
     app.include_router(auth.router, prefix=API_PREFIX)

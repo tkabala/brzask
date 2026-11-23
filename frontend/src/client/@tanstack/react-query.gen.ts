@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addInterest, addSource, approveChange, changeInterest, changeSource, deletePause, exportSources, getArticle, getArticleRanking, getBrief, getDigest, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listChanges, listDigests, listInterests, listRuns, listSources, login, logout, openLink, type Options, readStatus, readyz, recordBriefOpen, rejectChange, search, setPause } from '../sdk.gen';
-import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetBriefData, GetBriefError, GetBriefResponse, GetDigestData, GetDigestError, GetDigestResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RecordBriefOpenData, RecordBriefOpenError, RecordBriefOpenResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse } from '../types.gen';
+import { addInterest, addSource, approveChange, changeInterest, changeSource, deletePause, diveMarkdown, exportSources, getArticle, getArticleRanking, getBrief, getDigest, getDive, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listArticleDives, listChanges, listDigests, listDives, listInterests, listRuns, listSources, login, logout, openLink, type Options, readDive, readStatus, readyz, recordBriefOpen, rejectChange, retryDive, search, setPause, startDive } from '../sdk.gen';
+import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, DiveMarkdownData, DiveMarkdownError, DiveMarkdownResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetBriefData, GetBriefError, GetBriefResponse, GetDigestData, GetDigestError, GetDigestResponse, GetDiveData, GetDiveError, GetDiveResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListArticleDivesData, ListArticleDivesError, ListArticleDivesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListDivesData, ListDivesError, ListDivesResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadDiveData, ReadDiveError, ReadDiveResponse, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RecordBriefOpenData, RecordBriefOpenError, RecordBriefOpenResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, RetryDiveData, RetryDiveError, RetryDiveResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse, StartDiveData, StartDiveError, StartDiveResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -235,6 +235,168 @@ export const getArticleRankingOptions = (options: Options<GetArticleRankingData>
         return data;
     },
     queryKey: getArticleRankingQueryKey(options)
+});
+
+export const listArticleDivesQueryKey = (options: Options<ListArticleDivesData>) => createQueryKey('listArticleDives', options);
+
+/**
+ * List an article's deep dives
+ */
+export const listArticleDivesOptions = (options: Options<ListArticleDivesData>) => queryOptions<ListArticleDivesResponse, ListArticleDivesError, ListArticleDivesResponse, ReturnType<typeof listArticleDivesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listArticleDives({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listArticleDivesQueryKey(options)
+});
+
+/**
+ * Ask for a deep dive
+ *
+ * Queued and written in the background. 409 when the article has no stored text,
+ * the spending limit is reached, or the same focus is already being written.
+ */
+export const startDiveMutation = (options?: Partial<Options<StartDiveData>>): UseMutationOptions<StartDiveResponse, StartDiveError, Options<StartDiveData>> => {
+    const mutationOptions: UseMutationOptions<StartDiveResponse, StartDiveError, Options<StartDiveData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await startDive({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listDivesQueryKey = (options?: Options<ListDivesData>) => createQueryKey('listDives', options);
+
+/**
+ * List deep dives
+ */
+export const listDivesOptions = (options?: Options<ListDivesData>) => queryOptions<ListDivesResponse, ListDivesError, ListDivesResponse, ReturnType<typeof listDivesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listDives({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listDivesQueryKey(options)
+});
+
+export const listDivesInfiniteQueryKey = (options?: Options<ListDivesData>): QueryKey<Options<ListDivesData>> => createQueryKey('listDives', options, true);
+
+/**
+ * List deep dives
+ */
+export const listDivesInfiniteOptions = (options?: Options<ListDivesData>) => {
+    const opts = infiniteQueryOptions<ListDivesResponse, ListDivesError, InfiniteData<ListDivesResponse>, QueryKey<Options<ListDivesData>>, string | null | Pick<QueryKey<Options<ListDivesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListDivesData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    cursor: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listDives({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listDivesInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
+
+export const getDiveQueryKey = (options: Options<GetDiveData>) => createQueryKey('getDive', options);
+
+/**
+ * Get a deep dive
+ */
+export const getDiveOptions = (options: Options<GetDiveData>) => queryOptions<GetDiveResponse, GetDiveError, GetDiveResponse, ReturnType<typeof getDiveQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getDive({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getDiveQueryKey(options)
+});
+
+/**
+ * Mark a deep dive read
+ *
+ * Records the first time only.
+ */
+export const readDiveMutation = (options?: Partial<Options<ReadDiveData>>): UseMutationOptions<ReadDiveResponse, ReadDiveError, Options<ReadDiveData>> => {
+    const mutationOptions: UseMutationOptions<ReadDiveResponse, ReadDiveError, Options<ReadDiveData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await readDive({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Try a failed deep dive again
+ *
+ * A new deep dive with the same article and focus; 409 unless this one failed.
+ */
+export const retryDiveMutation = (options?: Partial<Options<RetryDiveData>>): UseMutationOptions<RetryDiveResponse, RetryDiveError, Options<RetryDiveData>> => {
+    const mutationOptions: UseMutationOptions<RetryDiveResponse, RetryDiveError, Options<RetryDiveData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await retryDive({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const diveMarkdownQueryKey = (options: Options<DiveMarkdownData>) => createQueryKey('diveMarkdown', options);
+
+/**
+ * Export a deep dive as Markdown
+ *
+ * 409 until the deep dive is done.
+ */
+export const diveMarkdownOptions = (options: Options<DiveMarkdownData>) => queryOptions<DiveMarkdownResponse, DiveMarkdownError, DiveMarkdownResponse, ReturnType<typeof diveMarkdownQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await diveMarkdown({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: diveMarkdownQueryKey(options)
 });
 
 export const searchQueryKey = (options: Options<SearchData>) => createQueryKey('search', options);

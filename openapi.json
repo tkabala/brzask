@@ -576,6 +576,671 @@
         }
       }
     },
+    "/api/v1/articles/{article_id}/deep-dives": {
+      "get": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "List an article's deep dives",
+        "operationId": "list_article_dives",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDeepDives"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "Ask for a deep dive",
+        "description": "Queued and written in the background. 409 when the article has no stored text,\nthe spending limit is reached, or the same focus is already being written.",
+        "operationId": "start_dive",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeepDiveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeepDiveRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deep-dives": {
+      "get": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "List deep dives",
+        "operationId": "list_dives",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Items per page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Items per page."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` of the previous page; leave out for the first page.",
+              "title": "Cursor"
+            },
+            "description": "`next_cursor` of the previous page; leave out for the first page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeepDiveList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deep-dives/{dive_id}": {
+      "get": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "Get a deep dive",
+        "operationId": "get_dive",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dive_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Dive Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeepDiveOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deep-dives/{dive_id}/read": {
+      "post": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "Mark a deep dive read",
+        "description": "Records the first time only.",
+        "operationId": "read_dive",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dive_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Dive Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deep-dives/{dive_id}/retry": {
+      "post": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "Try a failed deep dive again",
+        "description": "A new deep dive with the same article and focus; 409 unless this one failed.",
+        "operationId": "retry_dive",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dive_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Dive Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeepDiveRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deep-dives/{dive_id}/markdown": {
+      "get": {
+        "tags": [
+          "deep dives"
+        ],
+        "summary": "Export a deep dive as Markdown",
+        "description": "409 until the deep dive is done.",
+        "operationId": "dive_markdown",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dive_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Dive Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/search": {
       "get": {
         "tags": [
@@ -2824,6 +3489,41 @@
         ],
         "title": "ArticleCountsOut"
       },
+      "ArticleDeepDives": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeepDiveRef"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "can_start": {
+            "type": "boolean",
+            "title": "Can Start"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why a new deep dive cannot start; null when it can."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "can_start",
+          "reason"
+        ],
+        "title": "ArticleDeepDives"
+      },
       "ArticleOut": {
         "properties": {
           "id": {
@@ -3244,6 +3944,410 @@
           "password"
         ],
         "title": "Credentials"
+      },
+      "DeepDiveArticle": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "In the digest language when the article was in a digest."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DeepDiveArticle"
+      },
+      "DeepDiveList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeepDiveRef"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          },
+          "unread": {
+            "type": "integer",
+            "title": "Unread",
+            "description": "Finished and not opened yet."
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active",
+            "description": "Queued or being written."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "unread",
+          "active"
+        ],
+        "title": "DeepDiveList"
+      },
+      "DeepDiveOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "article": {
+            "$ref": "#/components/schemas/DeepDiveArticle"
+          },
+          "focus": {
+            "type": "string",
+            "title": "Focus",
+            "description": "What the reader asked to focus on; empty when nothing."
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeepDiveStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At",
+            "description": "First time the finished report was opened."
+          },
+          "article_link": {
+            "type": "string",
+            "title": "Article Link"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeepDiveReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until the deep dive is done."
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/DeepDiveSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "thin": {
+            "type": "boolean",
+            "title": "Thin",
+            "description": "Written from the article alone."
+          },
+          "searched_web": {
+            "type": "boolean",
+            "title": "Searched Web",
+            "description": "A web search was configured and answered."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "article",
+          "focus",
+          "status",
+          "created_at",
+          "finished_at",
+          "read_at",
+          "article_link",
+          "report",
+          "sources",
+          "thin",
+          "searched_web",
+          "error"
+        ],
+        "title": "DeepDiveOut"
+      },
+      "DeepDiveParagraph": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "sources": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Numbers of the sources it rests on."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "sources"
+        ],
+        "title": "DeepDiveParagraph"
+      },
+      "DeepDiveReading": {
+        "properties": {
+          "source": {
+            "type": "integer",
+            "title": "Source"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "why"
+        ],
+        "title": "DeepDiveReading"
+      },
+      "DeepDiveRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "article": {
+            "$ref": "#/components/schemas/DeepDiveArticle"
+          },
+          "focus": {
+            "type": "string",
+            "title": "Focus",
+            "description": "What the reader asked to focus on; empty when nothing."
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeepDiveStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At",
+            "description": "First time the finished report was opened."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "article",
+          "focus",
+          "status",
+          "created_at",
+          "finished_at",
+          "read_at"
+        ],
+        "title": "DeepDiveRef"
+      },
+      "DeepDiveReport": {
+        "properties": {
+          "background": {
+            "items": {
+              "$ref": "#/components/schemas/DeepDiveParagraph"
+            },
+            "type": "array",
+            "title": "Background"
+          },
+          "practice": {
+            "items": {
+              "$ref": "#/components/schemas/DeepDiveStep"
+            },
+            "type": "array",
+            "title": "Practice"
+          },
+          "further": {
+            "items": {
+              "$ref": "#/components/schemas/DeepDiveReading"
+            },
+            "type": "array",
+            "title": "Further"
+          }
+        },
+        "type": "object",
+        "required": [
+          "background",
+          "practice",
+          "further"
+        ],
+        "title": "DeepDiveReport"
+      },
+      "DeepDiveRequest": {
+        "properties": {
+          "focus": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Focus",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DeepDiveRequest"
+      },
+      "DeepDiveSource": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "article",
+              "archive",
+              "web"
+            ],
+            "title": "Origin"
+          },
+          "open_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Url",
+            "description": "For archive articles: follow this to record the open; null otherwise."
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "url",
+          "title",
+          "origin",
+          "open_url"
+        ],
+        "title": "DeepDiveSource"
+      },
+      "DeepDiveStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "DeepDiveStatus"
+      },
+      "DeepDiveStep": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command",
+            "description": "Verbatim from a source; never run by brzask."
+          },
+          "sources": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "command",
+          "sources"
+        ],
+        "title": "DeepDiveStep"
       },
       "DigestDayOut": {
         "properties": {

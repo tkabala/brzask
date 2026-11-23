@@ -126,6 +126,11 @@ The interactive documentation lists every field; in short:
 | `GET /articles/{id}/brief` | Its brief: gist, points, caveats, chapters of a video (each with a link that opens the video at that moment) and what text it was written from; 404 when it has none |
 | `POST /articles/{id}/brief-open` | Records the first view of the brief; 404, recording nothing, when it has none |
 | `GET /articles/{id}/ranking` | Why it was ranked where it was: its place in the ranking, the pool it came from, the methods used and the selection's reason |
+| `GET`, `POST /articles/{id}/deep-dives` | Its deep dives, and whether a new one can start (and why not); `POST {"focus": "…"}` asks for one, written in the background (202) |
+| `GET /deep-dives` | Deep dives newest first, paginated, with how many are unread and how many are being written |
+| `GET /deep-dives/{id}` | One deep dive: its report, numbered sources, and its state or error |
+| `POST /deep-dives/{id}/read`, `POST /deep-dives/{id}/retry` | Record the first reading; try a failed one again as a new deep dive |
+| `GET /deep-dives/{id}/markdown` | A finished deep dive as a Markdown file |
 | `GET /search?q=` | Articles closest in meaning to `q` |
 | `GET /sources` | Sources by name, with fetch health and what each published in the last 30 days; `?status=pending` lists the ones waiting for a decision |
 | `POST /sources` | Add a source from its feed or any page of the site |
@@ -152,6 +157,12 @@ All of them are under `/api/v1`. A few choices worth knowing:
 - **The ranking explanation** uses what the digest run recorded. Runs from
   before a statistic was recorded give `null` for it. Scores per dimension
   from composite ranking are not stored, so they are not part of it.
+- **A deep dive is refused with 409** when the article has no stored text
+  (only digest articles do), when a spending limit is reached, or while one
+  with the same focus is being written. Deep dives are written one at a time;
+  one that was waiting or being written when the API stopped is marked failed
+  (`interrupted`) and can be tried again. Its report cites sources by number
+  only, and every link it shows is one of its sources.
 - Small collections (interests) are plain arrays; everything that grows is
   paginated.
 

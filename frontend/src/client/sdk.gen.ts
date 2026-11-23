@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetBriefData, GetBriefErrors, GetBriefResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RecordBriefOpenData, RecordBriefOpenErrors, RecordBriefOpenResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses } from './types.gen';
+import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, DiveMarkdownData, DiveMarkdownErrors, DiveMarkdownResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetBriefData, GetBriefErrors, GetBriefResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetDiveData, GetDiveErrors, GetDiveResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListArticleDivesData, ListArticleDivesErrors, ListArticleDivesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListDivesData, ListDivesErrors, ListDivesResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadDiveData, ReadDiveErrors, ReadDiveResponses, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RecordBriefOpenData, RecordBriefOpenErrors, RecordBriefOpenResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, RetryDiveData, RetryDiveErrors, RetryDiveResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses, StartDiveData, StartDiveErrors, StartDiveResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -118,6 +118,110 @@ export const getArticleRanking = <ThrowOnError extends boolean = false>(options:
             type: 'apiKey'
         }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/articles/{article_id}/ranking',
+    ...options
+});
+
+/**
+ * List an article's deep dives
+ */
+export const listArticleDives = <ThrowOnError extends boolean = false>(options: Options<ListArticleDivesData, ThrowOnError>): RequestResult<ListArticleDivesResponses, ListArticleDivesErrors, ThrowOnError> => (options.client ?? client).get<ListArticleDivesResponses, ListArticleDivesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/deep-dives',
+    ...options
+});
+
+/**
+ * Ask for a deep dive
+ *
+ * Queued and written in the background. 409 when the article has no stored text,
+ * the spending limit is reached, or the same focus is already being written.
+ */
+export const startDive = <ThrowOnError extends boolean = false>(options: Options<StartDiveData, ThrowOnError>): RequestResult<StartDiveResponses, StartDiveErrors, ThrowOnError> => (options.client ?? client).post<StartDiveResponses, StartDiveErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/deep-dives',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List deep dives
+ */
+export const listDives = <ThrowOnError extends boolean = false>(options?: Options<ListDivesData, ThrowOnError>): RequestResult<ListDivesResponses, ListDivesErrors, ThrowOnError> => (options?.client ?? client).get<ListDivesResponses, ListDivesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/deep-dives',
+    ...options
+});
+
+/**
+ * Get a deep dive
+ */
+export const getDive = <ThrowOnError extends boolean = false>(options: Options<GetDiveData, ThrowOnError>): RequestResult<GetDiveResponses, GetDiveErrors, ThrowOnError> => (options.client ?? client).get<GetDiveResponses, GetDiveErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/deep-dives/{dive_id}',
+    ...options
+});
+
+/**
+ * Mark a deep dive read
+ *
+ * Records the first time only.
+ */
+export const readDive = <ThrowOnError extends boolean = false>(options: Options<ReadDiveData, ThrowOnError>): RequestResult<ReadDiveResponses, ReadDiveErrors, ThrowOnError> => (options.client ?? client).post<ReadDiveResponses, ReadDiveErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/deep-dives/{dive_id}/read',
+    ...options
+});
+
+/**
+ * Try a failed deep dive again
+ *
+ * A new deep dive with the same article and focus; 409 unless this one failed.
+ */
+export const retryDive = <ThrowOnError extends boolean = false>(options: Options<RetryDiveData, ThrowOnError>): RequestResult<RetryDiveResponses, RetryDiveErrors, ThrowOnError> => (options.client ?? client).post<RetryDiveResponses, RetryDiveErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/deep-dives/{dive_id}/retry',
+    ...options
+});
+
+/**
+ * Export a deep dive as Markdown
+ *
+ * 409 until the deep dive is done.
+ */
+export const diveMarkdown = <ThrowOnError extends boolean = false>(options: Options<DiveMarkdownData, ThrowOnError>): RequestResult<DiveMarkdownResponses, DiveMarkdownErrors, ThrowOnError> => (options.client ?? client).get<DiveMarkdownResponses, DiveMarkdownErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/deep-dives/{dive_id}/markdown',
     ...options
 });
 

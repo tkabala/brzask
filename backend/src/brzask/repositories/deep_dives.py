@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session
 
 from brzask.db.models import DeepDive, DeepDiveStatus
@@ -50,11 +50,11 @@ class DeepDiveRepository:
             .order_by(DeepDive.created_at.desc(), DeepDive.id.desc())
         ).all()
 
-    def page(self, limit: int, before: datetime | None) -> Sequence[DeepDive]:
-        """Dives newest first, created before `before` when given."""
+    def page(self, limit: int, before: tuple[datetime, int] | None) -> Sequence[DeepDive]:
+        """Dives newest first; after the dive with `before` = (created_at, id) when given."""
         query = select(DeepDive).order_by(DeepDive.created_at.desc(), DeepDive.id.desc())
         if before is not None:
-            query = query.where(DeepDive.created_at < before)
+            query = query.where(tuple_(DeepDive.created_at, DeepDive.id) < tuple_(*before))
         return self.session.scalars(query.limit(limit)).all()
 
     def counts(self) -> tuple[int, int]:

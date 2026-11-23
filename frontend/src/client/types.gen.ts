@@ -31,6 +31,28 @@ export type ArticleCountsOut = {
 };
 
 /**
+ * ArticleDeepDives
+ */
+export type ArticleDeepDives = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<DeepDiveRef>;
+    /**
+     * Can Start
+     */
+    can_start: boolean;
+    /**
+     * Reason
+     *
+     * Why a new deep dive cannot start; null when it can.
+     */
+    reason: string | null;
+};
+
+/**
  * ArticleOut
  */
 export type ArticleOut = {
@@ -270,6 +292,255 @@ export type Credentials = {
      * Password
      */
     password: string;
+};
+
+/**
+ * DeepDiveArticle
+ */
+export type DeepDiveArticle = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Title
+     *
+     * In the digest language when the article was in a digest.
+     */
+    title: string;
+};
+
+/**
+ * DeepDiveList
+ */
+export type DeepDiveList = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<DeepDiveRef>;
+    /**
+     * Next Cursor
+     *
+     * Pass as `cursor` for the next page; null on the last page.
+     */
+    next_cursor: string | null;
+    /**
+     * Unread
+     *
+     * Finished and not opened yet.
+     */
+    unread: number;
+    /**
+     * Active
+     *
+     * Queued or being written.
+     */
+    active: number;
+};
+
+/**
+ * DeepDiveOut
+ */
+export type DeepDiveOut = {
+    /**
+     * Id
+     */
+    id: number;
+    article: DeepDiveArticle;
+    /**
+     * Focus
+     *
+     * What the reader asked to focus on; empty when nothing.
+     */
+    focus: string;
+    status: DeepDiveStatus;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Read At
+     *
+     * First time the finished report was opened.
+     */
+    read_at: string | null;
+    /**
+     * Article Link
+     */
+    article_link: string;
+    /**
+     * Null until the deep dive is done.
+     */
+    report: DeepDiveReport | null;
+    /**
+     * Sources
+     */
+    sources: Array<DeepDiveSource>;
+    /**
+     * Thin
+     *
+     * Written from the article alone.
+     */
+    thin: boolean;
+    /**
+     * Searched Web
+     *
+     * A web search was configured and answered.
+     */
+    searched_web: boolean;
+    /**
+     * Error
+     */
+    error: string | null;
+};
+
+/**
+ * DeepDiveParagraph
+ */
+export type DeepDiveParagraph = {
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Sources
+     *
+     * Numbers of the sources it rests on.
+     */
+    sources: Array<number>;
+};
+
+/**
+ * DeepDiveReading
+ */
+export type DeepDiveReading = {
+    /**
+     * Source
+     */
+    source: number;
+    /**
+     * Why
+     */
+    why: string;
+};
+
+/**
+ * DeepDiveRef
+ */
+export type DeepDiveRef = {
+    /**
+     * Id
+     */
+    id: number;
+    article: DeepDiveArticle;
+    /**
+     * Focus
+     *
+     * What the reader asked to focus on; empty when nothing.
+     */
+    focus: string;
+    status: DeepDiveStatus;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Read At
+     *
+     * First time the finished report was opened.
+     */
+    read_at: string | null;
+};
+
+/**
+ * DeepDiveReport
+ */
+export type DeepDiveReport = {
+    /**
+     * Background
+     */
+    background: Array<DeepDiveParagraph>;
+    /**
+     * Practice
+     */
+    practice: Array<DeepDiveStep>;
+    /**
+     * Further
+     */
+    further: Array<DeepDiveReading>;
+};
+
+/**
+ * DeepDiveRequest
+ */
+export type DeepDiveRequest = {
+    /**
+     * Focus
+     */
+    focus?: string;
+};
+
+/**
+ * DeepDiveSource
+ */
+export type DeepDiveSource = {
+    /**
+     * N
+     */
+    n: number;
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Origin
+     */
+    origin: 'article' | 'archive' | 'web';
+    /**
+     * Open Url
+     *
+     * For archive articles: follow this to record the open; null otherwise.
+     */
+    open_url: string | null;
+};
+
+/**
+ * DeepDiveStatus
+ */
+export type DeepDiveStatus = 'queued' | 'running' | 'done' | 'failed';
+
+/**
+ * DeepDiveStep
+ */
+export type DeepDiveStep = {
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Command
+     *
+     * Verbatim from a source; never run by brzask.
+     */
+    command: string | null;
+    /**
+     * Sources
+     */
+    sources: Array<number>;
 };
 
 /**
@@ -1340,6 +1611,324 @@ export type GetArticleRankingResponses = {
 };
 
 export type GetArticleRankingResponse = GetArticleRankingResponses[keyof GetArticleRankingResponses];
+
+export type ListArticleDivesData = {
+    body?: never;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/deep-dives';
+};
+
+export type ListArticleDivesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ListArticleDivesError = ListArticleDivesErrors[keyof ListArticleDivesErrors];
+
+export type ListArticleDivesResponses = {
+    /**
+     * Successful Response
+     */
+    200: ArticleDeepDives;
+};
+
+export type ListArticleDivesResponse = ListArticleDivesResponses[keyof ListArticleDivesResponses];
+
+export type StartDiveData = {
+    body: DeepDiveRequest;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/deep-dives';
+};
+
+export type StartDiveErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type StartDiveError = StartDiveErrors[keyof StartDiveErrors];
+
+export type StartDiveResponses = {
+    /**
+     * Successful Response
+     */
+    202: DeepDiveRef;
+};
+
+export type StartDiveResponse = StartDiveResponses[keyof StartDiveResponses];
+
+export type ListDivesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         *
+         * Items per page.
+         */
+        limit?: number;
+        /**
+         * Cursor
+         *
+         * `next_cursor` of the previous page; leave out for the first page.
+         */
+        cursor?: string | null;
+    };
+    url: '/api/v1/deep-dives';
+};
+
+export type ListDivesErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ListDivesError = ListDivesErrors[keyof ListDivesErrors];
+
+export type ListDivesResponses = {
+    /**
+     * Successful Response
+     */
+    200: DeepDiveList;
+};
+
+export type ListDivesResponse = ListDivesResponses[keyof ListDivesResponses];
+
+export type GetDiveData = {
+    body?: never;
+    path: {
+        /**
+         * Dive Id
+         */
+        dive_id: number;
+    };
+    query?: never;
+    url: '/api/v1/deep-dives/{dive_id}';
+};
+
+export type GetDiveErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type GetDiveError = GetDiveErrors[keyof GetDiveErrors];
+
+export type GetDiveResponses = {
+    /**
+     * Successful Response
+     */
+    200: DeepDiveOut;
+};
+
+export type GetDiveResponse = GetDiveResponses[keyof GetDiveResponses];
+
+export type ReadDiveData = {
+    body?: never;
+    path: {
+        /**
+         * Dive Id
+         */
+        dive_id: number;
+    };
+    query?: never;
+    url: '/api/v1/deep-dives/{dive_id}/read';
+};
+
+export type ReadDiveErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ReadDiveError = ReadDiveErrors[keyof ReadDiveErrors];
+
+export type ReadDiveResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ReadDiveResponse = ReadDiveResponses[keyof ReadDiveResponses];
+
+export type RetryDiveData = {
+    body?: never;
+    path: {
+        /**
+         * Dive Id
+         */
+        dive_id: number;
+    };
+    query?: never;
+    url: '/api/v1/deep-dives/{dive_id}/retry';
+};
+
+export type RetryDiveErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type RetryDiveError = RetryDiveErrors[keyof RetryDiveErrors];
+
+export type RetryDiveResponses = {
+    /**
+     * Successful Response
+     */
+    202: DeepDiveRef;
+};
+
+export type RetryDiveResponse = RetryDiveResponses[keyof RetryDiveResponses];
+
+export type DiveMarkdownData = {
+    body?: never;
+    path: {
+        /**
+         * Dive Id
+         */
+        dive_id: number;
+    };
+    query?: never;
+    url: '/api/v1/deep-dives/{dive_id}/markdown';
+};
+
+export type DiveMarkdownErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type DiveMarkdownError = DiveMarkdownErrors[keyof DiveMarkdownErrors];
+
+export type DiveMarkdownResponses = {
+    /**
+     * Successful Response
+     */
+    200: string;
+};
+
+export type DiveMarkdownResponse = DiveMarkdownResponses[keyof DiveMarkdownResponses];
 
 export type SearchData = {
     body?: never;

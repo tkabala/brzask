@@ -135,7 +135,7 @@ def test_page_is_newest_first_and_pages_by_before(session: Session, make: Factor
     session.flush()
 
     assert [d.id for d in repository.page(2, None)] == [dives[2].id, dives[1].id]
-    assert [d.id for d in repository.page(2, dives[1].created_at)] == [dives[0].id]
+    assert [d.id for d in repository.page(2, (dives[1].created_at, dives[1].id))] == [dives[0].id]
     assert [d.id for d in repository.for_article(article.id)] == [d.id for d in reversed(dives)]
 
 

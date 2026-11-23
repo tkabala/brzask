@@ -76,6 +76,131 @@ export const zCredentials = z.object({
 });
 
 /**
+ * DeepDiveArticle
+ */
+export const zDeepDiveArticle = z.object({
+    id: z.int(),
+    title: z.string()
+});
+
+/**
+ * DeepDiveParagraph
+ */
+export const zDeepDiveParagraph = z.object({
+    text: z.string(),
+    sources: z.array(z.int())
+});
+
+/**
+ * DeepDiveReading
+ */
+export const zDeepDiveReading = z.object({
+    source: z.int(),
+    why: z.string()
+});
+
+/**
+ * DeepDiveRequest
+ */
+export const zDeepDiveRequest = z.object({
+    focus: z.string().max(300).optional().default('')
+});
+
+/**
+ * DeepDiveSource
+ */
+export const zDeepDiveSource = z.object({
+    n: z.int(),
+    url: z.string(),
+    title: z.string(),
+    origin: z.enum([
+        'article',
+        'archive',
+        'web'
+    ]),
+    open_url: z.string().nullable()
+});
+
+/**
+ * DeepDiveStatus
+ */
+export const zDeepDiveStatus = z.enum([
+    'queued',
+    'running',
+    'done',
+    'failed'
+]);
+
+/**
+ * DeepDiveRef
+ */
+export const zDeepDiveRef = z.object({
+    id: z.int(),
+    article: zDeepDiveArticle,
+    focus: z.string(),
+    status: zDeepDiveStatus,
+    created_at: z.iso.datetime(),
+    finished_at: z.iso.datetime().nullable(),
+    read_at: z.iso.datetime().nullable()
+});
+
+/**
+ * ArticleDeepDives
+ */
+export const zArticleDeepDives = z.object({
+    items: z.array(zDeepDiveRef),
+    can_start: z.boolean(),
+    reason: z.string().nullable()
+});
+
+/**
+ * DeepDiveList
+ */
+export const zDeepDiveList = z.object({
+    items: z.array(zDeepDiveRef),
+    next_cursor: z.string().nullable(),
+    unread: z.int(),
+    active: z.int()
+});
+
+/**
+ * DeepDiveStep
+ */
+export const zDeepDiveStep = z.object({
+    text: z.string(),
+    command: z.string().nullable(),
+    sources: z.array(z.int())
+});
+
+/**
+ * DeepDiveReport
+ */
+export const zDeepDiveReport = z.object({
+    background: z.array(zDeepDiveParagraph),
+    practice: z.array(zDeepDiveStep),
+    further: z.array(zDeepDiveReading)
+});
+
+/**
+ * DeepDiveOut
+ */
+export const zDeepDiveOut = z.object({
+    id: z.int(),
+    article: zDeepDiveArticle,
+    focus: z.string(),
+    status: zDeepDiveStatus,
+    created_at: z.iso.datetime(),
+    finished_at: z.iso.datetime().nullable(),
+    read_at: z.iso.datetime().nullable(),
+    article_link: z.string(),
+    report: zDeepDiveReport.nullable(),
+    sources: z.array(zDeepDiveSource),
+    thin: z.boolean(),
+    searched_web: z.boolean(),
+    error: z.string().nullable()
+});
+
+/**
  * DigestDayOut
  */
 export const zDigestDayOut = z.object({
@@ -536,6 +661,72 @@ export const zGetArticleRankingPath = z.object({
  * Successful Response
  */
 export const zGetArticleRankingResponse = zRankingOut;
+
+export const zListArticleDivesPath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zListArticleDivesResponse = zArticleDeepDives;
+
+export const zStartDiveBody = zDeepDiveRequest;
+
+export const zStartDivePath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zStartDiveResponse = zDeepDiveRef;
+
+export const zListDivesQuery = z.object({
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    cursor: z.string().nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListDivesResponse = zDeepDiveList;
+
+export const zGetDivePath = z.object({
+    dive_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zGetDiveResponse = zDeepDiveOut;
+
+export const zReadDivePath = z.object({
+    dive_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zReadDiveResponse = z.void();
+
+export const zRetryDivePath = z.object({
+    dive_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRetryDiveResponse = zDeepDiveRef;
+
+export const zDiveMarkdownPath = z.object({
+    dive_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zDiveMarkdownResponse = z.string();
 
 export const zSearchQuery = z.object({
     q: z.string().min(1).max(500).regex(/^[^\x00]*$/),
