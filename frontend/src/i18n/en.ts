@@ -199,6 +199,7 @@ export const en = {
       visited: 'Opened links',
       discovery: 'Discovery',
       replay: 'Replay',
+      deep_dive: 'Deep dive',
     },
     runStatus: { running: 'running', ok: 'ok', skipped: 'skipped', failed: 'failed' },
     dryRun: 'dry run',

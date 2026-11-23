@@ -4012,7 +4012,8 @@
           "review",
           "visited",
           "discovery",
-          "replay"
+          "replay",
+          "deep_dive"
         ],
         "title": "RunKind"
       },

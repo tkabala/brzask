@@ -205,6 +205,7 @@ export const pl: Resources = {
       visited: 'Otwarte linki',
       discovery: 'Wyszukiwanie źródeł',
       replay: 'Powtórka przeglądów',
+      deep_dive: 'Pogłębienie',
     },
     runStatus: { running: 'trwa', ok: 'ok', skipped: 'pominięty', failed: 'błąd' },
     dryRun: 'próba',

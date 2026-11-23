@@ -18,6 +18,7 @@ from brzask.db.models import (
     Change,
     ChangeStatus,
     ContentKind,
+    DeepDiveStatus,
     Interest,
     LoginSession,
     RunKind,
@@ -54,7 +55,16 @@ def fill_every_table(session: Session, make: Factories) -> None:
         topic="AI",
         embedding=[0.5] * 768,
     )
-    make.run(NOW, cost=0.0042)
+    run = make.run(NOW, cost=0.0042)
+    make.deep_dive(
+        picked,
+        focus="for Proxmox",
+        status=DeepDiveStatus.DONE,
+        run_id=run.id,
+        report={"background": [{"text": "Why.", "sources": [1]}], "practice": [], "further": []},
+        sources=[{"n": 1, "url": picked.link, "title": "T", "origin": "article"}],
+        finished_at=NOW,
+    )
     session.add_all(
         [
             ArticleContent(article_id=picked.id, text="The whole text.", kind=ContentKind.PAGE),

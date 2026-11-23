@@ -40,6 +40,7 @@ TABLES: tuple[Table, ...] = tuple(
         "article_contents",
         "article_briefs",
         "runs",
+        "deep_dives",
         "settings",
         "change_log",
         "api_tokens",

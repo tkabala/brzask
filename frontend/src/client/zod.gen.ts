@@ -220,7 +220,8 @@ export const zRunKind = z.enum([
     'review',
     'visited',
     'discovery',
-    'replay'
+    'replay',
+    'deep_dive'
 ]);
 
 /**
