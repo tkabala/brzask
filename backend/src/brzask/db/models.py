@@ -272,6 +272,55 @@ class ArticleBrief(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class DeepDiveStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class DeepDive(Base):
+    """A report on one article, written on the reader's request from gathered sources."""
+
+    __tablename__ = "deep_dives"
+
+    id: Mapped[int] = _id()
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), index=True
+    )
+    focus: Mapped[str] = mapped_column(
+        server_default=text("''"), comment="The reader's focus line; empty when none."
+    )
+    status: Mapped[DeepDiveStatus] = mapped_column(
+        text_enum(DeepDiveStatus, "deep_dive_status"),
+        default=DeepDiveStatus.QUEUED,
+        server_default=DeepDiveStatus.QUEUED.value,
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("runs.id", ondelete="SET NULL"))
+    report: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, comment="{background, practice, further}; sources cited by number."
+    )
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        server_default=text("'[]'"),
+        default=list,
+        comment="Gathered sources: [{n, url, title, origin, article_id}].",
+    )
+    thin: Mapped[bool] = mapped_column(
+        default=False, server_default=text("false"), comment="Written from the article alone."
+    )
+    searched_web: Mapped[bool] = mapped_column(
+        default=False, server_default=text("false"), comment="A web search answered."
+    )
+    model: Mapped[str | None] = mapped_column(comment="The LLM that wrote the report.")
+    error: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    finished_at: Mapped[datetime | None]
+    read_at: Mapped[datetime | None]
+
+    article: Mapped[Article] = relationship(lazy="joined")
+
+
 # --- Runs ------------------------------------------------------------------------
 
 
@@ -283,6 +332,8 @@ class RunKind(StrEnum):
     # A replay an agent started: recorded, so its cost counts towards the
     # spending limits, but not a pipeline (nothing schedules or forces it).
     REPLAY = "replay"
+    # A deep dive the reader asked for: recorded for its cost, run by the api.
+    DEEP_DIVE = "deep_dive"
 
 
 # The kinds the worker schedules, in the order of pipelines sharing a time.

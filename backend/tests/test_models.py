@@ -21,6 +21,7 @@ def test_all_tables_are_registered() -> None:
         "article_embeddings",
         "article_contents",
         "article_briefs",
+        "deep_dives",
         "runs",
         "settings",
         "change_log",

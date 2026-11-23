@@ -13,6 +13,7 @@ what the states mean and why some columns exist.
 | `articles` | Every fetched entry, its ranking, embedding, digest text and whether you opened it |
 | `article_contents` | The untruncated text of picked articles: page text, video transcript or feed description |
 | `article_briefs` | One brief per picked article: gist, points, caveats and, for videos, chapters |
+| `deep_dives` | Reports on an article written on request: background, steps to try, further reading, and their sources |
 | `runs` | One row per pipeline run: status, stats, timings, error |
 | `settings` | Values changed at runtime, such as a pause (configuration lives in environment variables) |
 | `change_log` | Every change to sources, interests or configuration, by a person, a pipeline or an agent |
@@ -88,6 +89,22 @@ paragraph, was read. `model` names the LLM that wrote it. A brief is written
 once: a forced run never replaces one. An article whose brief failed is tried
 again by later digest runs on its digest day and the day after, not later.
 
+### Deep dives
+
+A deep dive is a report on one article that the reader asks for from its
+brief, with an optional one-line `focus`. Its `status` goes `queued` →
+`running` → `done` or `failed` (with `error`); a dive still queued or running
+when the API stops is marked `failed` with the error `interrupted` at the next
+start. An article may have several dives, but only one per focus at a time
+(compared trimmed and case-insensitively). `report` holds the report as
+structure, `{background, practice, further}`, citing `sources` by number;
+`sources` is the numbered list it was written from (`n`, `url`, `title`,
+`origin` = `article`, `archive` or `web`, and `article_id` for archive
+articles), source 1 being the article itself. `thin` marks a report with no
+source besides the article, `searched_web` one for which a web search
+answered. `run_id` points at its run (kind `deep_dive`), `read_at` records
+the first time it was opened. Deleting the article deletes its dives.
+
 ## Sources
 
 | Status | Meaning |
@@ -150,9 +167,10 @@ instead of deleting its articles, so digest history and opens are kept.
 ## Runs
 
 Every pipeline run (`digest`, `review`, `visited`, `discovery`) writes one row,
-and so does a replay an agent starts (`replay`, always a dry run), so that its
-cost counts towards the spending limits. A replay run is not a pipeline:
-nothing schedules it and the status page's pipelines leave it out.
+and so does a replay an agent starts (`replay`, always a dry run) and a deep
+dive (`deep_dive`), so that their cost counts towards the spending limits.
+Neither is a pipeline: nothing schedules them and the status page's pipelines
+leave them out.
 A run an agent started over MCP has `started_by` set to `agent:<token name>`,
 which `AGENT_RUNS_PER_DAY` counts; the scheduler and the CLI leave it empty.
 Its `id` is the same as the `run_id` in the logs, so a failed run can be traced

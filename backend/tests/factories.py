@@ -14,6 +14,8 @@ from brzask.db.models import (
     Article,
     ArticleEmbedding,
     ArticleState,
+    DeepDive,
+    DeepDiveStatus,
     Interest,
     Run,
     RunKind,
@@ -122,6 +124,16 @@ class Factories:
         return self._add(
             ArticleEmbedding(article_id=article.id, model=model, embedding=list(vector))
         )
+
+    def deep_dive(
+        self,
+        article: Article,
+        *,
+        focus: str = "",
+        status: DeepDiveStatus = DeepDiveStatus.QUEUED,
+        **fields: Any,
+    ) -> DeepDive:
+        return self._add(DeepDive(article_id=article.id, focus=focus, status=status, **fields))
 
     def run(
         self,
