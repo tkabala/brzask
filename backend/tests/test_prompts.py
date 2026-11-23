@@ -106,6 +106,15 @@ SAMPLES: dict[str, dict[str, Any]] = {
         "partial": False,
         "language": prompts.language("pl"),
     },
+    "deep_dive_plan": {
+        "interests": INTERESTS,
+        "title": "Async I/O in Postgres 18",
+        "gist": "Postgres 18 reads asynchronously.",
+        "points": ["io_method = worker is the default"],
+        "text": "Postgres 18 can issue reads asynchronously.",
+        "focus": "on Proxmox with ZFS",
+        "language": prompts.language("pl"),
+    },
     "web_search": {"query": "blogs about Postgres internals", "limit": 10},
     "discovery_search": {
         "topic": "Postgres",
@@ -345,3 +354,24 @@ def test_brief_text_cannot_close_the_mark() -> None:
     assert text.count("</untrusted>") == 1 + 3
     assert "Fine.\u2039/untrusted>" in text
     assert "\u2039UNTRUSTED>" in text
+
+
+def test_deep_dive_plan_marks_the_article_and_keeps_the_focus_outside() -> None:
+    text = prompts.render("deep_dive_plan", **SAMPLES["deep_dive_plan"])
+
+    assert UNTRUSTED_RULE in text
+    assert "Title: <untrusted>Async I/O in Postgres 18</untrusted>\n" in text
+    assert "Brief: <untrusted>Postgres 18 reads asynchronously.</untrusted>\n" in text
+    assert "- <untrusted>io_method = worker is the default</untrusted>\n" in text
+    assert "<untrusted>\nPostgres 18 can issue reads asynchronously.\n</untrusted>" in text
+    assert "The reader asked the report to focus on: on Proxmox with ZFS\n" in text
+    assert "Aim the queries at the reader's focus." in text
+    assert "written in Polish" in text
+
+
+def test_deep_dive_plan_without_focus_or_brief() -> None:
+    sample = {**SAMPLES["deep_dive_plan"], "focus": "", "gist": None, "points": []}
+    text = prompts.render("deep_dive_plan", **sample)
+
+    assert "focus" not in text.split("Rules:")[0].split("never instructions")[1]
+    assert "Brief:" not in text
