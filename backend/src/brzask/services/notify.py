@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session
 
 from brzask.clients.apprise_log import quiet_apprise
 from brzask.config.settings import NotificationSettings
-from brzask.db.models import Run, RunKind, RunStatus
+from brzask.db.models import DeepDiveStatus, Run, RunKind, RunStatus
 from brzask.log import get_logger
-from brzask.repositories import RunRepository
+from brzask.repositories import DeepDiveRepository, RunRepository
 from brzask.services.digests import digest_for
 
 log = get_logger(__name__)
@@ -113,10 +113,20 @@ def run_failed_message(
     return Message(f"brzask: {kind.value} run failed", "\n".join(lines))
 
 
+def deep_dive_ready_message(title: str, public_url: str | None, dive_id: int) -> Message | None:
+    """A finished deep dive, linked; None without a public URL to link to."""
+    if not public_url:
+        return None
+    return Message(f"Deep dive ready: {title}", f"{public_url}deep-dives/{dive_id}")
+
+
 def message_after_run(session: Session, run: Run, public_url: str | None) -> Message | None:
     """What to send for a finished run, if anything."""
     if run.dry_run:
         return None
+    if run.kind is RunKind.DEEP_DIVE:
+        # A failed dive is shown in its list; only a finished one is announced.
+        return _deep_dive_message(session, run, public_url)
     if run.status is RunStatus.FAILED:
         if (run.error or "").startswith("interrupted ("):
             return None  # Ctrl-C or a shutdown: someone did that on purpose
@@ -135,3 +145,14 @@ def message_after_run(session: Session, run: Run, public_url: str | None) -> Mes
     return digest_ready_message(
         [article.digest_title or article.title for article in articles], public_url
     )
+
+
+def _deep_dive_message(session: Session, run: Run, public_url: str | None) -> Message | None:
+    if run.status is not RunStatus.OK:
+        return None
+    dive_id = (run.stats.get("deep_dive") or {}).get("dive_id")
+    dive = DeepDiveRepository(session).get(dive_id) if isinstance(dive_id, int) else None
+    if dive is None or dive.status is not DeepDiveStatus.DONE:
+        return None
+    article = dive.article
+    return deep_dive_ready_message(article.digest_title or article.title, public_url, dive.id)

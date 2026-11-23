@@ -82,7 +82,8 @@ flowchart LR
   router or a command.
 - **Services** hold the pipelines (`digest/`, `review`, `visited`,
   `discovery`) and everything else: sources, interests, opens, search,
-  replay and the benchmarks.
+  replay, the benchmarks and deep dives (`deep_dive/`: plan, gather, read,
+  write, run one at a time by a thread in the API process).
 - **Repositories** own every query, with the typed SQLAlchemy ORM
   ([ADR 0019](decisions/0019-typed-sqlalchemy-and-raw-sql-only-where-needed.md)).
 - **Clients** talk to the outside: one OpenAI-compatible client per role,

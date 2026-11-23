@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from brzask.clients.extractors.base import ExtractionInput
 from brzask.clients.extractors.chain import SNIPPET, ExtractionResult
-from brzask.clients.usage import UsageMeter
 from brzask.clients.web_search import SearchResult, WebSearchError
 from brzask.db.models import Article, ArticleContent, ContentKind
 from brzask.services.deep_dive.gather import (
@@ -17,6 +16,7 @@ from brzask.services.deep_dive.gather import (
 )
 from brzask.services.deep_dive.plan import Queries
 from tests.factories import Factories
+from tests.services.deep_dive_fakes import FakeSearch
 from tests.services.digest.fakes import FakeEmbedder, FakeExtractor
 
 LINK = "https://pve.example/news/9"
@@ -30,26 +30,6 @@ def test_round_robin() -> None:
     a1, a2, b1, c1, c2, c3 = (result(n) for n in ("a1", "a2", "b1", "c1", "c2", "c3"))
     assert round_robin([[a1, a2], [b1], [c1, c2, c3]]) == [a1, b1, c1, a2, c2, c3]
     assert round_robin([]) == []
-
-
-class FakeSearch:
-    name = "fake"
-
-    def __init__(self, answers: dict[str, list[SearchResult] | Exception]) -> None:
-        self.answers = answers
-        self.calls: list[tuple[str, int]] = []
-
-    def search(
-        self, query: str, *, limit: int = 10, meter: UsageMeter | None = None
-    ) -> list[SearchResult]:
-        self.calls.append((query, limit))
-        answer = self.answers[query]
-        if isinstance(answer, Exception):
-            raise answer
-        return answer
-
-    def close(self) -> None:
-        pass
 
 
 def test_web_candidates_drop_the_article_and_repeats() -> None:

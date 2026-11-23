@@ -33,6 +33,17 @@ run 0b6f1c2e-6a59-4a0f-9a55-3c1e0f6a7d10
 https://news.example.com/status
 ```
 
+**Deep dive ready**, when a deep dive you asked for from a brief is
+written, with a link to it. It needs `BASE_URL`, since the message is only
+the link; a deep dive that failed sends nothing (the list of deep dives shows
+it).
+
+```text
+Deep dive ready: Proxmox 9 is out
+
+https://news.example.com/deep-dives/12
+```
+
 ## What is never sent
 
 Nothing else, by design. No message for:
