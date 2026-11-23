@@ -115,6 +115,28 @@ SAMPLES: dict[str, dict[str, Any]] = {
         "focus": "on Proxmox with ZFS",
         "language": prompts.language("pl"),
     },
+    "deep_dive_report": {
+        "interests": INTERESTS,
+        "title": "Async I/O in Postgres 18",
+        "focus": "on Proxmox with ZFS",
+        "language": prompts.language("pl"),
+        "sources": [
+            {
+                "n": 1,
+                "title": "Async I/O in Postgres 18",
+                "url": "https://pg.example/18",
+                "origin": "article",
+                "text": "Postgres 18 can issue reads asynchronously.",
+            },
+            {
+                "n": 2,
+                "title": "io_uring docs",
+                "url": "https://docs.example/io",
+                "origin": "web",
+                "text": "Set io_method = io_uring.",
+            },
+        ],
+    },
     "web_search": {"query": "blogs about Postgres internals", "limit": 10},
     "discovery_search": {
         "topic": "Postgres",
@@ -375,3 +397,27 @@ def test_deep_dive_plan_without_focus_or_brief() -> None:
 
     assert "focus" not in text.split("Rules:")[0].split("never instructions")[1]
     assert "Brief:" not in text
+
+
+def test_deep_dive_report_marks_every_source_and_keeps_the_focus_outside() -> None:
+    text = prompts.render("deep_dive_report", **SAMPLES["deep_dive_report"])
+
+    assert UNTRUSTED_RULE in text
+    assert "Source 1 (article): <untrusted>Async I/O in Postgres 18</untrusted>\n" in text
+    assert "<untrusted>\nPostgres 18 can issue reads asynchronously.\n</untrusted>" in text
+    assert "Source 2 (web): <untrusted>io_uring docs</untrusted>\n" in text
+    assert "<untrusted>\nSet io_method = io_uring.\n</untrusted>" in text
+    assert "The reader asked the report to focus on: on Proxmox with ZFS\n" in text
+    assert "https://docs.example/io" not in text  # sources are cited by number only
+    assert "in Polish" in text
+    assert "Only the article itself" not in text
+
+
+def test_deep_dive_report_from_the_article_alone() -> None:
+    sample = SAMPLES["deep_dive_report"]
+    text = prompts.render(
+        "deep_dive_report", **{**sample, "focus": "", "sources": sample["sources"][:1]}
+    )
+
+    assert "Only the article itself is available" in text
+    assert "focus on" not in text
