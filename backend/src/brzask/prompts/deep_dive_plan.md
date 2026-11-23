@@ -31,11 +31,12 @@ Answer with only a JSON object, no code fences or commentary:
 Rules:
 - "background": 1-3 web search queries for what led to this article: earlier events, the project or company, the concepts and terms it assumes.
 - "practice": 0-3 web search queries for using what the article describes: documentation, guides, setup, known problems. An empty list when there is nothing to do with it.
-- "archive": 1-2 short queries (two to four words) for earlier articles on the same subject among those the reader has already been sent.
+- "archive": 0-2 short queries (two to four words) for earlier articles on the same subject among those the reader has already been sent; an empty list when the subject is new.
 - Write queries the way you would type them into a search engine: specific names, versions and terms, no full sentences.
 - Write each query in the language most likely to find good results: English for technical and international topics, the article's language for local ones. The report itself will be written in {{ language.name }}.
+- The text may be an automatic transcript with misheard names; search for what a name most likely is, and leave out names you cannot place. Do not search for side remarks (one bug, one error message).
 {% if focus %}
-- Aim the queries at the reader's focus.
+- Aim the queries at the reader's focus: at least two of the background and practice queries name it.
 {% endif %}
 
 Title: <untrusted>{{ title | untrusted }}</untrusted>

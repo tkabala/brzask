@@ -24,7 +24,9 @@ from brzask.urls import is_http_url, item_key
 log = get_logger(__name__)
 
 # Starting values, confirmed or corrected by the real checks before release.
-ARCHIVE_SOURCES = 5  # archive articles kept
+# Archive articles kept. Over five real dives (2026-11-23) 4 of 25 archive
+# sources were cited, 3 of them in one dive; three leave room for that case.
+ARCHIVE_SOURCES = 3
 WEB_RESULTS = 5  # results asked of each web query
 WEB_PAGES = 8  # web results read
 SOURCE_CHARS = 12_000  # characters of each archive or web source the writer reads
@@ -86,19 +88,27 @@ def archive_candidates(
 ) -> list[Article]:
     """Stored articles matching the archive queries, shown ones first.
 
-    Each query is searched by meaning (articles with vectors) and by text
-    (titles and summaries of all the rest); the article itself is never one.
+    Each query is searched by meaning (articles with vectors); only a query
+    that finds nothing that way is searched by text (titles and summaries):
+    for a new subject a text match is rarely about it, and it filled every
+    slot with unrelated articles in the real checks. The article itself is
+    never one.
     """
     repository = ArticleRepository(session)
     found: dict[int, Article] = {}
     for query in queries:
         try:
-            similar = [match.article for match in search_articles(session, embedder, query, 6)]
+            similar = [
+                match.article
+                for match in search_articles(session, embedder, query, ARCHIVE_SOURCES + 1)
+            ]
         except EmbeddingError as error:
             log.warning("deep dive archive search failed", error=str(error))
             similar = []
+        similar = [article for article in similar if article.id != article_id]
         # One more than kept, so the article itself never leaves a slot empty.
-        for article in [*similar, *repository.search_text(query, ARCHIVE_SOURCES + 1)]:
+        text = [] if similar else repository.search_text(query, ARCHIVE_SOURCES + 1)
+        for article in [*similar, *text]:
             if article.id != article_id:
                 found.setdefault(article.id, article)
     ordered = sorted(found.values(), key=lambda article: article.state is not ArticleState.SHOWN)

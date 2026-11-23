@@ -8,7 +8,7 @@ where a link points.
 import re
 import unicodedata
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from brzask.db.models import Article, DeepDive
 from brzask.prompts import Language
@@ -33,7 +33,9 @@ HEADINGS: dict[str, dict[str, str]] = {
 }
 
 SLUG_CHARS = 60
-_SPECIAL = re.compile(r"([\\\[\]()`*_#<>])")
+# Parentheses stay: with brackets escaped they cannot form a link.
+_SPECIAL = re.compile(r"([\\\[\]`*_#<>])")
+_CODE = re.compile(r"(`[^`\n]+`)")
 _SPACE = re.compile(r"\s+")
 _BACKTICKS = re.compile(r"`+")
 # Letters NFKD does not split into a base letter and a mark.
@@ -41,8 +43,21 @@ _ASCII = str.maketrans({"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "ß": "ss", 
 
 
 def escape(text: str) -> str:
-    """`text` on one line with every Markdown-significant character escaped."""
-    return _SPECIAL.sub(r"\\\1", _SPACE.sub(" ", text).strip())
+    """`text` on one line with every Markdown-significant character escaped,
+    except inside inline code spans (`like this`), which stay code."""
+    parts = _CODE.split(_SPACE.sub(" ", text).strip())
+    return "".join(part if n % 2 else _SPECIAL.sub(r"\\\1", part) for n, part in enumerate(parts))
+
+
+def without_tracking(url: str) -> str:
+    """`url` without `utm_*` query parameters."""
+    parts = urlsplit(url.strip())
+    query = [
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if not k.startswith("utm_")
+    ]
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 def link_target(url: str) -> str:
@@ -57,7 +72,7 @@ def render(dive: DeepDive, article: Article, language: Language) -> str:
     sources = {int(s["n"]): s for s in dive.sources}
     finished = dive.finished_at or dive.created_at
     lines = [f"# {escape(article.digest_title or article.title)}", ""]
-    lines.append(f"{finished:%Y-%m-%d} · {link_target(article.link)}")
+    lines.append(f"{finished:%Y-%m-%d} · {link_target(without_tracking(article.link))}")
     if dive.focus:
         lines.append(f"{words['focus']}: {escape(dive.focus)}")
 

@@ -110,7 +110,7 @@ def test_hostile_title_cannot_change_a_link() -> None:
 
     for line in text.splitlines():
         if "javascript" in line:
-            assert line.count("](") == 1
+            assert line.count("](") - line.count("\\](") == 1
             assert "](https://wiki.example/x)" in line
 
 
@@ -142,8 +142,25 @@ def test_title_with_newlines_and_hashes_stays_one_line() -> None:
 
 
 def test_escape() -> None:
-    assert escape("a [b] (c) `d` *e* _f_ #g <h> \\i\nj") == (
-        "a \\[b\\] \\(c\\) \\`d\\` \\*e\\* \\_f\\_ \\#g \\<h\\> \\\\i j"
+    assert escape("a [b] (c) *e* _f_ #g <h> \\i\nj") == (
+        "a \\[b\\] (c) \\*e\\* \\_f\\_ \\#g \\<h\\> \\\\i j"
+    )
+
+
+def test_inline_code_stays_code() -> None:
+    assert escape("use `--start-dir` [x]") == "use `--start-dir` \\[x\\]"
+    assert escape("a lone ` tick") == "a lone \\` tick"
+
+
+def test_tracking_parameters_leave_the_article_link() -> None:
+    article = Article(
+        id=1,
+        title="t",
+        digest_title="T",
+        link="https://a.example/p?id=3&utm_source=rss&utm_medium=x",
+    )
+    assert "\n2026-11-23 · https://a.example/p?id=3\n" in render(
+        dive(), article, prompts.language("en")
     )
 
 

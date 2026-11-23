@@ -387,7 +387,7 @@ def test_deep_dive_plan_marks_the_article_and_keeps_the_focus_outside() -> None:
     assert "- <untrusted>io_method = worker is the default</untrusted>\n" in text
     assert "<untrusted>\nPostgres 18 can issue reads asynchronously.\n</untrusted>" in text
     assert "The reader asked the report to focus on: on Proxmox with ZFS\n" in text
-    assert "Aim the queries at the reader's focus." in text
+    assert "Aim the queries at the reader's focus:" in text
     assert "written in Polish" in text
 
 
@@ -421,3 +421,16 @@ def test_deep_dive_report_from_the_article_alone() -> None:
 
     assert "Only the article itself is available" in text
     assert "focus on" not in text
+
+
+def test_deep_dive_prompts_bound_what_the_model_may_add() -> None:
+    plan = prompts.render("deep_dive_plan", **SAMPLES["deep_dive_plan"])
+    report = prompts.render("deep_dive_report", **SAMPLES["deep_dive_report"])
+
+    assert "misheard names" in plan
+    assert "at least two of the background and practice queries name it" in plan
+    assert "an empty list when the subject is new" in plan
+    assert "never connect the article to them" in report
+    assert "copied character for character" in report
+    assert "never as fact" in report
+    assert "never a product landing page" in report

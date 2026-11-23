@@ -78,13 +78,22 @@ def test_archive_candidates(session: Session, make: Factories) -> None:
     [query_vector] = embedder.embed(["proxmox"], "query")
     itself = make.article(title="Proxmox itself", embedding=query_vector)
     near = make.article(title="Unrelated title", embedding=query_vector)
-    texts = [make.article(title=f"Proxmox note {n}") for n in range(6)]
+    for n in range(6):
+        make.article(title=f"Proxmox note {n}")
 
     found = archive_candidates(session, embedder, ["proxmox"], itself.id)
 
     assert itself not in found
-    assert found[0] == near  # the vector match first, then text matches newest first
-    assert found[1:] == list(reversed(texts))[:4]
+    assert found == [near]  # a match by meaning: no text search for that query
+
+
+def test_text_search_only_when_meaning_finds_nothing(session: Session, make: Factories) -> None:
+    itself = make.article(title="Proxmox itself")
+    texts = [make.article(title=f"Proxmox note {n}") for n in range(6)]
+
+    found = archive_candidates(session, FakeEmbedder(), ["proxmox"], itself.id)
+
+    assert found == list(reversed(texts))[:3]
 
 
 def test_archive_candidates_order_shown_first(session: Session, make: Factories) -> None:
