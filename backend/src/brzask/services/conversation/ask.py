@@ -201,6 +201,15 @@ def material(session: Session, message_id: int, language: Language) -> Material:
         interest_context(session),
         language,
     )
+    # The context's size per answer, to check the caps against real conversations.
+    log.info(
+        "conversation context",
+        message_id=message_id,
+        chars=len(prompt),
+        sources=len(sources),
+        source_text_chars=sum(len(s.text or "") for s in sources),
+        exchanges=sum(1 for m in earlier if m.role is MessageRole.USER) - 1,
+    )
     return Material(prompt, frozenset(s.n for s in sources), question or "", message.usage)
 
 
