@@ -163,7 +163,7 @@ describe('deep dive page', () => {
     const user = userEvent.setup()
     renderApp(`/deep-dives/${String(done.id)}`)
     await user.click(await screen.findByRole('button', { name: 'Copy as Markdown' }))
-    expect(await screen.findByText('Could not export the report.')).toBeInTheDocument()
+    expect(await screen.findByText('Could not export it.')).toBeInTheDocument()
   })
 
   it('offers share only where the browser can share', async () => {

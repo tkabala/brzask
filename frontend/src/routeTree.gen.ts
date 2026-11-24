@@ -20,6 +20,7 @@ import { Route as ArchiveDayRouteImport } from './routes/archive/$day'
 import { Route as ArticlesIdRouteImport } from './routes/articles.$id'
 import { Route as DeepDivesIndexRouteImport } from './routes/deep-dives/index'
 import { Route as DeepDivesIdRouteImport } from './routes/deep-dives/$id'
+import { Route as ArticlesIdChatRouteImport } from './routes/articles.$id_.chat'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -76,6 +77,11 @@ const DeepDivesIdRoute = DeepDivesIdRouteImport.update({
   path: '/deep-dives/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArticlesIdChatRoute = ArticlesIdChatRouteImport.update({
+  id: '/articles/$id_/chat',
+  path: '/articles/$id/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/deep-dives/$id': typeof DeepDivesIdRoute
   '/archive/': typeof ArchiveIndexRoute
   '/deep-dives/': typeof DeepDivesIndexRoute
+  '/articles/$id/chat': typeof ArticlesIdChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/deep-dives/$id': typeof DeepDivesIdRoute
   '/archive': typeof ArchiveIndexRoute
   '/deep-dives': typeof DeepDivesIndexRoute
+  '/articles/$id/chat': typeof ArticlesIdChatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/deep-dives/$id': typeof DeepDivesIdRoute
   '/archive/': typeof ArchiveIndexRoute
   '/deep-dives/': typeof DeepDivesIndexRoute
+  '/articles/$id_/chat': typeof ArticlesIdChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/deep-dives/$id'
     | '/archive/'
     | '/deep-dives/'
+    | '/articles/$id/chat'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/deep-dives/$id'
     | '/archive'
     | '/deep-dives'
+    | '/articles/$id/chat'
   id:
     | '__root__'
     | '/'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/deep-dives/$id'
     | '/archive/'
     | '/deep-dives/'
+    | '/articles/$id_/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   DeepDivesIdRoute: typeof DeepDivesIdRoute
   ArchiveIndexRoute: typeof ArchiveIndexRoute
   DeepDivesIndexRoute: typeof DeepDivesIndexRoute
+  ArticlesIdChatRoute: typeof ArticlesIdChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeepDivesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/articles/$id_/chat': {
+      id: '/articles/$id_/chat'
+      path: '/articles/$id/chat'
+      fullPath: '/articles/$id/chat'
+      preLoaderRoute: typeof ArticlesIdChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -267,6 +287,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeepDivesIdRoute: DeepDivesIdRoute,
   ArchiveIndexRoute: ArchiveIndexRoute,
   DeepDivesIndexRoute: DeepDivesIndexRoute,
+  ArticlesIdChatRoute: ArticlesIdChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

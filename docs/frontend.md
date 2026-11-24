@@ -24,7 +24,8 @@ origin, as they do in production. Over plain HTTP the session cookie is not
 | Path | Screen |
 |---|---|
 | `/` | Today's digest: a card per article, "why here?" from the ranking explanation |
-| `/articles/<id>` | An article's brief: gist, points, caveats, a video's chapters, and the original; under it "Go deeper" asks for a deep dive |
+| `/articles/<id>` | An article's brief: gist, points, caveats, a video's chapters, and the original; under it "Ask" leads to its conversation and "Go deeper" asks for a deep dive |
+| `/articles/<id>/chat` | Questions about the article answered from its stored material, with numbered sources; a search round on request; export buttons |
 | `/deep-dives`, `/deep-dives/<id>` | Deep dives newest first, unread ones marked; a report with its numbered sources, export buttons, or its state while it is written |
 | `/archive`, `/archive/<day>` | Days with a digest, and any day's digest |
 | `/search?q=` | Search by meaning; the query stays in the address |
@@ -47,8 +48,19 @@ still known.
 
 The navigation counts finished deep dives not opened yet. While a deep dive
 is queued or being written, its page, the list and the count refetch every
-5 seconds; opening a finished one marks it read once. Copy and Share fetch
-the Markdown export when pressed; Download is a plain link to it.
+5 seconds; opening a finished one marks it read once. The export buttons
+(shared by reports and conversations) fetch the Markdown ahead, so Copy and
+Share run within the tap, as Safari requires; Download is a plain link to it.
+
+The brief and the report both lead to the article's conversation, showing its
+number of questions. A question appears at once with a "Writing…" row while
+the request is answered (up to about 45 seconds); the field stays focused and
+keeps a refused question's text. Source numbers under an answer expand to the
+source's title and link: stored articles through `open_url`, web pages in a
+new tab. The search control sits under the latest answer: a plain link while
+the answer was enough, the main button with "The material does not answer
+this." when it was not. While an answer is being written elsewhere or a search
+round runs, the page refetches every 5 seconds; sending waits until it ends.
 
 Each screen is a route that fetches and changes data (`src/routes/`) and a view
 that only takes props (`src/features/<screen>/`).

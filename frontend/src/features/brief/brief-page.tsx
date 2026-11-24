@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getArticleOptions, getBriefOptions } from '@/client/@tanstack/react-query.gen'
 import { Pending } from '@/components/pending'
 import { ProblemMessage } from '@/components/problem-message'
+import { AskEntry } from '@/features/conversation/ask-entry'
 import { GoDeeper } from '@/features/deep-dive/go-deeper'
 import { useMarkOpened } from '@/features/digest/use-mark-opened'
 import { ApiProblem } from '@/lib/api'
@@ -36,6 +37,7 @@ export function BriefPage({ articleId }: { articleId: number }) {
   return (
     <>
       <BriefView brief={brief.data} onOpen={markOpened} />
+      <AskEntry articleId={articleId} count={brief.data.conversation_questions} />
       <GoDeeper articleId={articleId} />
     </>
   )

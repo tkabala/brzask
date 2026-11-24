@@ -11,9 +11,3 @@ export const isActive = (dive: Pick<DeepDiveRef, 'status'>) =>
 export function markdownUrl(diveId: number): string {
   return `${client.getConfig().baseUrl ?? ''}/api/v1/deep-dives/${String(diveId)}/markdown`
 }
-
-export async function fetchMarkdown(diveId: number): Promise<string> {
-  const response = await fetch(markdownUrl(diveId), { credentials: 'same-origin' })
-  if (!response.ok) throw new Error(`markdown export answered ${String(response.status)}`)
-  return response.text()
-}

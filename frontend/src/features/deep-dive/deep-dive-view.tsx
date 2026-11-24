@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { DeepDiveOut, DeepDiveRef, DeepDiveSource } from '@/client/types.gen'
+import { ExportButtons } from '@/components/export-buttons'
 import { Button } from '@/components/ui/button'
+import { AskEntry } from '@/features/conversation/ask-entry'
+import { canCopy } from '@/lib/clipboard'
 
-import { fetchMarkdown, markdownUrl } from './lib'
+import { markdownUrl } from './lib'
 
 function Cites({ numbers }: { numbers: number[] }) {
   return numbers.map((n) => (
@@ -26,70 +27,6 @@ function SourceLink({ source }: { source: DeepDiveSource }) {
     <a href={source.url} target="_blank" rel="noopener noreferrer">
       {source.title}
     </a>
-  )
-}
-
-/** False on plain-http origins, where browsers leave the clipboard out. */
-const canCopy = () => typeof navigator !== 'undefined' && 'clipboard' in navigator
-
-export function ExportButtons({ dive }: { dive: Pick<DeepDiveOut, 'id'> }) {
-  const { t } = useTranslation()
-  const [note, setNote] = useState<string | null>(null)
-  const canShare = typeof navigator !== 'undefined' && 'share' in navigator
-  // Fetched ahead, so share and copy run while the click still counts as the
-  // reader's gesture (Safari refuses both once a request was awaited).
-  const markdown = useQuery({
-    queryKey: ['deepDiveMarkdown', dive.id],
-    queryFn: () => fetchMarkdown(dive.id),
-    staleTime: Infinity,
-  })
-  const withMarkdown = (send: (text: string) => Promise<unknown>, done?: string) => {
-    const run =
-      markdown.data !== undefined ? send(markdown.data) : fetchMarkdown(dive.id).then(send)
-    run.then(
-      () => {
-        if (done) setNote(done)
-      },
-      (error: unknown) => {
-        // Closing the share sheet is not a failure.
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setNote(t('deepDive.exportFailed'))
-      },
-    )
-  }
-  return (
-    <div className="mt-8 flex flex-wrap gap-2">
-      {canShare ? (
-        <Button
-          variant="outline"
-          onClick={() => {
-            withMarkdown((text) => navigator.share({ text }))
-          }}
-        >
-          {t('deepDive.share')}
-        </Button>
-      ) : null}
-      {canCopy() ? (
-        <Button
-          variant="outline"
-          onClick={() => {
-            withMarkdown((text) => navigator.clipboard.writeText(text), t('deepDive.copied'))
-          }}
-        >
-          {t('deepDive.copy')}
-        </Button>
-      ) : null}
-      <Button variant="outline" asChild>
-        <a href={markdownUrl(dive.id)} download>
-          {t('deepDive.download')}
-        </a>
-      </Button>
-      {note ? (
-        <span role="status" className="self-center text-sm text-muted-foreground">
-          {note}
-        </span>
-      ) : null}
-    </div>
   )
 }
 
@@ -216,7 +153,8 @@ function Report({
           </li>
         ))}
       </ol>
-      <ExportButtons dive={dive} />
+      <ExportButtons url={markdownUrl(dive.id)} />
+      <AskEntry articleId={dive.article.id} count={dive.conversation_questions} />
     </>
   )
 }

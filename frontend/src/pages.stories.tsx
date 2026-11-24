@@ -44,6 +44,13 @@ export const Login: Story = {
 export const Archive: Story = { args: { path: '/archive' } }
 export const ArchivedDay: Story = { args: { path: '/archive/2026-10-21' } }
 export const Brief: Story = { args: { path: `/articles/${String(briefs[0]?.article.id)}` } }
+export const Conversation: Story = {
+  args: { path: `/articles/${String(briefs[0]?.article.id)}/chat` },
+}
+/** No questions yet: three starters. */
+export const ConversationEmpty: Story = {
+  args: { path: `/articles/${String(briefs[1]?.article.id)}/chat` },
+}
 export const Search: Story = { args: { path: '/search?q=postgres release' } }
 export const Sources: Story = { args: { path: '/sources' } }
 export const Interests: Story = { args: { path: '/interests' } }

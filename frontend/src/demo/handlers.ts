@@ -8,6 +8,8 @@
 import { http, HttpResponse, type RequestHandler } from 'msw'
 
 import type {
+  ConversationMessageOut,
+  ConversationOut,
   DeepDiveOut,
   DeepDiveRef,
   ArticleOut,
@@ -59,6 +61,7 @@ function fresh() {
     status: demo.status,
     changes: demo.proposals,
     deepDives: demo.deepDives,
+    conversations: demo.conversations,
   })
 }
 
@@ -152,7 +155,7 @@ export const handlers = [
   http.get(`${API}/deep-dives/:id`, ({ params }) => {
     const dive = db.deepDives.find((d) => String(d.id) === params.id)
     if (!dive) return problem(404, 'Not Found', `no deep dive ${String(params.id)}`)
-    return HttpResponse.json(dive)
+    return HttpResponse.json({ ...dive, conversation_questions: questionsAbout(dive.article.id) })
   }),
   http.post(`${API}/deep-dives/:id/read`, ({ params }) => {
     const dive = db.deepDives.find((d) => String(d.id) === params.id)
@@ -191,7 +194,11 @@ export const handlers = [
     const article = allArticles().find((a) => String(a.id) === params.id)
     if (!brief || !article)
       return problem(404, 'Not Found', `no brief of article ${String(params.id)}`)
-    return HttpResponse.json({ ...brief, article })
+    return HttpResponse.json({
+      ...brief,
+      article,
+      conversation_questions: questionsAbout(article.id),
+    })
   }),
   http.post(`${API}/articles/:id/brief-open`, ({ params }) => {
     if (!db.briefs.some((b) => String(b.article.id) === params.id)) {
@@ -398,6 +405,73 @@ export const handlers = [
     db.status.paused_until = null
     return new HttpResponse(null, { status: 204 })
   }),
+  // --- Conversations ------------------------------------------------------------
+  http.get(`${API}/articles/:id/conversation/markdown`, ({ params }) => {
+    const conversation = conversationOf(Number(params.id))
+    if (!conversation || conversation.messages.length === 0)
+      return problem(404, 'Not Found', `no conversation about article ${String(params.id)}`)
+    return new HttpResponse(`# ${conversation.article.title}\n`, {
+      headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+    })
+  }),
+  http.get(`${API}/articles/:id/conversation`, ({ params }) => {
+    const id = Number(params.id)
+    const conversation = conversationOf(id) ?? emptyConversation(id)
+    if (!conversation) return problem(404, 'Not Found', `no article ${String(params.id)}`)
+    // A search round in the demo ends by the next look.
+    for (const message of conversation.messages) {
+      if (message.status === 'searching') {
+        message.status = 'done'
+        message.searched = true
+        message.note = 'The search found nothing new.'
+      }
+    }
+    return HttpResponse.json(conversation)
+  }),
+  http.post(`${API}/articles/:id/conversation/messages`, async ({ params, request }) => {
+    const id = Number(params.id)
+    const conversation = conversationOf(id) ?? emptyConversation(id)
+    if (!conversation) return problem(404, 'Not Found', `no article ${String(params.id)}`)
+    if (!conversation.can_ask) return problem(409, 'Conflict', conversation.reason ?? undefined)
+    if (conversation.messages.some(inProgress))
+      return problem(409, 'Conflict', 'an answer is still being written')
+    const { text } = (await request.json()) as { text: string }
+    if (!conversationOf(id)) db.conversations.push(conversation)
+    const question = message(conversation, { role: 'user', text: text.trim() })
+    const answer = message(conversation, {
+      role: 'assistant',
+      answer: {
+        paragraphs: [
+          { text: 'The article answers this only in part: see its second section.', sources: [1] },
+        ],
+        enough: false,
+        suggestions: [],
+      },
+    })
+    return HttpResponse.json({ question, answer })
+  }),
+  http.post(`${API}/conversation-messages/:id/retry`, ({ params }) => {
+    const found = latestAnswer(Number(params.id))
+    if (found?.status !== 'failed')
+      return problem(409, 'Conflict', 'only the latest failed answer can be tried again')
+    Object.assign(found, {
+      status: 'done',
+      error: null,
+      answer: {
+        paragraphs: [{ text: 'Answered on the second try.', sources: [1] }],
+        enough: true,
+        suggestions: [],
+      },
+    })
+    return HttpResponse.json(found)
+  }),
+  http.post(`${API}/conversation-messages/:id/search`, ({ params }) => {
+    const found = latestAnswer(Number(params.id))
+    if (!found || (found.status !== 'done' && found.status !== 'failed'))
+      return problem(409, 'Conflict', 'only the latest finished answer can be searched for')
+    found.status = 'searching'
+    return HttpResponse.json(found, { status: 202 })
+  }),
 ]
 
 /**
@@ -432,4 +506,67 @@ function queueDive(article: DeepDiveRef['article'], focus: string, link: string)
   }
   db.deepDives.unshift(dive)
   return dive
+}
+
+const inProgress = (m: ConversationMessageOut) =>
+  m.status === 'answering' || m.status === 'searching'
+
+function conversationOf(articleId: number): ConversationOut | undefined {
+  return db.conversations.find((c) => c.article.id === articleId)
+}
+
+/** What an article without questions answers: nothing yet, asking allowed with a brief. */
+function emptyConversation(articleId: number): ConversationOut | undefined {
+  const article = allArticles().find((a) => a.id === articleId)
+  if (!article) return undefined
+  const briefed = db.briefs.some((b) => b.article.id === articleId)
+  return {
+    article: { id: article.id, title: article.title },
+    messages: [],
+    sources: [
+      {
+        n: 1,
+        url: article.link,
+        title: article.title,
+        origin: 'article',
+        open_url: article.open_url,
+      },
+    ],
+    can_ask: briefed,
+    reason: briefed ? null : 'this article has no stored text to answer from',
+    web_search: true,
+  }
+}
+
+function questionsAbout(articleId: number): number {
+  return conversationOf(articleId)?.messages.filter((m) => m.role === 'user').length ?? 0
+}
+
+/** The message `id` when it is the latest answer of its conversation. */
+function latestAnswer(id: number): ConversationMessageOut | undefined {
+  for (const conversation of db.conversations) {
+    const last = conversation.messages.at(-1)
+    if (last?.id === id && last.role === 'assistant') return last
+  }
+  return undefined
+}
+
+function message(
+  conversation: ConversationOut,
+  fields: Pick<ConversationMessageOut, 'role'> & Partial<ConversationMessageOut>,
+): ConversationMessageOut {
+  const all = db.conversations.flatMap((c) => c.messages)
+  const added: ConversationMessageOut = {
+    id: Math.max(0, ...all.map((m) => m.id)) + 1,
+    text: null,
+    answer: null,
+    status: 'done',
+    searched: false,
+    note: null,
+    error: null,
+    created_at: new Date().toISOString(),
+    ...fields,
+  }
+  conversation.messages.push(added)
+  return added
 }

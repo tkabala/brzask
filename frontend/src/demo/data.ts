@@ -18,6 +18,7 @@ import type {
   SourceOut,
   SourceStatus,
   StatusOut,
+  ConversationOut,
   DeepDiveOut,
 } from '@/client/types.gen'
 
@@ -400,6 +401,126 @@ export const deepDives: DeepDiveOut[] = (() => {
       searched_web: true,
       conversation_questions: 0,
       error: null,
+    },
+  ]
+})()
+
+/** A conversation about the first briefed article: two questions, the second
+ * answered again after a search round. Its sources follow the deep dive's. */
+export const conversations: ConversationOut[] = (() => {
+  const article = must(briefs[0], 'a brief').article
+  const at = (time: string) => `${DAY}T${time}Z`
+  return [
+    {
+      article: { id: article.id, title: article.title },
+      messages: [
+        {
+          id: 1,
+          role: 'user',
+          text: 'What does this mean for me?',
+          answer: null,
+          status: 'done',
+          searched: false,
+          note: null,
+          error: null,
+          created_at: at('08:20:00'),
+        },
+        {
+          id: 2,
+          role: 'assistant',
+          text: null,
+          answer: {
+            paragraphs: [
+              {
+                text: 'If your clients are less than five years old, nothing changes: they already speak the newer protocol.',
+                sources: [1],
+              },
+              {
+                text: 'Older ones stop connecting at the handshake; the compatibility proxy keeps them working for one more year.',
+                sources: [1, 3],
+              },
+            ],
+            enough: true,
+            suggestions: [
+              'How do I find out which clients are older?',
+              'What does the proxy cost?',
+            ],
+          },
+          status: 'done',
+          searched: false,
+          note: null,
+          error: null,
+          created_at: at('08:20:01'),
+        },
+        {
+          id: 3,
+          role: 'user',
+          text: 'Has anyone measured the slowdown of the proxy?',
+          answer: null,
+          status: 'done',
+          searched: false,
+          note: null,
+          error: null,
+          created_at: at('08:22:00'),
+        },
+        {
+          id: 4,
+          role: 'assistant',
+          text: null,
+          answer: {
+            paragraphs: [
+              {
+                text: 'A benchmark by the maintainers adds about 2 ms per request through the proxy on the same host.',
+                sources: [4],
+              },
+              {
+                text: 'Your archive has no measurement of its own; the earlier release notes only mention that it exists.',
+                sources: [2],
+              },
+            ],
+            enough: true,
+            suggestions: ['Can the proxy run next to each client?'],
+          },
+          status: 'done',
+          searched: true,
+          note: null,
+          error: null,
+          created_at: at('08:22:01'),
+        },
+      ],
+      sources: [
+        {
+          n: 1,
+          url: article.link,
+          title: article.title,
+          origin: 'article',
+          open_url: article.open_url,
+        },
+        {
+          n: 2,
+          url: 'https://news.example/earlier',
+          title: 'The previous release',
+          origin: 'archive',
+          open_url: `/open?id=${String(article.id)}`,
+        },
+        {
+          n: 3,
+          url: 'https://docs.example/upgrade',
+          title: 'Upgrade guide',
+          origin: 'report',
+          open_url: null,
+        },
+        {
+          n: 4,
+          url: 'https://bench.example/proxy',
+          title: 'Proxy overhead benchmark',
+          origin: 'web',
+          open_url: null,
+        },
+      ],
+      can_ask: true,
+      reason: null,
+      web_search: true,
     },
   ]
 })()
