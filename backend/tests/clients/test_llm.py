@@ -354,3 +354,16 @@ def test_from_settings_uses_the_key_and_timeout() -> None:
 
     assert llm.client.api_key == "sk-test"
     assert llm.client.timeout == 12
+
+
+def test_a_bounded_client_tries_once_within_its_time() -> None:
+    fake = Fake(httpx2.ReadTimeout("timed out"), answer("ok"))
+    bounded = fake.llm.bounded(12.5)
+
+    assert bounded.client.timeout == 12.5
+    assert (bounded.model, bounded.report_cost) == (fake.llm.model, fake.llm.report_cost)
+    with pytest.raises(LLMError, match="conversation: gave up after 1 attempts"):
+        bounded.complete("p", purpose="conversation")
+    assert len(fake.requests) == 1
+    assert fake.sleeps == []
+    assert fake.llm.complete("p", purpose="test").content == "ok"

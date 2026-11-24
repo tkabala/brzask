@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from brzask.clients.usage import CallUsage, UsageMeter
+from brzask.clients.usage import CallUsage, UsageMeter, combined
 
 
 def call(purpose: str, cost: float | None, tokens: int = 10) -> CallUsage:
@@ -81,3 +81,17 @@ def test_known_cost_sums_priced_calls_and_counts_the_rest() -> None:
     unpriced = UsageMeter()
     unpriced.add(call("ranking", None))
     assert unpriced.summary()["cost_usd_known"] == 0.0
+
+
+def test_summaries_add_up() -> None:
+    first, second = UsageMeter(), UsageMeter()
+    first.add(CallUsage("m", "conversation", 100, 10, 0.002, 900))
+    second.add(CallUsage("m", "conversation_search", 50, 5, 0.001, 300))
+    second.add(CallUsage("m", "conversation", 80, 8, None, 700))
+    both = UsageMeter()
+    for call in [*first.calls, *second.calls]:
+        both.add(call)
+
+    assert combined(first.summary(), second.summary()) == both.summary()
+    assert combined({}, first.summary()) == first.summary()
+    assert combined(first.summary(), {}) == first.summary()

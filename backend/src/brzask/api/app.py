@@ -56,7 +56,8 @@ from brzask.db.models import RunKind
 from brzask.log import get_logger
 from brzask.mcp.runs import BackgroundRuns
 from brzask.mcp.server import McpDeps, McpEndpoint, build_mcp
-from brzask.repositories import DeepDiveRepository
+from brzask.repositories import ConversationRepository, DeepDiveRepository
+from brzask.services.conversation.search import SearchWorker
 from brzask.services.deep_dive.runner import DeepDiveRunner
 from brzask.services.open_rate import register_open_rate
 from brzask.services.runs import Pipeline, sweep_abandoned
@@ -80,6 +81,7 @@ def create_app(
     pipelines: Mapping[RunKind, Pipeline] | None = None,
     replay: Callable[[int, Sequence[int]], Pipeline] | None = None,
     deep_dive_runner: DeepDiveRunner | None = None,
+    conversation_search: SearchWorker | None = None,
 ) -> FastAPI:
     """`metrics_registry` is what `/metrics` renders; the meter provider (the
     global one unless given) must feed it through a Prometheus reader; `clients`
@@ -88,11 +90,13 @@ def create_app(
     unless given. `web_dir` is the built web app to serve at `/`; without it only
     the API is served. `pipelines` replaces the real ones for runs agents start,
     and `replay` the replay runs they start (days, sources left out);
-    `deep_dive_runner` writes the deep dives readers ask for."""
+    `deep_dive_runner` writes the deep dives readers ask for and
+    `conversation_search` runs the search rounds they ask for under an answer."""
     server = server or get_settings().server
     clients = clients or ApiClients()
     agent_runs = BackgroundRuns(sessions, pipelines)
     runner = deep_dive_runner or DeepDiveRunner(sessions)
+    searches = conversation_search or SearchWorker(sessions)
     deps = McpDeps(sessions, clients, agent_runs)
     if replay is not None:
         deps.replay = replay
@@ -102,12 +106,14 @@ def create_app(
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await anyio.to_thread.run_sync(sweep_abandoned, sessions, datetime.now(UTC))
         await anyio.to_thread.run_sync(_fail_interrupted_dives, sessions)
+        await anyio.to_thread.run_sync(_settle_interrupted_answers, sessions)
         try:
             async with mcp.session_manager.run():
                 yield
         finally:
             await anyio.to_thread.run_sync(agent_runs.close)
             await anyio.to_thread.run_sync(app.state.deep_dives.close)
+            await anyio.to_thread.run_sync(app.state.conversation_search.close)
 
     app = FastAPI(
         lifespan=lifespan,
@@ -128,6 +134,7 @@ def create_app(
     app.state.metrics_registry = metrics_registry
     app.state.clients = clients
     app.state.deep_dives = runner
+    app.state.conversation_search = searches
     app.state.auth = Auth(
         auth_settings or get_settings().auth,
         root_path=server.root_path,
@@ -232,3 +239,16 @@ def _fail_interrupted_dives(sessions: sessionmaker[Session]) -> None:
         return
     if count:
         log.info("deep dives interrupted by a restart", count=count)
+
+
+def _settle_interrupted_answers(sessions: sessionmaker[Session]) -> None:
+    """Answers left in progress by a stopped API will not finish; keep what they had."""
+    try:
+        with sessions.begin() as session:
+            count = ConversationRepository(session).settle_interrupted(datetime.now(UTC))
+    except SQLAlchemyError as error:
+        # Housekeeping only, as for deep dives: the next start checks again.
+        log.warning("interrupted answers not checked", error=str(error))
+        return
+    if count:
+        log.info("answers interrupted by a restart", count=count)

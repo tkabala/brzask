@@ -132,11 +132,14 @@ def render(dive: DeepDive, article: Article, language: Language, tz: tzinfo = UT
 def filename(dive: DeepDive, article: Article, tz: tzinfo = UTC) -> str:
     """`<finished date in tz>-<ascii slug of the title>.md`."""
     finished = (dive.finished_at or dive.created_at).astimezone(tz)
-    title = (article.digest_title or article.title).translate(_ASCII)
-    ascii_title = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_title.lower()).strip("-")
-    slug = slug[:SLUG_CHARS].rstrip("-") or "deep-dive"
-    return f"{finished:%Y-%m-%d}-{slug}.md"
+    return f"{finished:%Y-%m-%d}-{slug(article.digest_title or article.title, 'deep-dive')}.md"
+
+
+def slug(title: str, fallback: str) -> str:
+    """`title` as lowercase ASCII words joined by hyphens, at most `SLUG_CHARS` long."""
+    ascii_title = unicodedata.normalize("NFKD", title.translate(_ASCII))
+    words = re.sub(r"[^a-z0-9]+", "-", ascii_title.encode("ascii", "ignore").decode().lower())
+    return words.strip("-")[:SLUG_CHARS].rstrip("-") or fallback
 
 
 def _cited(text: str, numbers: list[int]) -> str:

@@ -56,3 +56,44 @@ def _totals(calls: list[CallUsage]) -> dict[str, Any]:
         "unpriced_calls": len(calls) - len(costs),
         "duration_ms": sum(call.duration_ms for call in calls),
     }
+
+
+_SUMMED = ("calls", "input_tokens", "output_tokens", "unpriced_calls", "duration_ms")
+
+
+def combined(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    """Two summaries as one, as if their calls had gone through one meter.
+
+    For a record that gathers calls over several requests, such as an answer
+    asked again or searched for later. An empty dict is a summary of no calls.
+    """
+    if not first:
+        return dict(second)
+    if not second:
+        return dict(first)
+    purposes = {**first.get("by_purpose", {}), **second.get("by_purpose", {})}
+    return {
+        **_add(first, second),
+        "by_purpose": {
+            purpose: _add(
+                first.get("by_purpose", {}).get(purpose, {}),
+                second.get("by_purpose", {}).get(purpose, {}),
+            )
+            for purpose in purposes
+        },
+    }
+
+
+def _add(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    totals: dict[str, Any] = {key: first.get(key, 0) + second.get(key, 0) for key in _SUMMED}
+    known = round(float(first.get("cost_usd_known", 0) + second.get("cost_usd_known", 0)), 6)
+    priced = totals["calls"] and not totals["unpriced_calls"]
+    return {
+        "calls": totals["calls"],
+        "input_tokens": totals["input_tokens"],
+        "output_tokens": totals["output_tokens"],
+        "cost_usd": known if priced else None,
+        "cost_usd_known": known,
+        "unpriced_calls": totals["unpriced_calls"],
+        "duration_ms": totals["duration_ms"],
+    }

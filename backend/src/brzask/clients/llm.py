@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import openai
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
-from brzask.clients.retry import APIError, EmptyResponseError, call_with_retries
+from brzask.clients.retry import ATTEMPTS, APIError, EmptyResponseError, call_with_retries
 from brzask.clients.usage import CallUsage, UsageMeter
 from brzask.config.settings import LLMSettings, ReasoningEffort
 from brzask.log import get_logger
@@ -70,12 +70,29 @@ class LLMClient:
         report_cost: bool = False,
         reasoning_effort: ReasoningEffort | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        attempts: int = ATTEMPTS,
     ) -> None:
         self.client = client
         self.model = model
         self.report_cost = report_cost
         self.reasoning_effort = reasoning_effort
         self._sleep = sleep
+        self._attempts = attempts
+
+    def bounded(self, seconds: float) -> Self:
+        """This client giving up after `seconds`: one attempt, no retries.
+
+        For calls a person waits for, which must end before a reverse proxy
+        cuts the request.
+        """
+        return type(self)(
+            self.client.with_options(timeout=seconds),
+            self.model,
+            report_cost=self.report_cost,
+            reasoning_effort=self.reasoning_effort,
+            sleep=self._sleep,
+            attempts=1,
+        )
 
     @classmethod
     def from_settings(cls, settings: LLMSettings) -> Self:
@@ -135,7 +152,11 @@ class LLMClient:
 
         with api_call_span("chat", self.model, purpose) as span:
             content, usage = call_with_retries(
-                attempt, purpose=purpose, error=LLMError, sleep=self._sleep
+                attempt,
+                purpose=purpose,
+                error=LLMError,
+                sleep=self._sleep,
+                attempts=self._attempts,
             )
             span.record(usage)
         return Completion(content, usage)

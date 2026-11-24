@@ -42,9 +42,9 @@ def parse_queries(answer: Any, title: str) -> Queries:
     if not isinstance(answer, dict):
         answer = {}
     queries = Queries(
-        _queries(answer.get("background"), MAX_BACKGROUND),
-        _queries(answer.get("practice"), MAX_PRACTICE),
-        _queries(answer.get("archive"), MAX_ARCHIVE),
+        clean_queries(answer.get("background"), MAX_BACKGROUND),
+        clean_queries(answer.get("practice"), MAX_PRACTICE),
+        clean_queries(answer.get("archive"), MAX_ARCHIVE),
     )
     if not queries.background and not queries.practice:
         title = title.strip()[:QUERY_CHARS]
@@ -82,7 +82,7 @@ def plan_queries(
     return parse_queries(answer, article.title)
 
 
-def _queries(value: Any, limit: int) -> list[str]:
+def clean_queries(value: Any, limit: int) -> list[str]:
     if not isinstance(value, list):
         return []
     queries: list[str] = []

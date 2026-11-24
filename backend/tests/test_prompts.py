@@ -162,6 +162,13 @@ SAMPLES: dict[str, dict[str, Any]] = {
         "question": "Does it help on ZFS?",
         "language": prompts.language("pl"),
     },
+    "conversation_search": {
+        "title": "Async I/O in Postgres 18",
+        "gist": "Reads go async.",
+        "history": [{"question": "What is new?", "answer": "Async reads."}],
+        "question": "Does it help on ZFS?",
+        "language": prompts.language("pl"),
+    },
     "web_search": {"query": "blogs about Postgres internals", "limit": 10},
     "discovery_search": {
         "topic": "Postgres",

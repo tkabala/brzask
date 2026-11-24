@@ -382,6 +382,8 @@ class ConversationMessage(Base):
     # Last: in the class body the name hides sqlalchemy's text() used above.
     text: Mapped[str | None] = mapped_column(comment="The question; null for answers.")
 
+    conversation: Mapped[Conversation] = relationship(lazy="joined")
+
 
 class ConversationSourceOrigin(StrEnum):
     ARTICLE = "article"  # the article itself, always number 1

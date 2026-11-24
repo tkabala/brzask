@@ -40,14 +40,15 @@ def call_with_retries[T](
     purpose: str,
     error: type[APIError],
     sleep: Callable[[float], None],
+    attempts: int = ATTEMPTS,
 ) -> T:
     """Run `call`, retrying temporary failures; other API errors fail at once as `error`."""
-    for attempt in range(1, ATTEMPTS + 1):
+    for attempt in range(1, attempts + 1):
         try:
             return call()
         except _RETRYABLE as failure:
-            if attempt == ATTEMPTS:
-                raise error(f"{purpose}: gave up after {ATTEMPTS} attempts: {failure}") from failure
+            if attempt == attempts:
+                raise error(f"{purpose}: gave up after {attempts} attempts: {failure}") from failure
             delay = _delay(attempt, failure)
             log.warning(
                 "api call failed, retrying",
