@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from brzask.db.models import (
@@ -50,11 +51,17 @@ class ConversationRepository:
         )
 
     def get_or_create(self, article_id: int) -> Conversation:
+        """The article's conversation; two first questions at once share one."""
         conversation = self.for_article(article_id)
         if conversation is None:
-            conversation = Conversation(article_id=article_id)
-            self.session.add(conversation)
-            self.session.flush()
+            self.session.execute(
+                insert(Conversation)
+                .values(article_id=article_id)
+                .on_conflict_do_nothing(index_elements=[Conversation.article_id])
+            )
+            conversation = self.session.scalars(
+                select(Conversation).where(Conversation.article_id == article_id)
+            ).one()
         return conversation
 
     def messages(self, conversation_id: int) -> Sequence[ConversationMessage]:
@@ -77,6 +84,8 @@ class ConversationRepository:
             )
             .order_by(ConversationMessage.id.desc())
             .limit(1)
+            # A row this session read before the lock keeps its old status otherwise.
+            .execution_options(populate_existing=True)
         )
 
     def add_question(
@@ -181,6 +190,9 @@ class ConversationRepository:
     ) -> list[ConversationSource]:
         """Add sources under the next free numbers, a URL once; a known URL keeps its
         number and gains the text it lacked. Returns the sources added or given text."""
+        # Numbers are taken under the conversation's lock, so two writers never
+        # take the same one.
+        self._lock(conversation_id)
         known = {source.url: source for source in self.sources(conversation_id)}
         next_n = max((source.n for source in known.values()), default=0) + 1
         changed: dict[int, ConversationSource] = {}
@@ -259,7 +271,10 @@ class ConversationRepository:
     def _locked_latest(self, conversation_id: int) -> ConversationMessage | None:
         """The latest answer, read after locking the conversation's row: a second
         request waits for the first to commit, then sees its answer."""
+        self._lock(conversation_id)
+        return self.latest_answer(conversation_id)
+
+    def _lock(self, conversation_id: int) -> None:
         self.session.execute(
             select(Conversation.id).where(Conversation.id == conversation_id).with_for_update()
         )
-        return self.latest_answer(conversation_id)

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from brzask.db.models import (
@@ -85,6 +85,25 @@ def test_a_search_in_progress_also_blocks_a_question(session: Session, make: Fac
     repository.begin(answer_id, MessageStatus.SEARCHING)
     with pytest.raises(AnswerInProgressError):
         repository.add_question(conversation_id, "And?", AT)
+    with pytest.raises(AnswerInProgressError):
+        repository.begin(answer_id, MessageStatus.SEARCHING)
+
+
+def test_begin_sees_an_answer_another_request_put_in_progress(
+    session: Session, make: Factories
+) -> None:
+    repository, _, answer_id = asked(session, make)
+    repository.fail(answer_id, "timeout", None, AT)
+    # Read before the other request commits, and held, as the services hold it.
+    seen = repository.message(answer_id)
+    assert seen is not None and seen.status is MessageStatus.FAILED
+    # What a second request committing first leaves behind, unseen by this session's row.
+    session.execute(
+        update(ConversationMessage)
+        .where(ConversationMessage.id == answer_id)
+        .values(status=MessageStatus.ANSWERING)
+        .execution_options(synchronize_session=False)
+    )
     with pytest.raises(AnswerInProgressError):
         repository.begin(answer_id, MessageStatus.SEARCHING)
 
