@@ -108,6 +108,14 @@ def test_mark_read_keeps_the_first_time(session: Session, make: Factories) -> No
     assert not repository.mark_read(dive.id + 1000, AT)
 
 
+def test_a_dive_not_done_stays_unread(session: Session, make: Factories) -> None:
+    repository = DeepDiveRepository(session)
+    dive = dive_in(repository, make.article().id, DeepDiveStatus.RUNNING)
+
+    assert repository.mark_read(dive.id, AT)
+    assert dive.read_at is None
+
+
 def test_fail_interrupted_touches_only_active_ones(session: Session, make: Factories) -> None:
     article = make.article()
     repository = DeepDiveRepository(session)

@@ -23,13 +23,15 @@ from brzask.urls import is_http_url, item_key
 
 log = get_logger(__name__)
 
-# Starting values, confirmed or corrected by the real checks before release.
-# Archive articles kept. Over five real dives (2026-11-23) 4 of 25 archive
-# sources were cited, 3 of them in one dive; three leave room for that case.
+# Measured on five real dives (2026-11-23). Archive articles kept: 4 of 25
+# archive sources were cited, 3 of them in one dive; three leave room for that.
 ARCHIVE_SOURCES = 3
 WEB_RESULTS = 5  # results asked of each web query
-WEB_PAGES = 8  # web results read
-SOURCE_CHARS = 12_000  # characters of each archive or web source the writer reads
+# Web results read: each dive had 23-29 candidates and cited at least 4 of the 8.
+WEB_PAGES = 8
+# Characters of each archive or web source the writer reads: the write call
+# took 18k-72k input tokens with 12 sources.
+SOURCE_CHARS = 12_000
 READ_WORKERS = 5
 
 Origin = Literal["article", "archive", "web"]

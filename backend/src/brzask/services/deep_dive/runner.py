@@ -37,22 +37,22 @@ class DeepDiveRunner:
         self.sessions = sessions
         self.pipeline = pipeline
         self.notifier = notifier
-        self._queue: queue.Queue[int | None] = queue.Queue()
+        self._queue: queue.Queue[tuple[int, contextvars.Context] | None] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
 
     def submit(self, dive_id: int) -> None:
-        """Queue the dive; it runs after the ones submitted before it."""
+        """Queue the dive; it runs after the ones submitted before it.
+
+        Each dive runs in its own caller's context (trace, log fields), not in
+        that of the request that happened to start the thread.
+        """
         with self._lock:
             if self._thread is None:
-                self._thread = threading.Thread(
-                    target=contextvars.copy_context().run,
-                    args=(self._work,),
-                    name="deep-dives",
-                    daemon=True,
-                )
+                # A new thread starts with an empty context.
+                self._thread = threading.Thread(target=self._work, name="deep-dives", daemon=True)
                 self._thread.start()
-        self._queue.put(dive_id)
+        self._queue.put((dive_id, contextvars.copy_context()))
 
     def close(self, grace: float = 5.0) -> None:
         """Take nothing new; give the running dive `grace` seconds, then leave it."""
@@ -61,20 +61,24 @@ class DeepDiveRunner:
             self._thread.join(grace)
 
     def _work(self) -> None:
-        while (dive_id := self._queue.get()) is not None:
-            try:
-                run = run_pipeline(
-                    self.sessions,
-                    RunKind.DEEP_DIVE,
-                    pipelines={RunKind.DEEP_DIVE: self.pipeline(dive_id)},
-                    notifier=self.notifier,
-                )
-                reason = run.stats.get("reason") or run.error
-            except Exception as error:
-                # Recorded on the run's row (and the dive) already.
-                log.warning("deep dive failed", dive_id=dive_id, error=type(error).__name__)
-                reason = f"{type(error).__name__}: {error}"
-            self._fail_if_untouched(dive_id, reason)
+        while (item := self._queue.get()) is not None:
+            dive_id, context = item
+            context.run(self._run, dive_id)
+
+    def _run(self, dive_id: int) -> None:
+        try:
+            run = run_pipeline(
+                self.sessions,
+                RunKind.DEEP_DIVE,
+                pipelines={RunKind.DEEP_DIVE: self.pipeline(dive_id)},
+                notifier=self.notifier,
+            )
+            reason = run.stats.get("reason") or run.error
+        except Exception as error:
+            # Recorded on the run's row (and the dive) already.
+            log.warning("deep dive failed", dive_id=dive_id, error=type(error).__name__)
+            reason = f"{type(error).__name__}: {error}"
+        self._fail_if_untouched(dive_id, reason)
 
     def _fail_if_untouched(self, dive_id: int, reason: object) -> None:
         try:

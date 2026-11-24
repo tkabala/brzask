@@ -7,6 +7,7 @@ where a link points.
 
 import re
 import unicodedata
+from datetime import UTC, tzinfo
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
@@ -37,6 +38,12 @@ SLUG_CHARS = 60
 _SPECIAL = re.compile(r"([\\\[\]`*_#<>])")
 _CODE = re.compile(r"(`[^`\n]+`)")
 _SPACE = re.compile(r"\s+")
+# What notes apps turn into a link or a block without any Markdown syntax:
+# bare URLs and `www.` names (GFM autolinks), and a list item, thematic break
+# or setext underline at the start of a line. A backslash before the colon,
+# dot or marker keeps them text.
+_AUTOLINK = re.compile(r"(?i)(\b(?:https?|ftp)):(?=//)|(\bwww)\.")
+_BLOCK_START = re.compile(r"^(\d*)([-+=.)])")
 _BACKTICKS = re.compile(r"`+")
 # Letters NFKD does not split into a base letter and a mark.
 _ASCII = str.maketrans({"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "ß": "ss", "đ": "d", "Đ": "D"})
@@ -44,9 +51,27 @@ _ASCII = str.maketrans({"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "ß": "ss", 
 
 def escape(text: str) -> str:
     """`text` on one line with every Markdown-significant character escaped,
-    except inside inline code spans (`like this`), which stay code."""
+    except inside inline code spans (`like this`), which stay code. Bare URLs
+    stay text, not links."""
     parts = _CODE.split(_SPACE.sub(" ", text).strip())
-    return "".join(part if n % 2 else _SPECIAL.sub(r"\\\1", part) for n, part in enumerate(parts))
+    escaped = "".join(
+        part if n % 2 else _AUTOLINK.sub(_unlink, _SPECIAL.sub(r"\\\1", part))
+        for n, part in enumerate(parts)
+    )
+    return _BLOCK_START.sub(_unblock, escaped, count=1)
+
+
+def _unlink(match: re.Match[str]) -> str:
+    scheme, www = match.groups()
+    return f"{scheme}\\:" if scheme else f"{www}\\."
+
+
+def _unblock(match: re.Match[str]) -> str:
+    digits, marker = match.groups()
+    # Only "-", "+" and "=" start a block alone; "." and ")" after digits.
+    if bool(digits) != (marker in ".)"):
+        return match.group(0)
+    return f"{digits}\\{marker}"
 
 
 def without_tracking(url: str) -> str:
@@ -65,12 +90,12 @@ def link_target(url: str) -> str:
     return quote(url.strip(), safe=":/?#[]@!$&'*+,;=%~-._")
 
 
-def render(dive: DeepDive, article: Article, language: Language) -> str:
-    """The dive as a Markdown document, headings in `language`."""
+def render(dive: DeepDive, article: Article, language: Language, tz: tzinfo = UTC) -> str:
+    """The dive as a Markdown document, headings in `language`, dated in `tz`."""
     words = HEADINGS.get(language.code, HEADINGS["en"])
     report: dict[str, Any] = dive.report or {"background": [], "practice": [], "further": []}
     sources = {int(s["n"]): s for s in dive.sources}
-    finished = dive.finished_at or dive.created_at
+    finished = (dive.finished_at or dive.created_at).astimezone(tz)
     lines = [f"# {escape(article.digest_title or article.title)}", ""]
     lines.append(f"{finished:%Y-%m-%d} · {link_target(without_tracking(article.link))}")
     if dive.focus:
@@ -104,9 +129,9 @@ def render(dive: DeepDive, article: Article, language: Language) -> str:
     return "\n".join(lines) + "\n"
 
 
-def filename(dive: DeepDive, article: Article) -> str:
-    """`<finished date>-<ascii slug of the title>.md`."""
-    finished = dive.finished_at or dive.created_at
+def filename(dive: DeepDive, article: Article, tz: tzinfo = UTC) -> str:
+    """`<finished date in tz>-<ascii slug of the title>.md`."""
+    finished = (dive.finished_at or dive.created_at).astimezone(tz)
     title = (article.digest_title or article.title).translate(_ASCII)
     ascii_title = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_title.lower()).strip("-")

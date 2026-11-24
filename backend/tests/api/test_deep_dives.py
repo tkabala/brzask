@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from brzask.api import deep_dives as api
+from brzask.api.pagination import encode_cursor
 from brzask.config.settings import BudgetSettings
 from brzask.db.models import Article, ArticleContent, ContentKind, DeepDiveStatus
 from brzask.repositories import DeepDiveRepository
@@ -147,6 +148,8 @@ def test_list_and_get(client: TestClient, session: Session, make: Factories) -> 
     assert [first["items"][0]["focus"], rest["items"][0]["focus"]] == ["b", "a"]
     assert rest["next_cursor"] is None
     assert client.get("/api/v1/deep-dives?cursor=nonsense").status_code == 400
+    short = encode_cursor([datetime.now(UTC).isoformat()])
+    assert client.get(f"/api/v1/deep-dives?cursor={short}").status_code == 400
 
     body = client.get(f"/api/v1/deep-dives/{done.id}").json()
     assert body["report"] == {

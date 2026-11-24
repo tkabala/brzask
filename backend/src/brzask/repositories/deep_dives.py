@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session
 
-from brzask.db.models import DeepDive, DeepDiveStatus
+from brzask.db.models import Article, DeepDive, DeepDiveStatus
 
 ACTIVE = (DeepDiveStatus.QUEUED, DeepDiveStatus.RUNNING)
 INTERRUPTED = "interrupted"
@@ -27,6 +27,9 @@ class DeepDiveRepository:
         second tab asks once.
         """
         focus = focus.strip()
+        # The article's row is locked so two requests at once cannot both pass the
+        # check: the second waits for the first to commit, then sees its dive.
+        self.session.execute(select(Article.id).where(Article.id == article_id).with_for_update())
         active = self.session.scalars(
             select(DeepDive.focus).where(
                 DeepDive.article_id == article_id, DeepDive.status.in_(ACTIVE)
@@ -99,11 +102,14 @@ class DeepDiveRepository:
         self._set(dive_id, status=DeepDiveStatus.FAILED, error=error, finished_at=at)
 
     def mark_read(self, dive_id: int, at: datetime) -> bool:
-        """Record the first time the dive was opened; False when there is no such dive."""
+        """Record the first time the finished dive was opened; False when there is no such dive.
+
+        A dive not done yet is left unread, so it counts as unread once it is.
+        """
         dive = self.get(dive_id)
         if dive is None:
             return False
-        if dive.read_at is None:
+        if dive.read_at is None and dive.status is DeepDiveStatus.DONE:
             dive.read_at = at
             self.session.flush()
         return True

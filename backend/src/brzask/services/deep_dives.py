@@ -80,9 +80,14 @@ def mark_read(session: Session, dive_id: int, now: datetime) -> None:
         raise NotFoundError(f"no deep dive {dive_id}")
 
 
-def export_markdown(session: Session, dive_id: int, language: Language) -> tuple[str, str]:
-    """The finished dive as Markdown, and its file name."""
+def export_markdown(
+    session: Session, dive_id: int, language: Language, tz: tzinfo
+) -> tuple[str, str]:
+    """The finished dive as Markdown, and its file name; dated in `tz`."""
     dive = get_dive(session, dive_id)
     if dive.status is not DeepDiveStatus.DONE:
         raise ConflictError("the deep dive is not finished")
-    return markdown.render(dive, dive.article, language), markdown.filename(dive, dive.article)
+    return (
+        markdown.render(dive, dive.article, language, tz),
+        markdown.filename(dive, dive.article, tz),
+    )

@@ -97,6 +97,24 @@ describe('deep dives list and badge', () => {
   })
 })
 
+describe('deep dives list paging', () => {
+  it('loads the next page on request', async () => {
+    const [first, second] = deepDives
+    if (!first || !second) throw new Error('two demo dives needed')
+    const api = loggedInApi({
+      'GET /api/v1/deep-dives': (request) =>
+        new URL(request.url).searchParams.get('cursor') === 'next'
+          ? json({ items: [second], next_cursor: null, unread: 0, active: 0 })
+          : json({ items: [first], next_cursor: 'next', unread: 0, active: 0 }),
+    })
+    renderApp('/deep-dives')
+    await userEvent.click(await screen.findByRole('button', { name: 'Load more' }))
+    expect(await screen.findByRole('link', { name: second.article.title })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+    expect(api.sent('GET /api/v1/deep-dives').length).toBeGreaterThanOrEqual(2)
+  })
+})
+
 describe('deep dive page', () => {
   it('renders the report with its sources and marks it read once', async () => {
     const api = loggedInApi({})
@@ -136,6 +154,16 @@ describe('deep dive page', () => {
     await user.click(await screen.findByRole('button', { name: 'Copy as Markdown' }))
     expect(await screen.findByText('Copied')).toBeInTheDocument()
     expect(await navigator.clipboard.readText()).toBe(`# ${done.article.title}\n`)
+  })
+
+  it('says so when the export cannot be read', async () => {
+    loggedInApi({
+      'GET /api/v1/deep-dives/:id/markdown': () => problem(500, 'Internal Server Error', 'boom'),
+    })
+    const user = userEvent.setup()
+    renderApp(`/deep-dives/${String(done.id)}`)
+    await user.click(await screen.findByRole('button', { name: 'Copy as Markdown' }))
+    expect(await screen.findByText('Could not export the report.')).toBeInTheDocument()
   })
 
   it('offers share only where the browser can share', async () => {

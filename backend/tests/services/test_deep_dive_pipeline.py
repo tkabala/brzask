@@ -1,3 +1,4 @@
+import contextvars
 import threading
 import time
 from datetime import UTC, date, datetime
@@ -242,3 +243,30 @@ def test_a_skipped_run_fails_its_queued_dive(
         DeepDiveStatus.FAILED,
         "another deep_dive run is in progress",
     )
+
+
+def test_each_dive_runs_in_its_submitters_context(sessions: sessionmaker[Session]) -> None:
+    caller: contextvars.ContextVar[str] = contextvars.ContextVar("caller", default="none")
+    seen: dict[int, str] = {}
+    done = threading.Event()
+
+    def pipeline(dive_id: int) -> Any:
+        def build(context: RunContext) -> None:
+            seen[dive_id] = caller.get()
+            if dive_id == 2:
+                done.set()
+
+        return build
+
+    runner = DeepDiveRunner(sessions, pipeline, notifier=None)
+
+    def submit_as(name: str, dive_id: int) -> None:
+        caller.set(name)
+        runner.submit(dive_id)
+
+    for dive_id, name in ((1, "first request"), (2, "second request")):
+        contextvars.Context().run(submit_as, name, dive_id)
+    assert done.wait(10)
+    runner.close()
+
+    assert seen == {1: "first request", 2: "second request"}

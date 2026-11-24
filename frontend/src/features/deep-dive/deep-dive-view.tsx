@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -28,34 +29,56 @@ function SourceLink({ source }: { source: DeepDiveSource }) {
   )
 }
 
+/** False on plain-http origins, where browsers leave the clipboard out. */
+const canCopy = () => typeof navigator !== 'undefined' && 'clipboard' in navigator
+
 export function ExportButtons({ dive }: { dive: Pick<DeepDiveOut, 'id'> }) {
   const { t } = useTranslation()
   const [note, setNote] = useState<string | null>(null)
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator
+  // Fetched ahead, so share and copy run while the click still counts as the
+  // reader's gesture (Safari refuses both once a request was awaited).
+  const markdown = useQuery({
+    queryKey: ['deepDiveMarkdown', dive.id],
+    queryFn: () => fetchMarkdown(dive.id),
+    staleTime: Infinity,
+  })
+  const withMarkdown = (send: (text: string) => Promise<unknown>, done?: string) => {
+    const run =
+      markdown.data !== undefined ? send(markdown.data) : fetchMarkdown(dive.id).then(send)
+    run.then(
+      () => {
+        if (done) setNote(done)
+      },
+      (error: unknown) => {
+        // Closing the share sheet is not a failure.
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setNote(t('deepDive.exportFailed'))
+      },
+    )
+  }
   return (
     <div className="mt-8 flex flex-wrap gap-2">
       {canShare ? (
         <Button
           variant="outline"
           onClick={() => {
-            void fetchMarkdown(dive.id).then((text) => navigator.share({ text }))
+            withMarkdown((text) => navigator.share({ text }))
           }}
         >
           {t('deepDive.share')}
         </Button>
       ) : null}
-      <Button
-        variant="outline"
-        onClick={() => {
-          void fetchMarkdown(dive.id)
-            .then((text) => navigator.clipboard.writeText(text))
-            .then(() => {
-              setNote(t('deepDive.copied'))
-            })
-        }}
-      >
-        {t('deepDive.copy')}
-      </Button>
+      {canCopy() ? (
+        <Button
+          variant="outline"
+          onClick={() => {
+            withMarkdown((text) => navigator.clipboard.writeText(text), t('deepDive.copied'))
+          }}
+        >
+          {t('deepDive.copy')}
+        </Button>
+      ) : null}
       <Button variant="outline" asChild>
         <a href={markdownUrl(dive.id)} download>
           {t('deepDive.download')}
@@ -153,13 +176,17 @@ function Report({
                   <pre className="min-w-0 flex-1 overflow-x-auto rounded bg-muted p-2 text-sm">
                     <code>{step.command}</code>
                   </pre>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void navigator.clipboard.writeText(step.command ?? '')}
-                  >
-                    {t('deepDive.copyCommand')}
-                  </Button>
+                  {canCopy() ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(step.command ?? '').catch(() => undefined)
+                      }}
+                    >
+                      {t('deepDive.copyCommand')}
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
             </li>
@@ -195,34 +222,49 @@ function Report({
 }
 
 /** The list of deep dives, newest first; unread ones marked. */
-export function DeepDiveList({ items }: { items: DeepDiveRef[] }) {
+export function DeepDiveList({
+  items,
+  hasMore = false,
+  onMore,
+}: {
+  items: DeepDiveRef[]
+  hasMore?: boolean
+  onMore?: () => void
+}) {
   const { t, i18n } = useTranslation()
   if (items.length === 0) return <p className="text-muted-foreground">{t('deepDive.empty')}</p>
   return (
-    <ul className="grid gap-3">
-      {items.map((dive) => {
-        const unread = dive.status === 'done' && dive.read_at === null
-        return (
-          <li key={dive.id}>
-            <Link
-              to="/deep-dives/$id"
-              params={{ id: String(dive.id) }}
-              className={unread ? 'font-semibold hover:underline' : 'hover:underline'}
-            >
-              {dive.article.title}
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              {[
-                dive.focus,
-                unread ? t('deepDive.unread') : t(`deepDive.status.${dive.status}`),
-                new Date(dive.created_at).toLocaleDateString(i18n.language),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          </li>
-        )
-      })}
-    </ul>
+    <>
+      <ul className="grid gap-3">
+        {items.map((dive) => {
+          const unread = dive.status === 'done' && dive.read_at === null
+          return (
+            <li key={dive.id}>
+              <Link
+                to="/deep-dives/$id"
+                params={{ id: String(dive.id) }}
+                className={unread ? 'font-semibold hover:underline' : 'hover:underline'}
+              >
+                {dive.article.title}
+              </Link>
+              <p className="text-sm text-muted-foreground">
+                {[
+                  dive.focus,
+                  unread ? t('deepDive.unread') : t(`deepDive.status.${dive.status}`),
+                  new Date(dive.created_at).toLocaleDateString(i18n.language),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </li>
+          )
+        })}
+      </ul>
+      {hasMore ? (
+        <Button variant="outline" className="mt-4" onClick={onMore}>
+          {t('app.loadMore')}
+        </Button>
+      ) : null}
+    </>
   )
 }

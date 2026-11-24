@@ -115,6 +115,12 @@ def _limits() -> tuple[Any, Any]:
     return settings.budget, settings.scheduler.timezone
 
 
+def _parse_key(values: list[str]) -> tuple[datetime, int]:
+    # Unpacked, so a cursor with too few or too many values is a ValueError (a 400).
+    created_at, dive_id = values
+    return datetime.fromisoformat(created_at), int(dive_id)
+
+
 def _submit(request: Request, session: DbSession, dive: DeepDive) -> DeepDiveRef:
     # Committed first: the runner reads the dive in its own transaction.
     ref = DeepDiveRef.of(dive)
@@ -161,7 +167,7 @@ def list_dives(
     session: DbSession, limit: Limit = DEFAULT_LIMIT, cursor: CursorParam = None
 ) -> DeepDiveList:
     repository = DeepDiveRepository(session)
-    before = decode_cursor(cursor, lambda key: (datetime.fromisoformat(key[0]), int(key[1])))
+    before = decode_cursor(cursor, _parse_key)
     items, next_cursor = page(
         repository.page(limit + 1, before),
         limit,
@@ -241,8 +247,9 @@ def retry_dive(request: Request, session: DbSession, dive_id: Id) -> DeepDiveRef
 )
 def dive_markdown(session: DbSession, dive_id: Id) -> Response:
     """409 until the deep dive is done."""
-    language = prompts.language(get_settings().digest.language)
-    text, name = deep_dives.export_markdown(session, dive_id, language)
+    settings = get_settings()
+    language = prompts.language(settings.digest.language)
+    text, name = deep_dives.export_markdown(session, dive_id, language, settings.scheduler.timezone)
     return Response(
         text,
         media_type="text/markdown; charset=utf-8",

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from brzask import prompts
 from brzask.db.models import Article, DeepDive, DeepDiveStatus
@@ -176,3 +177,32 @@ def test_filename() -> None:
 
     empty = Article(id=1, title="!!!", digest_title=None, link="x")
     assert filename(dive(), empty) == "2026-11-23-deep-dive.md"
+
+
+def test_bare_urls_stay_text() -> None:
+    # GFM notes apps link bare URLs and www. names; a report links only its sources.
+    assert escape("see https://evil.example/x or www.evil.example") == (
+        "see https\\://evil.example/x or www\\.evil.example"
+    )
+    assert escape("HTTP://a.example and ftp://b.example") == (
+        "HTTP\\://a.example and ftp\\://b.example"
+    )
+    assert escape("`curl https://get.example`") == "`curl https://get.example`"
+    assert escape("Proxmox 9.1 released") == "Proxmox 9.1 released"
+
+
+def test_text_cannot_start_a_block() -> None:
+    assert escape("1. first") == "1\\. first"
+    assert escape("12) twelfth") == "12\\) twelfth"
+    assert escape("- item") == "\\- item"
+    assert escape("+ item") == "\\+ item"
+    assert escape("===") == "\\==="
+    assert escape("2026 was a year. a - b") == "2026 was a year. a - b"
+
+
+def test_dates_in_the_given_timezone() -> None:
+    late = dive(finished_at=datetime(2026, 11, 23, 23, 30, tzinfo=UTC))
+    warsaw = ZoneInfo("Europe/Warsaw")
+    assert filename(late, ARTICLE, warsaw).startswith("2026-11-24-")
+    assert "\n2026-11-24 · " in render(late, ARTICLE, prompts.language("en"), warsaw)
+    assert filename(late, ARTICLE).startswith("2026-11-23-")

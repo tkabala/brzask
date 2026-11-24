@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.metrics import MeterProvider
 from prometheus_client import CollectorRegistry
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.routing import Route
 
@@ -217,8 +218,17 @@ def _openapi(app: FastAPI) -> dict[str, Any]:
 
 
 def _fail_interrupted_dives(sessions: sessionmaker[Session]) -> None:
-    """Dives left queued or running by a stopped API will not finish; say so."""
-    with sessions.begin() as session:
-        count = DeepDiveRepository(session).fail_interrupted(datetime.now(UTC))
+    """Dives left queued or running by a stopped API will not finish; say so.
+
+    A database error is logged, not raised, as in `sweep_abandoned`.
+    """
+    try:
+        with sessions.begin() as session:
+            count = DeepDiveRepository(session).fail_interrupted(datetime.now(UTC))
+    except SQLAlchemyError as error:
+        # Housekeeping only: a database that is not up yet must not stop the
+        # process from starting; the next start checks again.
+        log.warning("interrupted deep dives not checked", error=str(error))
+        return
     if count:
         log.info("deep dives interrupted by a restart", count=count)

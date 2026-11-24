@@ -158,6 +158,7 @@ export const en = {
     share: 'Share',
     copy: 'Copy as Markdown',
     copied: 'Copied',
+    exportFailed: 'Could not export the report.',
     download: 'Download .md',
     copyCommand: 'Copy',
     empty: 'No deep dives yet. Ask for one under a brief.',

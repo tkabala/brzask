@@ -164,6 +164,7 @@ export const pl: Resources = {
     share: 'Udostępnij',
     copy: 'Kopiuj jako Markdown',
     copied: 'Skopiowano',
+    exportFailed: 'Nie udało się wyeksportować raportu.',
     download: 'Pobierz .md',
     copyCommand: 'Kopiuj',
     empty: 'Nie ma jeszcze pogłębień. Poproś o nie pod skrótem.',

@@ -41,6 +41,10 @@ def test_an_unusable_answer_falls_back_to_the_title(answer: Any) -> None:
     assert parse_queries(answer, TITLE) == Queries([TITLE], [], [TITLE])
 
 
+def test_a_blank_title_asks_no_queries() -> None:
+    assert parse_queries({}, "  ") == Queries()
+
+
 def article() -> tuple[Article, ArticleContent]:
     item = Article(id=1, title=TITLE, link="https://pve.example/9")
     content = ArticleContent(article_id=1, text="Proxmox 9 is out.", kind=ContentKind.PAGE)

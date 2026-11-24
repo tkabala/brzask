@@ -15,7 +15,9 @@ from brzask.services.digest.ranking import ChatModel
 
 log = get_logger(__name__)
 
-# Starting values, confirmed or corrected by the real checks before release.
+# Set by hand. In five real dives (2026-11-23) the model filled background and
+# practice to the maximum (six web searches, about 85% of a dive's cost) and
+# asked 0-2 archive queries.
 MAX_BACKGROUND = 3
 MAX_PRACTICE = 3
 MAX_ARCHIVE = 2
@@ -30,7 +32,9 @@ class Queries:
 
 
 def parse_queries(answer: Any, title: str) -> Queries:
-    """The model's queries, cleaned; the title alone when nothing usable is left.
+    """The model's queries, cleaned; the title alone when nothing usable is left,
+    and no queries at all when the title is blank too (the report then rests on
+    the article alone).
 
     Queries are stripped, cut to `QUERY_CHARS`, blank ones and repeats (case
     ignored) dropped, and each list cut to its maximum.
@@ -44,7 +48,7 @@ def parse_queries(answer: Any, title: str) -> Queries:
     )
     if not queries.background and not queries.practice:
         title = title.strip()[:QUERY_CHARS]
-        return Queries([title], [], [title])
+        return Queries([title], [], [title]) if title else Queries()
     return queries
 
 
