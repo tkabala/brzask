@@ -251,6 +251,18 @@ def _answer(
         with sessions() as session:
             found = material(session, message_id, clients.language)
         answer, model = write(clients.llm, found, meter, clients.clock, started)
+        # Inside the try: an answer that cannot be stored must not stay in
+        # progress, which would refuse every later question until a restart.
+        with sessions.begin() as session:
+            ConversationRepository(session).finish(
+                message_id,
+                answer=answer.as_json(),
+                model=model,
+                usage=combined(found.usage, meter.summary()),
+                searched=False,
+                note=None,
+                at=datetime.now(UTC),
+            )
     except Exception as error:
         log.warning("conversation answer failed", message_id=message_id, error=str(error))
         with sessions.begin() as session:
@@ -258,17 +270,6 @@ def _answer(
             ConversationRepository(session).fail(
                 message_id, _short(error), usage, datetime.now(UTC)
             )
-        return
-    with sessions.begin() as session:
-        ConversationRepository(session).finish(
-            message_id,
-            answer=answer.as_json(),
-            model=model,
-            usage=combined(found.usage, meter.summary()),
-            searched=False,
-            note=None,
-            at=datetime.now(UTC),
-        )
 
 
 def _usage(session: Session, message_id: int, meter: UsageMeter) -> dict[str, Any]:

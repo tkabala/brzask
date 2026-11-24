@@ -151,6 +151,18 @@ def test_a_failing_model_keeps_the_question(
     assert stored(session, question_id).text == "Why?"
 
 
+def test_an_answer_that_cannot_be_stored_fails(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    article = readable(session, make)
+    # Postgres JSONB refuses a NUL character.
+    model = FakeModel(always({"answer": [{"text": "It\u0000 reads.", "sources": [1]}]}))
+
+    _, answer_id = ask(sessions, clients(model), article.id, "Why?", NOW)
+
+    assert stored(session, answer_id).status is MessageStatus.FAILED
+
+
 def test_a_slow_model_fails_within_the_timeout(
     sessions: sessionmaker[Session], session: Session, make: Factories
 ) -> None:

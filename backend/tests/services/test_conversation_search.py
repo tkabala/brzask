@@ -269,3 +269,21 @@ def test_the_worker_runs_rounds_in_order_and_survives_a_failure(
     assert finished.wait(5)
     worker.close()
     assert done == [2, 3]
+
+
+def test_the_worker_keeps_the_answer_when_its_clients_cannot_be_built(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    answer_id = answered(sessions, session, make)
+
+    def broken(_sessions: Any) -> Any:
+        raise RuntimeError("no embedding model")
+
+    worker = SearchWorker(sessions, broken)
+    worker.submit(answer_id)
+    worker.close()
+
+    message = stored(session, answer_id)
+    assert message.status is MessageStatus.DONE
+    assert message.note == "no embedding model"
+    assert message.answer is not None

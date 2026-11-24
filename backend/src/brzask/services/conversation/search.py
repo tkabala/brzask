@@ -292,5 +292,18 @@ class SearchWorker:
                 self.round(self.sessions, clients, message_id, datetime.now(UTC))
         except Exception as error:
             # search_round never raises; a failure building the clients still must
-            # not stop the rounds queued after this one.
+            # not stop the rounds queued after this one, nor leave the answer
+            # searching, which would refuse every later question until a restart.
             log.warning("conversation search not run", message_id=message_id, error=str(error))
+            self._settle(message_id, (str(error) or type(error).__name__)[:ERROR_CHARS])
+
+    def _settle(self, message_id: int, note: str) -> None:
+        try:
+            with self.sessions.begin() as session:
+                repository = ConversationRepository(session)
+                message = repository.message(message_id)
+                if message is not None and message.status is MessageStatus.SEARCHING:
+                    repository.keep_with_note(message_id, note, None, datetime.now(UTC))
+        except Exception as error:
+            # The next start settles it as interrupted.
+            log.warning("conversation search not settled", message_id=message_id, error=str(error))
