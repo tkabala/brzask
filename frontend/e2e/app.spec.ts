@@ -200,11 +200,15 @@ test('the app can be installed', async ({ page, request }) => {
   expect(manifest.icons.some((icon) => icon.purpose === 'maskable')).toBe(true)
 
   await logIn(page)
-  const state = await page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.ready
-    return registration.active?.state
-  })
-  expect(state).toBe('activated')
+  // `ready` resolves once a worker is active, which may still be "activating".
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.ready
+        return registration.active?.state
+      }),
+    )
+    .toBe('activated')
 })
 
 test('today’s digest is readable offline, until logging out', async ({ page, context }) => {
