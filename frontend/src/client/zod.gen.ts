@@ -25,7 +25,7 @@ export const zArticleState = z.enum([
  * AskRequest
  */
 export const zAskRequest = z.object({
-    text: z.string().min(1).max(1000)
+    text: z.string().min(1).max(1000).regex(/^[^\x00]*$/)
 });
 
 /**

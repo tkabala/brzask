@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from brzask import prompts
 from brzask.api import problems
 from brzask.api.auth import AuthConfig
-from brzask.api.deps import DbSession, Id
+from brzask.api.deps import NO_NUL, DbSession, Id
 from brzask.config import get_settings
 from brzask.db.models import (
     ConversationMessage,
@@ -113,7 +113,10 @@ class ConversationOut(BaseModel):
 
 class AskRequest(BaseModel):
     text: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=QUESTION_CHARS)
+        str,
+        StringConstraints(
+            strip_whitespace=True, min_length=1, max_length=QUESTION_CHARS, pattern=NO_NUL
+        ),
     ]
 
 

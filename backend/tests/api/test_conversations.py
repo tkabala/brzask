@@ -145,7 +145,7 @@ def test_ask(client: TestClient, session: Session, make: Factories, model: FakeM
     ]
 
 
-@pytest.mark.parametrize("text", ["", "   ", "x" * 1001])
+@pytest.mark.parametrize("text", ["", "   ", "x" * 1001, "Why\x00?"])
 def test_a_question_must_have_one_to_a_thousand_characters(
     client: TestClient, session: Session, make: Factories, model: FakeModel, text: str
 ) -> None:

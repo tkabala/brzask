@@ -4204,6 +4204,7 @@
             "type": "string",
             "maxLength": 1000,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Text"
           }
         },
