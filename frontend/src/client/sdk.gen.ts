@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, DiveMarkdownData, DiveMarkdownErrors, DiveMarkdownResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetBriefData, GetBriefErrors, GetBriefResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetDiveData, GetDiveErrors, GetDiveResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListArticleDivesData, ListArticleDivesErrors, ListArticleDivesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListDivesData, ListDivesErrors, ListDivesResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadDiveData, ReadDiveErrors, ReadDiveResponses, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RecordBriefOpenData, RecordBriefOpenErrors, RecordBriefOpenResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, RetryDiveData, RetryDiveErrors, RetryDiveResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses, StartDiveData, StartDiveErrors, StartDiveResponses } from './types.gen';
+import type { AddInterestData, AddInterestErrors, AddInterestResponses, AddSourceData, AddSourceErrors, AddSourceResponses, ApproveChangeData, ApproveChangeErrors, ApproveChangeResponses, AskQuestionData, AskQuestionErrors, AskQuestionResponses, ChangeInterestData, ChangeInterestErrors, ChangeInterestResponses, ChangeSourceData, ChangeSourceErrors, ChangeSourceResponses, ConversationMarkdownData, ConversationMarkdownErrors, ConversationMarkdownResponses, DeletePauseData, DeletePauseErrors, DeletePauseResponses, DiveMarkdownData, DiveMarkdownErrors, DiveMarkdownResponses, ExportSourcesData, ExportSourcesErrors, ExportSourcesResponses, GetArticleData, GetArticleErrors, GetArticleRankingData, GetArticleRankingErrors, GetArticleRankingResponses, GetArticleResponses, GetBriefData, GetBriefErrors, GetBriefResponses, GetConversationData, GetConversationErrors, GetConversationResponses, GetDigestData, GetDigestErrors, GetDigestResponses, GetDiveData, GetDiveErrors, GetDiveResponses, GetFeedData, GetFeedErrors, GetFeedResponses, GetInterestData, GetInterestErrors, GetInterestResponses, GetPauseData, GetPauseErrors, GetPauseResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionStateData, GetSessionStateResponses, GetSourceData, GetSourceErrors, GetSourceResponses, GetTodayDigestData, GetTodayDigestErrors, GetTodayDigestResponses, HealthzData, HealthzResponses, ImportSourcesData, ImportSourcesErrors, ImportSourcesResponses, ListArticleDivesData, ListArticleDivesErrors, ListArticleDivesResponses, ListChangesData, ListChangesErrors, ListChangesResponses, ListDigestsData, ListDigestsErrors, ListDigestsResponses, ListDivesData, ListDivesErrors, ListDivesResponses, ListInterestsData, ListInterestsErrors, ListInterestsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenLinkData, OpenLinkErrors, ReadDiveData, ReadDiveErrors, ReadDiveResponses, ReadStatusData, ReadStatusErrors, ReadStatusResponses, ReadyzData, ReadyzErrors, ReadyzResponses, RecordBriefOpenData, RecordBriefOpenErrors, RecordBriefOpenResponses, RejectChangeData, RejectChangeErrors, RejectChangeResponses, RetryAnswerData, RetryAnswerErrors, RetryAnswerResponses, RetryDiveData, RetryDiveErrors, RetryDiveResponses, SearchAnswerData, SearchAnswerErrors, SearchAnswerResponses, SearchData, SearchErrors, SearchResponses, SetPauseData, SetPauseErrors, SetPauseResponses, StartDiveData, StartDiveErrors, StartDiveResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -222,6 +222,89 @@ export const diveMarkdown = <ThrowOnError extends boolean = false>(options: Opti
             type: 'apiKey'
         }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/deep-dives/{dive_id}/markdown',
+    ...options
+});
+
+/**
+ * Get the conversation about an article
+ *
+ * Empty lists when nothing was asked yet; nothing is created.
+ */
+export const getConversation = <ThrowOnError extends boolean = false>(options: Options<GetConversationData, ThrowOnError>): RequestResult<GetConversationResponses, GetConversationErrors, ThrowOnError> => (options.client ?? client).get<GetConversationResponses, GetConversationErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/conversation',
+    ...options
+});
+
+/**
+ * Ask about an article
+ *
+ * Answered within the request (at most about 45 s). A model that fails or is
+ * too slow gives a failed answer, which can be retried. 409 when the article has
+ * no stored text, an answer is in progress, or the spending limit is reached.
+ */
+export const askQuestion = <ThrowOnError extends boolean = false>(options: Options<AskQuestionData, ThrowOnError>): RequestResult<AskQuestionResponses, AskQuestionErrors, ThrowOnError> => (options.client ?? client).post<AskQuestionResponses, AskQuestionErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/conversation/messages',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Answer a failed answer again
+ *
+ * 409 unless it is the conversation's latest answer and failed.
+ */
+export const retryAnswer = <ThrowOnError extends boolean = false>(options: Options<RetryAnswerData, ThrowOnError>): RequestResult<RetryAnswerResponses, RetryAnswerErrors, ThrowOnError> => (options.client ?? client).post<RetryAnswerResponses, RetryAnswerErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/conversation-messages/{message_id}/retry',
+    ...options
+});
+
+/**
+ * Search and answer again
+ *
+ * One search round in the background (the archive, and the web when configured);
+ * poll the conversation until the answer is no longer `searching`. 409 unless it is
+ * the latest answer and done or failed, or when the spending limit is reached.
+ */
+export const searchAnswer = <ThrowOnError extends boolean = false>(options: Options<SearchAnswerData, ThrowOnError>): RequestResult<SearchAnswerResponses, SearchAnswerErrors, ThrowOnError> => (options.client ?? client).post<SearchAnswerResponses, SearchAnswerErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/conversation-messages/{message_id}/search',
+    ...options
+});
+
+/**
+ * Export the conversation about an article as Markdown
+ *
+ * Answered questions and the sources they cite; 404 when nothing was asked.
+ */
+export const conversationMarkdown = <ThrowOnError extends boolean = false>(options: Options<ConversationMarkdownData, ThrowOnError>): RequestResult<ConversationMarkdownResponses, ConversationMarkdownErrors, ThrowOnError> => (options.client ?? client).get<ConversationMarkdownResponses, ConversationMarkdownErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'brzask_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/articles/{article_id}/conversation/markdown',
     ...options
 });
 

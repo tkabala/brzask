@@ -131,7 +131,7 @@ export function rankingOf(article: ArticleOut): RankingOut {
 
 /** What each brief says, by its basis: a written article, a video with
  * chapters, and an article known only by its feed's description. */
-type BriefText = Omit<BriefOut, 'article' | 'basis' | 'chapters'> & {
+type BriefText = Omit<BriefOut, 'article' | 'basis' | 'chapters' | 'conversation_questions'> & {
   chapters: { start: number; title: string }[]
 }
 
@@ -182,6 +182,7 @@ function briefOf(article: ArticleOut): BriefOut | null {
     article,
     basis,
     ...text,
+    conversation_questions: 0,
     chapters: text.chapters.map((chapter) => ({
       ...chapter,
       open_url: `/open?id=${String(article.id)}&t=${String(chapter.start)}&sig=demo`,
@@ -337,6 +338,7 @@ export const deepDives: DeepDiveOut[] = (() => {
       sources: [],
       thin: false,
       searched_web: false,
+      conversation_questions: 0,
       error: null,
     },
     {
@@ -396,6 +398,7 @@ export const deepDives: DeepDiveOut[] = (() => {
       ],
       thin: false,
       searched_web: true,
+      conversation_questions: 0,
       error: null,
     },
   ]

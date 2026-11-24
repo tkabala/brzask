@@ -149,6 +149,27 @@ export type ArticleOut = {
 export type ArticleState = 'seen' | 'shown' | 'repeat';
 
 /**
+ * AskRequest
+ */
+export type AskRequest = {
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * AskResult
+ */
+export type AskResult = {
+    question: ConversationMessageOut;
+    /**
+     * Done or failed; a failed one can be retried.
+     */
+    answer: ConversationMessageOut;
+};
+
+/**
  * BriefBasis
  */
 export type BriefBasis = 'full_text' | 'transcript' | 'partial' | 'description';
@@ -188,6 +209,12 @@ export type BriefOut = {
      * What text the brief was written from.
      */
     basis: BriefBasis;
+    /**
+     * Conversation Questions
+     *
+     * Questions asked about the article.
+     */
+    conversation_questions: number;
 };
 
 /**
@@ -282,6 +309,167 @@ export type ChapterOut = {
      * Opens the video at `start` and records the open, like the article's `open_url`.
      */
     open_url: string;
+};
+
+/**
+ * ConversationAnswer
+ */
+export type ConversationAnswer = {
+    /**
+     * Paragraphs
+     */
+    paragraphs: Array<ConversationParagraph>;
+    /**
+     * Enough
+     *
+     * False when the material did not answer the question.
+     */
+    enough: boolean;
+    /**
+     * Suggestions
+     *
+     * Follow-up questions to offer.
+     */
+    suggestions: Array<string>;
+};
+
+/**
+ * ConversationArticle
+ */
+export type ConversationArticle = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Title
+     *
+     * In the digest language when the article was in a digest.
+     */
+    title: string;
+};
+
+/**
+ * ConversationMessageOut
+ */
+export type ConversationMessageOut = {
+    /**
+     * Id
+     */
+    id: number;
+    role: MessageRole;
+    /**
+     * Text
+     *
+     * The question; null for answers.
+     */
+    text: string | null;
+    /**
+     * Null until written.
+     */
+    answer: ConversationAnswer | null;
+    status: MessageStatus;
+    /**
+     * Searched
+     *
+     * Written again after a search round.
+     */
+    searched: boolean;
+    /**
+     * Note
+     *
+     * Shown under the answer, e.g. a search's outcome.
+     */
+    note: string | null;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * ConversationOut
+ */
+export type ConversationOut = {
+    article: ConversationArticle;
+    /**
+     * Messages
+     *
+     * Oldest first.
+     */
+    messages: Array<ConversationMessageOut>;
+    /**
+     * Sources
+     *
+     * By number.
+     */
+    sources: Array<ConversationSourceOut>;
+    /**
+     * Can Ask
+     */
+    can_ask: boolean;
+    /**
+     * Reason
+     *
+     * Why a question cannot be asked now; null when it can.
+     */
+    reason: string | null;
+    /**
+     * Web Search
+     *
+     * A search round also searches the web.
+     */
+    web_search: boolean;
+};
+
+/**
+ * ConversationParagraph
+ */
+export type ConversationParagraph = {
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Sources
+     *
+     * Numbers of the sources it rests on.
+     */
+    sources: Array<number>;
+};
+
+/**
+ * ConversationSourceOrigin
+ */
+export type ConversationSourceOrigin = 'article' | 'report' | 'archive' | 'web';
+
+/**
+ * ConversationSourceOut
+ */
+export type ConversationSourceOut = {
+    /**
+     * N
+     */
+    n: number;
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Title
+     */
+    title: string;
+    origin: ConversationSourceOrigin;
+    /**
+     * Open Url
+     *
+     * For stored articles: follow this to record the open; null otherwise.
+     */
+    open_url: string | null;
 };
 
 /**
@@ -398,6 +586,12 @@ export type DeepDiveOut = {
      * Error
      */
     error: string | null;
+    /**
+     * Conversation Questions
+     *
+     * Questions asked about the article.
+     */
+    conversation_questions: number;
 };
 
 /**
@@ -724,6 +918,16 @@ export type KnownSource = {
     name: string;
     status: SourceStatus;
 };
+
+/**
+ * MessageRole
+ */
+export type MessageRole = 'user' | 'assistant';
+
+/**
+ * MessageStatus
+ */
+export type MessageStatus = 'done' | 'answering' | 'searching' | 'failed';
 
 /**
  * NewInterest
@@ -1929,6 +2133,232 @@ export type DiveMarkdownResponses = {
 };
 
 export type DiveMarkdownResponse = DiveMarkdownResponses[keyof DiveMarkdownResponses];
+
+export type GetConversationData = {
+    body?: never;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/conversation';
+};
+
+export type GetConversationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type GetConversationError = GetConversationErrors[keyof GetConversationErrors];
+
+export type GetConversationResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConversationOut;
+};
+
+export type GetConversationResponse = GetConversationResponses[keyof GetConversationResponses];
+
+export type AskQuestionData = {
+    body: AskRequest;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/conversation/messages';
+};
+
+export type AskQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type AskQuestionError = AskQuestionErrors[keyof AskQuestionErrors];
+
+export type AskQuestionResponses = {
+    /**
+     * Successful Response
+     */
+    200: AskResult;
+};
+
+export type AskQuestionResponse = AskQuestionResponses[keyof AskQuestionResponses];
+
+export type RetryAnswerData = {
+    body?: never;
+    path: {
+        /**
+         * Message Id
+         */
+        message_id: number;
+    };
+    query?: never;
+    url: '/api/v1/conversation-messages/{message_id}/retry';
+};
+
+export type RetryAnswerErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type RetryAnswerError = RetryAnswerErrors[keyof RetryAnswerErrors];
+
+export type RetryAnswerResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConversationMessageOut;
+};
+
+export type RetryAnswerResponse = RetryAnswerResponses[keyof RetryAnswerResponses];
+
+export type SearchAnswerData = {
+    body?: never;
+    path: {
+        /**
+         * Message Id
+         */
+        message_id: number;
+    };
+    query?: never;
+    url: '/api/v1/conversation-messages/{message_id}/search';
+};
+
+export type SearchAnswerErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type SearchAnswerError = SearchAnswerErrors[keyof SearchAnswerErrors];
+
+export type SearchAnswerResponses = {
+    /**
+     * Successful Response
+     */
+    202: ConversationMessageOut;
+};
+
+export type SearchAnswerResponse = SearchAnswerResponses[keyof SearchAnswerResponses];
+
+export type ConversationMarkdownData = {
+    body?: never;
+    path: {
+        /**
+         * Article Id
+         */
+        article_id: number;
+    };
+    query?: never;
+    url: '/api/v1/articles/{article_id}/conversation/markdown';
+};
+
+export type ConversationMarkdownErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Unprocessable Content
+     */
+    422: Problem;
+};
+
+export type ConversationMarkdownError = ConversationMarkdownErrors[keyof ConversationMarkdownErrors];
+
+export type ConversationMarkdownResponses = {
+    /**
+     * Successful Response
+     */
+    200: string;
+};
+
+export type ConversationMarkdownResponse = ConversationMarkdownResponses[keyof ConversationMarkdownResponses];
 
 export type SearchData = {
     body?: never;

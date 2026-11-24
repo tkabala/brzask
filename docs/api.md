@@ -131,6 +131,10 @@ The interactive documentation lists every field; in short:
 | `GET /deep-dives/{id}` | One deep dive: its report, numbered sources, and its state or error |
 | `POST /deep-dives/{id}/read`, `POST /deep-dives/{id}/retry` | Record the first reading; try a failed one again as a new deep dive |
 | `GET /deep-dives/{id}/markdown` | A finished deep dive as a Markdown file |
+| `GET /articles/{id}/conversation` | The questions asked about an article and their answers, the numbered sources they cite, and whether a question can be asked now (and why not) |
+| `POST /articles/{id}/conversation/messages` | Ask a question (`{"text": "…"}`, up to 1,000 characters); answered within the request, a failed answer can be retried |
+| `POST /conversation-messages/{id}/retry`, `POST /conversation-messages/{id}/search` | Answer the latest failed answer again; run one search round (archive, and the web when configured) in the background and answer again (202) |
+| `GET /articles/{id}/conversation/markdown` | The answered questions as a Markdown file |
 | `GET /search?q=` | Articles closest in meaning to `q` |
 | `GET /sources` | Sources by name, with fetch health and what each published in the last 30 days; `?status=pending` lists the ones waiting for a decision |
 | `POST /sources` | Add a source from its feed or any page of the site |

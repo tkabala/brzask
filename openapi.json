@@ -1241,6 +1241,490 @@
         }
       }
     },
+    "/api/v1/articles/{article_id}/conversation": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get the conversation about an article",
+        "description": "Empty lists when nothing was asked yet; nothing is created.",
+        "operationId": "get_conversation",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/articles/{article_id}/conversation/messages": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Ask about an article",
+        "description": "Answered within the request (at most about 45 s). A model that fails or is\ntoo slow gives a failed answer, which can be retried. 409 when the article has\nno stored text, an answer is in progress, or the spending limit is reached.",
+        "operationId": "ask_question",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversation-messages/{message_id}/retry": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Answer a failed answer again",
+        "description": "409 unless it is the conversation's latest answer and failed.",
+        "operationId": "retry_answer",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMessageOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversation-messages/{message_id}/search": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Search and answer again",
+        "description": "One search round in the background (the archive, and the web when configured);\npoll the conversation until the answer is no longer `searching`. 409 unless it is\nthe latest answer and done or failed, or when the spending limit is reached.",
+        "operationId": "search_answer",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMessageOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/articles/{article_id}/conversation/markdown": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Export the conversation about an article as Markdown",
+        "description": "Answered questions and the sources they cite; 404 when nothing was asked.",
+        "operationId": "conversation_markdown",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "title": "Article Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {},
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/search": {
       "get": {
         "tags": [
@@ -3714,6 +4198,38 @@
         ],
         "title": "ArticleState"
       },
+      "AskRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "AskRequest"
+      },
+      "AskResult": {
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/ConversationMessageOut"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/ConversationMessageOut",
+            "description": "Done or failed; a failed one can be retried."
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "AskResult"
+      },
       "BriefBasis": {
         "type": "string",
         "enum": [
@@ -3761,6 +4277,11 @@
           "basis": {
             "$ref": "#/components/schemas/BriefBasis",
             "description": "What text the brief was written from."
+          },
+          "conversation_questions": {
+            "type": "integer",
+            "title": "Conversation Questions",
+            "description": "Questions asked about the article."
           }
         },
         "type": "object",
@@ -3770,7 +4291,8 @@
           "points",
           "caveats",
           "chapters",
-          "basis"
+          "basis",
+          "conversation_questions"
         ],
         "title": "BriefOut",
         "description": "What an article says, written ahead from its text."
@@ -3928,6 +4450,265 @@
           "open_url"
         ],
         "title": "ChapterOut"
+      },
+      "ConversationAnswer": {
+        "properties": {
+          "paragraphs": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationParagraph"
+            },
+            "type": "array",
+            "title": "Paragraphs"
+          },
+          "enough": {
+            "type": "boolean",
+            "title": "Enough",
+            "description": "False when the material did not answer the question."
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggestions",
+            "description": "Follow-up questions to offer."
+          }
+        },
+        "type": "object",
+        "required": [
+          "paragraphs",
+          "enough",
+          "suggestions"
+        ],
+        "title": "ConversationAnswer"
+      },
+      "ConversationArticle": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "In the digest language when the article was in a digest."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ConversationArticle"
+      },
+      "ConversationMessageOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The question; null for answers."
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until written."
+          },
+          "status": {
+            "$ref": "#/components/schemas/MessageStatus"
+          },
+          "searched": {
+            "type": "boolean",
+            "title": "Searched",
+            "description": "Written again after a search round."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Shown under the answer, e.g. a search's outcome."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "text",
+          "answer",
+          "status",
+          "searched",
+          "note",
+          "error",
+          "created_at"
+        ],
+        "title": "ConversationMessageOut"
+      },
+      "ConversationOut": {
+        "properties": {
+          "article": {
+            "$ref": "#/components/schemas/ConversationArticle"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageOut"
+            },
+            "type": "array",
+            "title": "Messages",
+            "description": "Oldest first."
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSourceOut"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "By number."
+          },
+          "can_ask": {
+            "type": "boolean",
+            "title": "Can Ask"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why a question cannot be asked now; null when it can."
+          },
+          "web_search": {
+            "type": "boolean",
+            "title": "Web Search",
+            "description": "A search round also searches the web."
+          }
+        },
+        "type": "object",
+        "required": [
+          "article",
+          "messages",
+          "sources",
+          "can_ask",
+          "reason",
+          "web_search"
+        ],
+        "title": "ConversationOut"
+      },
+      "ConversationParagraph": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "sources": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Numbers of the sources it rests on."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "sources"
+        ],
+        "title": "ConversationParagraph"
+      },
+      "ConversationSourceOrigin": {
+        "type": "string",
+        "enum": [
+          "article",
+          "report",
+          "archive",
+          "web"
+        ],
+        "title": "ConversationSourceOrigin"
+      },
+      "ConversationSourceOut": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ConversationSourceOrigin"
+          },
+          "open_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Url",
+            "description": "For stored articles: follow this to record the open; null otherwise."
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "url",
+          "title",
+          "origin",
+          "open_url"
+        ],
+        "title": "ConversationSourceOut"
       },
       "Credentials": {
         "properties": {
@@ -4095,6 +4876,11 @@
               }
             ],
             "title": "Error"
+          },
+          "conversation_questions": {
+            "type": "integer",
+            "title": "Conversation Questions",
+            "description": "Questions asked about the article."
           }
         },
         "type": "object",
@@ -4111,7 +4897,8 @@
           "sources",
           "thin",
           "searched_web",
-          "error"
+          "error",
+          "conversation_questions"
         ],
         "title": "DeepDiveOut"
       },
@@ -4626,6 +5413,24 @@
           "status"
         ],
         "title": "KnownSource"
+      },
+      "MessageRole": {
+        "type": "string",
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "title": "MessageRole"
+      },
+      "MessageStatus": {
+        "type": "string",
+        "enum": [
+          "done",
+          "answering",
+          "searching",
+          "failed"
+        ],
+        "title": "MessageStatus"
       },
       "NewInterest": {
         "properties": {

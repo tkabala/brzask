@@ -427,6 +427,7 @@ function queueDive(article: DeepDiveRef['article'], focus: string, link: string)
     sources: [],
     thin: false,
     searched_web: false,
+    conversation_questions: 0,
     error: null,
   }
   db.deepDives.unshift(dive)

@@ -22,6 +22,13 @@ export const zArticleState = z.enum([
 ]);
 
 /**
+ * AskRequest
+ */
+export const zAskRequest = z.object({
+    text: z.string().min(1).max(1000)
+});
+
+/**
  * BriefBasis
  */
 export const zBriefBasis = z.enum([
@@ -66,6 +73,52 @@ export const zChapterOut = z.object({
     start: z.int(),
     title: z.string(),
     open_url: z.string()
+});
+
+/**
+ * ConversationArticle
+ */
+export const zConversationArticle = z.object({
+    id: z.int(),
+    title: z.string()
+});
+
+/**
+ * ConversationParagraph
+ */
+export const zConversationParagraph = z.object({
+    text: z.string(),
+    sources: z.array(z.int())
+});
+
+/**
+ * ConversationAnswer
+ */
+export const zConversationAnswer = z.object({
+    paragraphs: z.array(zConversationParagraph),
+    enough: z.boolean(),
+    suggestions: z.array(z.string())
+});
+
+/**
+ * ConversationSourceOrigin
+ */
+export const zConversationSourceOrigin = z.enum([
+    'article',
+    'report',
+    'archive',
+    'web'
+]);
+
+/**
+ * ConversationSourceOut
+ */
+export const zConversationSourceOut = z.object({
+    n: z.int(),
+    url: z.string(),
+    title: z.string(),
+    origin: zConversationSourceOrigin,
+    open_url: z.string().nullable()
 });
 
 /**
@@ -197,7 +250,8 @@ export const zDeepDiveOut = z.object({
     sources: z.array(zDeepDiveSource),
     thin: z.boolean(),
     searched_web: z.boolean(),
-    error: z.string().nullable()
+    error: z.string().nullable(),
+    conversation_questions: z.int()
 });
 
 /**
@@ -256,6 +310,56 @@ export const zInterestOut = z.object({
     active: z.boolean(),
     created_at: z.iso.datetime(),
     updated_at: z.iso.datetime()
+});
+
+/**
+ * MessageRole
+ */
+export const zMessageRole = z.enum(['user', 'assistant']);
+
+/**
+ * MessageStatus
+ */
+export const zMessageStatus = z.enum([
+    'done',
+    'answering',
+    'searching',
+    'failed'
+]);
+
+/**
+ * ConversationMessageOut
+ */
+export const zConversationMessageOut = z.object({
+    id: z.int(),
+    role: zMessageRole,
+    text: z.string().nullable(),
+    answer: zConversationAnswer.nullable(),
+    status: zMessageStatus,
+    searched: z.boolean(),
+    note: z.string().nullable(),
+    error: z.string().nullable(),
+    created_at: z.iso.datetime()
+});
+
+/**
+ * AskResult
+ */
+export const zAskResult = z.object({
+    question: zConversationMessageOut,
+    answer: zConversationMessageOut
+});
+
+/**
+ * ConversationOut
+ */
+export const zConversationOut = z.object({
+    article: zConversationArticle,
+    messages: z.array(zConversationMessageOut),
+    sources: z.array(zConversationSourceOut),
+    can_ask: z.boolean(),
+    reason: z.string().nullable(),
+    web_search: z.boolean()
 });
 
 /**
@@ -496,7 +600,8 @@ export const zBriefOut = z.object({
     points: z.array(z.string()),
     caveats: z.array(z.string()),
     chapters: z.array(zChapterOut),
-    basis: zBriefBasis
+    basis: zBriefBasis,
+    conversation_questions: z.int()
 });
 
 /**
@@ -727,6 +832,53 @@ export const zDiveMarkdownPath = z.object({
  * Successful Response
  */
 export const zDiveMarkdownResponse = z.string();
+
+export const zGetConversationPath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zGetConversationResponse = zConversationOut;
+
+export const zAskQuestionBody = zAskRequest;
+
+export const zAskQuestionPath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zAskQuestionResponse = zAskResult;
+
+export const zRetryAnswerPath = z.object({
+    message_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRetryAnswerResponse = zConversationMessageOut;
+
+export const zSearchAnswerPath = z.object({
+    message_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zSearchAnswerResponse = zConversationMessageOut;
+
+export const zConversationMarkdownPath = z.object({
+    article_id: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zConversationMarkdownResponse = z.string();
 
 export const zSearchQuery = z.object({
     q: z.string().min(1).max(500).regex(/^[^\x00]*$/),

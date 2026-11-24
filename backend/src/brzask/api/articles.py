@@ -10,6 +10,7 @@ from brzask.api import problems
 from brzask.api.auth import Auth, AuthConfig
 from brzask.api.deps import DbSession, Id
 from brzask.db.models import Article, ArticleState, BriefBasis
+from brzask.repositories import ConversationRepository
 from brzask.services import digests, opens
 
 router = APIRouter(prefix="/articles", tags=["articles"])
@@ -86,6 +87,7 @@ class BriefOut(BaseModel):
     caveats: list[str] = Field(description="What to keep in mind when reading it.")
     chapters: list[ChapterOut] = Field(description="Of a video; empty for anything else.")
     basis: BriefBasis = Field(description="What text the brief was written from.")
+    conversation_questions: int = Field(description="Questions asked about the article.")
 
 
 class RankingOut(BaseModel):
@@ -139,6 +141,9 @@ def get_brief(session: DbSession, config: AuthConfig, article_id: Id) -> BriefOu
             for chapter in brief.chapters
         ],
         basis=brief.basis,
+        conversation_questions=ConversationRepository(session)
+        .question_counts([article.id])
+        .get(article.id, 0),
     )
 
 

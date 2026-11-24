@@ -14,7 +14,7 @@ from brzask.api.deps import DbSession, Id
 from brzask.api.pagination import DEFAULT_LIMIT, CursorParam, Limit, decode_cursor, page
 from brzask.config import get_settings
 from brzask.db.models import DeepDive, DeepDiveStatus
-from brzask.repositories import DeepDiveRepository
+from brzask.repositories import ConversationRepository, DeepDiveRepository
 from brzask.services import deep_dives
 
 router = APIRouter(tags=["deep dives"])
@@ -108,6 +108,7 @@ class DeepDiveOut(DeepDiveRef):
     thin: bool = Field(description="Written from the article alone.")
     searched_web: bool = Field(description="A web search was configured and answered.")
     error: str | None
+    conversation_questions: int = Field(description="Questions asked about the article.")
 
 
 def _limits() -> tuple[Any, Any]:
@@ -209,6 +210,9 @@ def get_dive(session: DbSession, config: AuthConfig, dive_id: Id) -> DeepDiveOut
         thin=dive.thin,
         searched_web=dive.searched_web,
         error=dive.error,
+        conversation_questions=ConversationRepository(session)
+        .question_counts([dive.article_id])
+        .get(dive.article_id, 0),
     )
 
 

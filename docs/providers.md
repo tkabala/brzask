@@ -73,6 +73,8 @@ Once a limit is reached:
   It writes no briefs; a digest of the day before still gets them from the
   next run under the limit;
 - **discovery** is skipped, because nearly all of its cost is the web search.
+- **questions about an article**, their retries and search rounds are refused
+  with the limit's reason; deep dives too.
 
 The run's statistics record the limits, what was spent and what was
 skipped, and the Status page says so. Providers that report no cost (an

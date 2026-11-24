@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addInterest, addSource, approveChange, changeInterest, changeSource, deletePause, diveMarkdown, exportSources, getArticle, getArticleRanking, getBrief, getDigest, getDive, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listArticleDives, listChanges, listDigests, listDives, listInterests, listRuns, listSources, login, logout, openLink, type Options, readDive, readStatus, readyz, recordBriefOpen, rejectChange, retryDive, search, setPause, startDive } from '../sdk.gen';
-import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, DeletePauseData, DeletePauseResponse, DiveMarkdownData, DiveMarkdownError, DiveMarkdownResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetBriefData, GetBriefError, GetBriefResponse, GetDigestData, GetDigestError, GetDigestResponse, GetDiveData, GetDiveError, GetDiveResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListArticleDivesData, ListArticleDivesError, ListArticleDivesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListDivesData, ListDivesError, ListDivesResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadDiveData, ReadDiveError, ReadDiveResponse, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RecordBriefOpenData, RecordBriefOpenError, RecordBriefOpenResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, RetryDiveData, RetryDiveError, RetryDiveResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse, StartDiveData, StartDiveError, StartDiveResponse } from '../types.gen';
+import { addInterest, addSource, approveChange, askQuestion, changeInterest, changeSource, conversationMarkdown, deletePause, diveMarkdown, exportSources, getArticle, getArticleRanking, getBrief, getConversation, getDigest, getDive, getFeed, getInterest, getPause, getRun, getSessionState, getSource, getTodayDigest, healthz, importSources, listArticleDives, listChanges, listDigests, listDives, listInterests, listRuns, listSources, login, logout, openLink, type Options, readDive, readStatus, readyz, recordBriefOpen, rejectChange, retryAnswer, retryDive, search, searchAnswer, setPause, startDive } from '../sdk.gen';
+import type { AddInterestData, AddInterestError, AddInterestResponse, AddSourceData, AddSourceError, AddSourceResponse, ApproveChangeData, ApproveChangeError, ApproveChangeResponse, AskQuestionData, AskQuestionError, AskQuestionResponse, ChangeInterestData, ChangeInterestError, ChangeInterestResponse, ChangeSourceData, ChangeSourceError, ChangeSourceResponse, ConversationMarkdownData, ConversationMarkdownError, ConversationMarkdownResponse, DeletePauseData, DeletePauseResponse, DiveMarkdownData, DiveMarkdownError, DiveMarkdownResponse, ExportSourcesData, ExportSourcesError, GetArticleData, GetArticleError, GetArticleRankingData, GetArticleRankingError, GetArticleRankingResponse, GetArticleResponse, GetBriefData, GetBriefError, GetBriefResponse, GetConversationData, GetConversationError, GetConversationResponse, GetDigestData, GetDigestError, GetDigestResponse, GetDiveData, GetDiveError, GetDiveResponse, GetFeedData, GetFeedError, GetInterestData, GetInterestError, GetInterestResponse, GetPauseData, GetPauseResponse, GetRunData, GetRunError, GetRunResponse, GetSessionStateData, GetSessionStateResponse, GetSourceData, GetSourceError, GetSourceResponse, GetTodayDigestData, GetTodayDigestResponse, HealthzData, HealthzResponse, ImportSourcesData, ImportSourcesError, ImportSourcesResponse, ListArticleDivesData, ListArticleDivesError, ListArticleDivesResponse, ListChangesData, ListChangesError, ListChangesResponse, ListDigestsData, ListDigestsError, ListDigestsResponse, ListDivesData, ListDivesError, ListDivesResponse, ListInterestsData, ListInterestsError, ListInterestsResponse, ListRunsData, ListRunsError, ListRunsResponse, ListSourcesData, ListSourcesError, ListSourcesResponse, LoginData, LoginError, LoginResponse, LogoutData, LogoutResponse, OpenLinkData, OpenLinkError, ReadDiveData, ReadDiveError, ReadDiveResponse, ReadStatusData, ReadStatusResponse, ReadyzData, ReadyzResponse, RecordBriefOpenData, RecordBriefOpenError, RecordBriefOpenResponse, RejectChangeData, RejectChangeError, RejectChangeResponse, RetryAnswerData, RetryAnswerError, RetryAnswerResponse, RetryDiveData, RetryDiveError, RetryDiveResponse, SearchAnswerData, SearchAnswerError, SearchAnswerResponse, SearchData, SearchError, SearchResponse, SetPauseData, SetPauseError, SetPauseResponse, StartDiveData, StartDiveError, StartDiveResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -397,6 +397,107 @@ export const diveMarkdownOptions = (options: Options<DiveMarkdownData>) => query
         return data;
     },
     queryKey: diveMarkdownQueryKey(options)
+});
+
+export const getConversationQueryKey = (options: Options<GetConversationData>) => createQueryKey('getConversation', options);
+
+/**
+ * Get the conversation about an article
+ *
+ * Empty lists when nothing was asked yet; nothing is created.
+ */
+export const getConversationOptions = (options: Options<GetConversationData>) => queryOptions<GetConversationResponse, GetConversationError, GetConversationResponse, ReturnType<typeof getConversationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getConversation({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getConversationQueryKey(options)
+});
+
+/**
+ * Ask about an article
+ *
+ * Answered within the request (at most about 45 s). A model that fails or is
+ * too slow gives a failed answer, which can be retried. 409 when the article has
+ * no stored text, an answer is in progress, or the spending limit is reached.
+ */
+export const askQuestionMutation = (options?: Partial<Options<AskQuestionData>>): UseMutationOptions<AskQuestionResponse, AskQuestionError, Options<AskQuestionData>> => {
+    const mutationOptions: UseMutationOptions<AskQuestionResponse, AskQuestionError, Options<AskQuestionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await askQuestion({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Answer a failed answer again
+ *
+ * 409 unless it is the conversation's latest answer and failed.
+ */
+export const retryAnswerMutation = (options?: Partial<Options<RetryAnswerData>>): UseMutationOptions<RetryAnswerResponse, RetryAnswerError, Options<RetryAnswerData>> => {
+    const mutationOptions: UseMutationOptions<RetryAnswerResponse, RetryAnswerError, Options<RetryAnswerData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await retryAnswer({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Search and answer again
+ *
+ * One search round in the background (the archive, and the web when configured);
+ * poll the conversation until the answer is no longer `searching`. 409 unless it is
+ * the latest answer and done or failed, or when the spending limit is reached.
+ */
+export const searchAnswerMutation = (options?: Partial<Options<SearchAnswerData>>): UseMutationOptions<SearchAnswerResponse, SearchAnswerError, Options<SearchAnswerData>> => {
+    const mutationOptions: UseMutationOptions<SearchAnswerResponse, SearchAnswerError, Options<SearchAnswerData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await searchAnswer({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const conversationMarkdownQueryKey = (options: Options<ConversationMarkdownData>) => createQueryKey('conversationMarkdown', options);
+
+/**
+ * Export the conversation about an article as Markdown
+ *
+ * Answered questions and the sources they cite; 404 when nothing was asked.
+ */
+export const conversationMarkdownOptions = (options: Options<ConversationMarkdownData>) => queryOptions<ConversationMarkdownResponse, ConversationMarkdownError, ConversationMarkdownResponse, ReturnType<typeof conversationMarkdownQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await conversationMarkdown({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: conversationMarkdownQueryKey(options)
 });
 
 export const searchQueryKey = (options: Options<SearchData>) => createQueryKey('search', options);
