@@ -137,6 +137,31 @@ SAMPLES: dict[str, dict[str, Any]] = {
             },
         ],
     },
+    "conversation": {
+        "interests": INTERESTS,
+        "title": "Async I/O in Postgres 18",
+        "source": "PG Weekly",
+        "kind": "transcript",
+        "text": "[00:00] Postgres 18 can issue reads asynchronously.",
+        "partial": True,
+        "brief": {"gist": "Reads go async.", "points": ["io_method"], "caveats": ["Linux only"]},
+        "dives": [
+            {
+                "focus": "on ZFS",
+                "background": [{"text": "Why.", "sources": [1, 2]}],
+                "practice": [{"text": "Try it.", "command": "pg_ctl start", "sources": [2]}],
+                "further": [{"source": 2, "why": "Docs."}],
+            }
+        ],
+        "sources": [
+            {"n": 1, "title": "Async I/O", "url": "https://pg.example/18", "text": None},
+            {"n": 2, "title": "io docs", "url": "https://docs.example/io", "text": "io_uring."},
+            {"n": 3, "title": "Old post", "url": "https://old.example/", "text": None},
+        ],
+        "history": [{"question": "What is new?", "answer": "Async reads."}],
+        "question": "Does it help on ZFS?",
+        "language": prompts.language("pl"),
+    },
     "web_search": {"query": "blogs about Postgres internals", "limit": 10},
     "discovery_search": {
         "topic": "Postgres",
