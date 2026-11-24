@@ -59,13 +59,17 @@ from brzask.services.search import QueryEmbedder
 
 log = get_logger(__name__)
 
-# Starting values, confirmed or corrected by the real checks.
+# Real check (2026-11-24, 4 rounds): a round took 24-51 s and cost
+# $0.012-0.013, of which the 2 web searches were $0.011; it added 4-6 sources
+# and, with the new sources named in the prompt, the rewrite cited them in 2 of
+# 2 rounds (0 of 1 before). More queries would add cost at the same rate.
 WEB_QUERIES = 2
 ARCHIVE_QUERIES = 1  # each keeps at most the deep dive's ARCHIVE_SOURCES (3) articles
 WEB_PAGES = 5  # web results read
 ERROR_CHARS = 300
 
 NOTHING_NEW = "The search found nothing new."
+NOTHING_USED = "The search found nothing that answers this."
 _ORIGINS = {"archive": ConversationSourceOrigin.ARCHIVE, "web": ConversationSourceOrigin.WEB}
 
 
@@ -183,8 +187,12 @@ def _search(
 
     started = clients.clock()
     with sessions() as session:
-        material_ = material(session, message_id, clients.language)
+        material_ = material(session, message_id, clients.language, sorted(s.n for s in changed))
     answer, model = write(clients.llm, material_, meter, clients.clock, started)
+    cited = {n for paragraph in answer.paragraphs for n in paragraph.sources}
+    # The answer is kept as rewritten either way; the note says when the new
+    # sources did not help, so the reader does not take it as searched for.
+    note = None if cited & {s.n for s in changed} else NOTHING_USED
     with sessions.begin() as session:
         ConversationRepository(session).finish(
             message_id,
@@ -192,7 +200,7 @@ def _search(
             model=model,
             usage=combined(material_.usage, meter.summary()),
             searched=True,
-            note=None,
+            note=note,
             at=datetime.now(UTC),
         )
     return None

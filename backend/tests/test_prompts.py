@@ -161,6 +161,7 @@ SAMPLES: dict[str, dict[str, Any]] = {
         "history": [{"question": "What is new?", "answer": "Async reads."}],
         "question": "Does it help on ZFS?",
         "language": prompts.language("pl"),
+        "fresh": [2],
     },
     "conversation_search": {
         "title": "Async I/O in Postgres 18",

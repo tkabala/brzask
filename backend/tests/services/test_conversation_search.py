@@ -20,6 +20,7 @@ from brzask.repositories.conversations import NewSource
 from brzask.services.conversation.ask import ask
 from brzask.services.conversation.search import (
     NOTHING_NEW,
+    NOTHING_USED,
     SearchClients,
     SearchWorker,
     parse_search_queries,
@@ -97,6 +98,25 @@ def test_search_round_adds_sources_and_rewrites_the_answer(
     assert model.llm.purposes == ["conversation_search", "conversation"]
     assert "How do I enable it?" in model.llm.prompts[0]
     assert "Set io_method = io_uring." in model.llm.prompts[1]
+    assert "just found sources 2." in model.llm.prompts[1]
+
+
+def test_a_rewrite_citing_no_new_source_says_so(
+    sessions: sessionmaker[Session], session: Session, make: Factories
+) -> None:
+    answer_id = answered(sessions, session, make)
+    old_only = {"answer": [{"text": "Still only the article.", "sources": [1]}], "enough": False}
+
+    search_round(sessions, search_clients(FakeModel(by_call(QUERIES, old_only))), answer_id, NOW)
+
+    answer = stored(session, answer_id)
+    assert (answer.status, answer.searched, answer.note) == (
+        MessageStatus.DONE,
+        True,
+        NOTHING_USED,
+    )
+    assert answer.answer is not None
+    assert answer.answer["answer"][0]["text"] == "Still only the article."
 
 
 def test_search_usage_is_added_to_the_row(

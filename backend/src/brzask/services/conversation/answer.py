@@ -4,11 +4,14 @@ The model names sources by number only. Numbers the conversation does not
 have are removed, so every link an answer shows is one of its sources.
 """
 
+import re
 from collections.abc import Collection
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-# Starting values, confirmed or corrected by the real checks.
+# Real check (2026-11-24, 24 answers and 4 search rounds on 3 articles): suggestions were 26-73
+# characters once asked for under 100; one over 120 lost its end when cut, so
+# longer ones are dropped.
 SUGGESTIONS = 3  # follow-up questions kept
 SUGGESTION_CHARS = 120  # a suggestion is a tap-to-ask button
 
@@ -54,9 +57,10 @@ class Answer:
 def parse_answer(value: Any, numbers: Collection[int], question: str) -> Answer:
     """The model's answer cleaned to one citing only `numbers`.
 
-    Blank paragraphs are dropped and unknown or repeated numbers removed;
-    `enough` is False only for a JSON false; suggestions are stripped, cut to
-    `SUGGESTION_CHARS`, repeats and the question itself dropped (case
+    Blank paragraphs are dropped, numbers written into the text ("[1]")
+    removed and unknown or repeated numbers dropped;
+    `enough` is False only for a JSON false; suggestions are stripped, those over
+    `SUGGESTION_CHARS` dropped, as are repeats and the question itself dropped (case
     ignored), at most `SUGGESTIONS`. Raises `AnswerError` when the value is
     not an object or no paragraph is left.
     """
@@ -65,7 +69,7 @@ def parse_answer(value: Any, numbers: Collection[int], question: str) -> Answer:
     paragraphs = [
         Paragraph(text, _numbers(item.get("sources"), numbers))
         for item in _items(value.get("answer"))
-        if (text := _text(item.get("text")))
+        if (text := _prose(item.get("text")))
     ]
     if not paragraphs:
         raise AnswerError("the answer has no paragraph")
@@ -77,8 +81,9 @@ def _suggestions(value: dict[str, Any], question: str) -> list[str]:
     kept: list[str] = []
     raw = value.get("suggestions")
     for item in raw if isinstance(raw, list) else []:
-        text = _text(item)[:SUGGESTION_CHARS].strip()
-        if not text or text.casefold() in seen:
+        text = _text(item).strip()
+        # Dropped, not cut: a cut question loses its end (and its question mark).
+        if not text or len(text) > SUGGESTION_CHARS or text.casefold() in seen:
             continue
         seen.add(text.casefold())
         kept.append(text)
@@ -91,6 +96,16 @@ def _items(value: Any) -> list[dict[str, Any]]:
 
 def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+# "[1]", "[2, 3]" or "[2][3]" written into the text: the page shows the numbers
+# as buttons already (3 of 13 answers in the real check carried them).
+_INLINE_NUMBERS = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\]")
+
+
+def _prose(value: Any) -> str:
+    """A paragraph's text without source numbers written into it."""
+    return _INLINE_NUMBERS.sub("", _text(value)).strip()
 
 
 def _numbers(value: Any, known: Collection[int]) -> list[int]:

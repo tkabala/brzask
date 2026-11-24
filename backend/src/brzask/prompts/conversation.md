@@ -19,6 +19,7 @@ Context:
   history    [{question, answer}]      earlier exchanges, oldest first
   question   str
   language   {name}
+  fresh      [int]        sources a search round just found for the question; empty otherwise
 #}
 The reader's standing interests:
 {% include "_interests.md" %}
@@ -85,14 +86,24 @@ Answer: {{ exchange.answer | untrusted }}
 {% endif %}
 
 The reader's new question: {{ question | untrusted }}
+{% if fresh %}
+
+A search for this question just found sources {{ fresh | join(", ") }}. Use them where their text answers it; when none does, say so in one sentence.
+{% endif %}
 
 Answer with only a JSON object, no code fences or commentary:
 {"answer": [{"text": string, "sources": [number]}], "enough": boolean, "suggestions": [string]}
 
 Rules:
-- "answer": 1-4 short paragraphs, written for a phone screen, in the language of the question. Answer only from the material above. After each paragraph list the numbers of the sources its claims rest on; the brief and the deeper reports count as the sources they cite, the brief as source 1.
-- When the material does not contain the answer, say plainly what is missing and set "enough" to false; otherwise set it to true. Never fill the gap from your own knowledge.
-- Cite sources by their number only. Never write a URL or a source that is not in the list.
+- "answer": short, for a phone screen: usually one or two paragraphs and about 600 characters in all; more only when the question asks for steps or a comparison. Answer the question asked; do not summarise the article again, and do not repeat what earlier answers already said (refer to it in a few words instead).
+- Answer only from the material above. Where the article and its brief disagree, the article is right.
+- After each paragraph list the numbers of the sources its claims rest on, in "sources" only: never write source numbers, "[1]" or "(sources: …)" in the text. What comes from the article, its brief or a quote in it is source 1. Cite another source only for what its text above says; a source given by title only can be cited only for what a deeper report says about it.
+- When the material does not contain the answer, say plainly what is missing in a sentence or two and set "enough" to false; otherwise set it to true. Never fill the gap from your own knowledge.
+- The material describes the time it was written. A question about now (the latest version, whether something is fixed yet, today's price or availability) is answered as of the material, saying so, with "enough" false unless a source found by a search answers it for now.
+- Asked to explain more simply: everyday words, no jargon left unexplained, shorter than the original.
+- Asked what it means for the reader: use their interests above, name in a sentence what the article does not tell about their case, and do not retell the article; this is an answer, so "enough" stays true.
+- Asked for weak points: the limits of the article's own claims and evidence (the brief's caveats among them), not only the flaws of what it describes.
 - Do not state anything the material does not support. Present what a commenter, analyst or reader says as their view, naming them, never as fact.
 - Keep product names, company names, commands and other proper nouns as they are.
-- "suggestions": 2-3 short follow-up questions this reader might ask next, in the language of the question, that the material can answer or that a search would; never the question just asked.
+- "suggestions": 2-3 follow-up questions under 100 characters each that the material above answers and this conversation has not answered yet; at most one that would need a search, and none about a gap an answer already said the material lacks. Name only things the material mentions; never the question just asked.
+- Write the answer and the suggestions in the language the new question is written in, whatever the language of the material: a question in English gets an English answer, a question in Polish a Polish one.

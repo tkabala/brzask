@@ -78,13 +78,13 @@ def test_suggestions_are_cleaned() -> None:
             "What changed?",
             "",
             42,
-            "x" * 500,
+            "x" * (SUGGESTION_CHARS + 1),
             "Where are the docs?",
             "One too many?",
         ],
     }
     answer = parse_answer(value, NUMBERS, "  what changed? ")
-    assert answer.suggestions == ["Is it faster?", "x" * SUGGESTION_CHARS, "Where are the docs?"]
+    assert answer.suggestions == ["Is it faster?", "Where are the docs?", "One too many?"]
 
 
 def test_ten_suggestions_become_three() -> None:
@@ -95,3 +95,18 @@ def test_ten_suggestions_become_three() -> None:
 def test_suggestions_that_are_not_a_list_are_none() -> None:
     value = {"answer": [{"text": "A."}], "suggestions": "Why?"}
     assert parse_answer(value, NUMBERS, "Q?").suggestions == []
+
+
+def test_numbers_written_into_the_text_are_removed() -> None:
+    value = {
+        "answer": [
+            {"text": "It reads ahead [1]. Since 18 [1, 2][3], in arrays [2].", "sources": [1]}
+        ]
+    }
+    answer = parse_answer(value, NUMBERS, "q")
+    assert answer.paragraphs[0].text == "It reads ahead. Since 18, in arrays."
+
+
+def test_a_paragraph_of_numbers_only_is_dropped() -> None:
+    value = {"answer": [{"text": "[1]", "sources": [1]}, {"text": "Kept.", "sources": []}]}
+    assert [p.text for p in parse_answer(value, NUMBERS, "q").paragraphs] == ["Kept."]

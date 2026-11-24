@@ -28,7 +28,13 @@ from brzask.repositories.conversations import NewSource
 from brzask.services.briefs import BRIEF_INPUT_CHARS, clip
 from brzask.services.conversation.answer import Answer
 
-# Starting values, confirmed or corrected by the real checks.
+# Real check (2026-11-24, 3 articles, 2 search rounds per run): prompts were
+# 9,500-17,000 characters before a search and up to 72,600 after one; stored
+# searched text reached 66,000 characters after one round of 5 pages plus
+# archive articles, so the cap bites from the first round on and keeps an
+# answer under about 19,000 input tokens ($0.0016). Conversations reached 6
+# exchanges; with answers of about 600 characters, 20 exchanges add some
+# 15,000 characters.
 HISTORY_EXCHANGES = 20  # earlier questions and answers the model sees
 SEARCHED_CHARS = 60_000  # characters of searched texts shared by all sources
 
@@ -151,8 +157,10 @@ def prompt(
     question: str,
     interests: Sequence[dict[str, Any]],
     language: Language,
+    fresh: Sequence[int] = (),
 ) -> str:
-    """The prompt for an answer to `question`."""
+    """The prompt for an answer to `question`; `fresh` numbers the sources a
+    search round just found for it."""
     text, clipped = clip(content.text, BRIEF_INPUT_CHARS)
     return prompts.render(
         "conversation",
@@ -170,4 +178,5 @@ def prompt(
         history=history(messages),
         question=question,
         language=language,
+        fresh=list(fresh),
     )

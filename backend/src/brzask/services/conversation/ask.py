@@ -7,7 +7,7 @@ request ends before a reverse proxy would cut it.
 """
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, tzinfo
 from typing import Any, Protocol
@@ -40,7 +40,9 @@ from brzask.services.errors import ConflictError, NotFoundError
 
 log = get_logger(__name__)
 
-# Starting values, confirmed or corrected by the real checks.
+# Real check (2026-11-24, 24 answers and 4 search rounds on 3 articles, deepseek-v4-flash): the
+# answer call took 2.2-34.9 s (median about 7 s), so 45 s leaves room for slow
+# answers and still ends before a proxy's usual 60 s.
 ANSWER_TIMEOUT = 45.0  # seconds; reverse proxies commonly cut requests at 60
 MIN_RETRY_SECONDS = 10.0  # an unusable answer is asked again only with this much time left
 ERROR_CHARS = 300
@@ -175,8 +177,11 @@ class Material:
     usage: dict[str, Any]  # what the row's earlier calls cost
 
 
-def material(session: Session, message_id: int, language: Language) -> Material:
-    """The prompt for answer `message_id`: its question and everything stored about the article."""
+def material(
+    session: Session, message_id: int, language: Language, fresh: Sequence[int] = ()
+) -> Material:
+    """The prompt for answer `message_id`: its question and everything stored about
+    the article; `fresh` numbers the sources a search round just added."""
     repository = ConversationRepository(session)
     message = repository.message(message_id)
     if message is None:
@@ -200,6 +205,7 @@ def material(session: Session, message_id: int, language: Language) -> Material:
         question or "",
         interest_context(session),
         language,
+        fresh,
     )
     # The context's size per answer, to check the caps against real conversations.
     log.info(
