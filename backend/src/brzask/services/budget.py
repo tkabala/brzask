@@ -1,11 +1,12 @@
-"""Spending limits: what the recorded runs cost today and this month.
+"""Spending limits: what the recorded runs and answers cost today and this month.
 
 Spending is the cost providers report for paid calls (LLM, embeddings, judge,
-web search), summed over every recorded run, forced and dry runs included.
+web search), summed over every recorded run, forced and dry runs included, and
+over every answer of a conversation about an article.
 A pipeline checks it once, when it starts: a run started under the limit runs
 in full, so one run can take spending past the limit by its own cost. Calls
 without a reported cost count as nothing, and the spending says how many runs
-had them. Days and months are local to the scheduler's time zone, like the
+and answers had them. Days and months are local to the scheduler's time zone, like the
 digest date.
 """
 
@@ -18,14 +19,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from brzask.config.settings import BudgetSettings
-from brzask.repositories import RunRepository
+from brzask.repositories import ConversationRepository, RunRepository
 
 
 @dataclass(frozen=True, slots=True)
 class Spending:
     today: Decimal
     month: Decimal
-    unpriced_runs: int  # runs this month with calls that reported no cost
+    unpriced_runs: int  # runs and answers this month with calls that reported no cost
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,8 +87,10 @@ def check_budget(
     if settings.daily_usd is None and settings.monthly_usd is None:
         return None
     day_start, month_start = window_starts(now, tz)
-    today, month, unpriced = RunRepository(session).spending(day_start, month_start)
-    return evaluate(settings, Spending(today, month, unpriced))
+    runs = RunRepository(session).spending(day_start, month_start)
+    answers = ConversationRepository(session).spending(day_start, month_start)
+    spending = Spending(runs[0] + answers[0], runs[1] + answers[1], runs[2] + answers[2])
+    return evaluate(settings, spending)
 
 
 def agent_runs_today(session: Session, now: datetime, tz: tzinfo) -> int:

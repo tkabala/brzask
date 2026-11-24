@@ -52,7 +52,8 @@ LLM_BUDGET_MONTHLY_USD=1
 
 Spending is the cost the provider reported, summed over every recorded run
 of the local day or calendar month (in `TZ`), manual, forced and dry runs
-included. Commands that record no run, such as `brzask replay` and the
+included, and over every answer of a conversation about an article (counted
+on the day its last call ended). Commands that record no run, such as `brzask replay` and the
 benches, do not count.
 
 A pipeline checks the limits when it starts. A run that starts under them

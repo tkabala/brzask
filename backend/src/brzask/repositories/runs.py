@@ -6,10 +6,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, Numeric, and_, case, cast, func, or_, select, tuple_
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from brzask.db.models import Run, RunKind, RunStatus
+from brzask.repositories.usage import usage_cost
 
 
 class RunRepository:
@@ -116,22 +117,7 @@ class RunRepository:
         cost, which make the sums a lower bound. Runs recorded before usage
         had `cost_usd_known` count their `cost_usd`, unpriced when it is null.
         """
-        usage = Run.stats["usage"]
-
-        def number(key: str) -> ColumnElement[Decimal]:
-            # Only JSON numbers are cast: one odd value must not fail every run's check.
-            value = usage[key]
-            return case((func.jsonb_typeof(value) == "number", cast(value.astext, Numeric)))
-
-        cost = func.coalesce(number("cost_usd_known"), number("cost_usd"), 0)
-        unpriced = or_(
-            number("unpriced_calls") > 0,
-            and_(
-                ~usage.has_key("cost_usd_known"),
-                number("calls") > 0,
-                func.jsonb_typeof(usage["cost_usd"]) == "null",
-            ),
-        )
+        cost, unpriced = usage_cost(Run.stats["usage"])
         query = select(
             func.coalesce(func.sum(cost).filter(Run.started_at >= day_start), 0),
             func.coalesce(func.sum(cost), 0),

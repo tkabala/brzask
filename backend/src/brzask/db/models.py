@@ -321,6 +321,97 @@ class DeepDive(Base):
     article: Mapped[Article] = relationship(lazy="joined")
 
 
+class Conversation(Base):
+    """The reader's questions about one article and their answers."""
+
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = _id()
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), unique=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    article: Mapped[Article] = relationship(lazy="joined")
+
+
+class MessageRole(StrEnum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class MessageStatus(StrEnum):
+    DONE = "done"
+    ANSWERING = "answering"  # the model is writing the answer
+    SEARCHING = "searching"  # a search round runs, then the answer is written again
+    FAILED = "failed"
+
+
+class ConversationMessage(Base):
+    """A question (user) or its answer (assistant); questions are always done."""
+
+    __tablename__ = "conversation_messages"
+
+    id: Mapped[int] = _id()
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[MessageRole] = mapped_column(text_enum(MessageRole, "message_role"))
+    answer: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, comment="{answer: [{text, sources}], enough, suggestions}; null until written."
+    )
+    status: Mapped[MessageStatus] = mapped_column(
+        text_enum(MessageStatus, "message_status"),
+        default=MessageStatus.DONE,
+        server_default=MessageStatus.DONE.value,
+    )
+    searched: Mapped[bool] = mapped_column(
+        default=False, server_default=text("false"), comment="Answered after a search round."
+    )
+    note: Mapped[str | None] = mapped_column(comment="Shown under the answer, e.g. a search's.")
+    error: Mapped[str | None]
+    model: Mapped[str | None] = mapped_column(comment="The LLM that wrote the answer.")
+    usage: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        server_default=text("'{}'"),
+        default=dict,
+        comment="Usage of every call made for this answer, shaped as a run's.",
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    finished_at: Mapped[datetime | None]
+    # Last: in the class body the name hides sqlalchemy's text() used above.
+    text: Mapped[str | None] = mapped_column(comment="The question; null for answers.")
+
+
+class ConversationSourceOrigin(StrEnum):
+    ARTICLE = "article"  # the article itself, always number 1
+    REPORT = "report"  # a web source of one of the article's deep dives
+    ARCHIVE = "archive"  # a stored article
+    WEB = "web"  # found by a search round
+
+
+class ConversationSource(Base):
+    """Material an answer may cite, numbered for the conversation's whole life."""
+
+    __tablename__ = "conversation_sources"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "n"),
+        UniqueConstraint("conversation_id", "url"),
+    )
+
+    id: Mapped[int] = _id()
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"))
+    n: Mapped[int] = mapped_column(comment="The number answers cite it by.")
+    url: Mapped[str]
+    title: Mapped[str]
+    origin: Mapped[ConversationSourceOrigin] = mapped_column(
+        text_enum(ConversationSourceOrigin, "conversation_source_origin")
+    )
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("articles.id", ondelete="SET NULL"))
+    text: Mapped[str | None] = mapped_column(comment="Text read for answers; null when none.")
+    added_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 # --- Runs ------------------------------------------------------------------------
 
 

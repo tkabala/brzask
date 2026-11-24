@@ -18,9 +18,13 @@ from brzask.db.models import (
     Change,
     ChangeStatus,
     ContentKind,
+    ConversationMessage,
+    ConversationSource,
+    ConversationSourceOrigin,
     DeepDiveStatus,
     Interest,
     LoginSession,
+    MessageRole,
     RunKind,
     Setting,
     Source,
@@ -65,8 +69,24 @@ def fill_every_table(session: Session, make: Factories) -> None:
         sources=[{"n": 1, "url": picked.link, "title": "T", "origin": "article"}],
         finished_at=NOW,
     )
+    answer = make.answer(picked, NOW, cost=0.0007)
     session.add_all(
         [
+            ConversationMessage(
+                conversation_id=answer.conversation_id,
+                role=MessageRole.USER,
+                text="Why?",
+                created_at=NOW,
+            ),
+            ConversationSource(
+                conversation_id=answer.conversation_id,
+                n=1,
+                url=picked.link,
+                title="T",
+                origin=ConversationSourceOrigin.ARTICLE,
+                article_id=picked.id,
+                text=None,
+            ),
             ArticleContent(article_id=picked.id, text="The whole text.", kind=ContentKind.PAGE),
             ArticleBrief(
                 article_id=picked.id,

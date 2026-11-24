@@ -119,3 +119,42 @@ def test_agent_runs_today_counts_local_days_and_agents_only(
     make.run(datetime(2026, 11, 12, 22, 30, tzinfo=UTC), started_by="agent:a")  # 23:30 yesterday
 
     assert agent_runs_today(session, now, WARSAW) == 2
+
+
+def test_answers_count_with_runs_towards_the_daily_limit(session: Session, make: Factories) -> None:
+    now = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
+    make.run(datetime(2026, 11, 24, 8, 0, tzinfo=UTC), cost=0.02)
+    make.answer(make.article(), datetime(2026, 11, 24, 9, 0, tzinfo=UTC), cost=0.03)
+
+    state = check_budget(session, now, limits("0.04"), WARSAW)
+
+    assert state is not None and state.over
+    assert state.reason is not None and state.reason.startswith("daily LLM budget $0.04")
+    assert state.spending.today == Decimal("0.05")
+
+
+def test_an_answer_last_month_is_not_counted_this_month(session: Session, make: Factories) -> None:
+    now = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
+    make.answer(make.article(), datetime(2026, 10, 30, 9, 0, tzinfo=UTC), cost=0.5)
+    make.answer(make.article(), datetime(2026, 11, 2, 9, 0, tzinfo=UTC), cost=0.25)
+
+    state = check_budget(session, now, limits(monthly="1"), WARSAW)
+
+    assert state is not None and not state.over
+    assert (state.spending.today, state.spending.month) == (Decimal(0), Decimal("0.25"))
+
+
+def test_an_answer_without_a_reported_cost_is_unpriced(session: Session, make: Factories) -> None:
+    now = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
+    make.run(datetime(2026, 11, 24, 8, 0, tzinfo=UTC), cost=0.01)
+    make.answer(
+        make.article(),
+        datetime(2026, 11, 24, 9, 0, tzinfo=UTC),
+        usage={"calls": 1, "cost_usd": None, "cost_usd_known": 0, "unpriced_calls": 1},
+    )
+
+    state = check_budget(session, now, limits("1"), WARSAW)
+
+    assert state is not None
+    assert state.spending.unpriced_runs == 1
+    assert state.spending.today == Decimal("0.01")

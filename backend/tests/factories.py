@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from brzask.db.models import (
@@ -14,9 +15,13 @@ from brzask.db.models import (
     Article,
     ArticleEmbedding,
     ArticleState,
+    Conversation,
+    ConversationMessage,
     DeepDive,
     DeepDiveStatus,
     Interest,
+    MessageRole,
+    MessageStatus,
     Run,
     RunKind,
     RunStatus,
@@ -134,6 +139,33 @@ class Factories:
         **fields: Any,
     ) -> DeepDive:
         return self._add(DeepDive(article_id=article.id, focus=focus, status=status, **fields))
+
+    def answer(
+        self,
+        article: Article,
+        finished_at: datetime,
+        *,
+        cost: float | None = None,
+        usage: dict[str, Any] | None = None,
+        status: MessageStatus = MessageStatus.DONE,
+    ) -> ConversationMessage:
+        """A finished answer in the article's conversation; `cost` fills its usage
+        as a fully priced call reports it."""
+        conversation = self.session.scalar(
+            select(Conversation).where(Conversation.article_id == article.id)
+        ) or self._add(Conversation(article_id=article.id))
+        if usage is None and cost is not None:
+            usage = {"calls": 1, "cost_usd": cost, "cost_usd_known": cost, "unpriced_calls": 0}
+        return self._add(
+            ConversationMessage(
+                conversation_id=conversation.id,
+                role=MessageRole.ASSISTANT,
+                status=status,
+                usage=usage or {},
+                created_at=finished_at,
+                finished_at=finished_at,
+            )
+        )
 
     def run(
         self,

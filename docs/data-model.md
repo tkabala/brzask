@@ -14,6 +14,9 @@ what the states mean and why some columns exist.
 | `article_contents` | The untruncated text of picked articles: page text, video transcript or feed description |
 | `article_briefs` | One brief per picked article: gist, points, caveats and, for videos, chapters |
 | `deep_dives` | Reports on an article written on request: background, steps to try, further reading, and their sources |
+| `conversations` | One per article the reader asked about |
+| `conversation_messages` | Questions and their answers, with the usage of each answer's calls |
+| `conversation_sources` | What a conversation's answers may cite, numbered for its whole life |
 | `runs` | One row per pipeline run: status, stats, timings, error |
 | `settings` | Values changed at runtime, such as a pause (configuration lives in environment variables) |
 | `change_log` | Every change to sources, interests or configuration, by a person, a pipeline or an agent |
@@ -104,6 +107,28 @@ articles), source 1 being the article itself. `thin` marks a report with no
 source besides the article, `searched_web` one for which a web search
 answered. `run_id` points at its run (kind `deep_dive`), `read_at` records
 the first time it was opened. Deleting the article deletes its dives.
+
+### Conversations
+
+A conversation holds the reader's questions about one article (at most one
+conversation per article). Each question (`role` = `user`) is followed by its
+answer (`role` = `assistant`); ids give the order. An answer's `status` is
+`answering` while the model writes it, `searching` during a search round,
+then `done` or `failed` (with `error`); only one answer of a conversation is
+in progress at a time. `answer` holds it as structure, `{answer: [{text,
+sources}], enough, suggestions}`, citing sources by number; `searched` marks
+an answer written again after a search round, and `note` says what the page
+shows under it (for example that a search found nothing new). `usage` sums
+the answer's calls like a run's usage and counts towards the spending limits.
+An answer left in progress when the API stops keeps its earlier text with the
+note `interrupted`, or fails with that error when it had none.
+
+`conversation_sources` numbers the material answers cite: `n` = 1 is the
+article, then the sources of the article's finished deep dives and whatever
+search rounds found, a URL once. Numbers never change, so earlier answers keep
+citing the right entries; `text` is what a search round read (null when the
+source is known by title and link only). Deleting the article deletes its
+conversation.
 
 ## Sources
 

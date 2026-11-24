@@ -10,6 +10,7 @@ from brzask.repositories.articles import ArticleRepository
 from brzask.repositories.briefs import BriefRepository
 from brzask.repositories.changes import ChangeRepository
 from brzask.repositories.contents import ContentRepository
+from brzask.repositories.conversations import ConversationRepository
 from brzask.repositories.deep_dives import DeepDiveRepository
 from brzask.repositories.embeddings import EmbeddingRepository
 from brzask.repositories.interests import InterestRepository
@@ -25,6 +26,7 @@ __all__ = [
     "BriefRepository",
     "ChangeRepository",
     "ContentRepository",
+    "ConversationRepository",
     "DeepDiveRepository",
     "EmbeddingRepository",
     "InterestRepository",
