@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.4.0](https://github.com/tkabala/brzask/compare/v0.3.1...v0.4.0) (2026-11-24)
+
+
+### Features
+
+* **api:** ask about an article ([30b9bac](https://github.com/tkabala/brzask/commit/30b9baca80c4f5045de9b16238b2fcf17ebb0d3c))
+* **api:** request, list and export deep dives ([c96d335](https://github.com/tkabala/brzask/commit/c96d33597658abaa36c62b238346b280f1ce9204))
+* **api:** serve briefs and record their views ([26e9df1](https://github.com/tkabala/brzask/commit/26e9df1e67cce1b20ef1924dc5a39b7f812929d9))
+* **conversation:** answer questions and search on request ([dda2087](https://github.com/tkabala/brzask/commit/dda2087186c15f8a652aa3055ae40e4eef33b475))
+* **conversation:** build the context and validate answers ([08669b7](https://github.com/tkabala/brzask/commit/08669b7c5fa489f05546697fc170dfa6028dc67b))
+* **conversation:** log the context size of each answer ([5239d53](https://github.com/tkabala/brzask/commit/5239d537c52663088ea5e6c7c122405bf1aefd6a))
+* **conversation:** shorter answers that follow the question ([0f350a1](https://github.com/tkabala/brzask/commit/0f350a1e45581742f821a0b17a53f14227b685e7))
+* **conversation:** store conversations and count their spending ([c19ac4a](https://github.com/tkabala/brzask/commit/c19ac4afd02f5c2befda2af67657aabe3cc5656f))
+* **deep-dive:** plan queries and gather sources ([42bdfbf](https://github.com/tkabala/brzask/commit/42bdfbf4b0b60821c1ccf0c20a6c5a43175c6299))
+* **deep-dive:** run deep dives in the background ([488ad02](https://github.com/tkabala/brzask/commit/488ad02142d90e437a14369a9b13073c9c957216))
+* **deep-dive:** store deep dives ([7ec6121](https://github.com/tkabala/brzask/commit/7ec6121bbad882c6e236231678abe00be32a9fc3))
+* **deep-dive:** write the report and export it as Markdown ([5090fe6](https://github.com/tkabala/brzask/commit/5090fe6657bf14aa0b38288cadce94c75e4643cb))
+* **digest:** keep the full text of picked articles ([9a178eb](https://github.com/tkabala/brzask/commit/9a178ebc9adbce690bd8e5bde5f5f22718dbfefd))
+* **digest:** write a brief for every picked article ([e29d796](https://github.com/tkabala/brzask/commit/e29d796f122d25fac7711871ca3b255a988ebe48))
+* **extract:** read YouTube videos from their captions ([8da363a](https://github.com/tkabala/brzask/commit/8da363a54d79564d6125a07061dfa8c9d40193a9))
+* **fetch:** tunnel third-party fetches through FETCH_PROXY ([3821cbb](https://github.com/tkabala/brzask/commit/3821cbb2c952c9e855c4c1717d62e9669345ec60))
+* **opens:** count a brief view as a preference signal ([53cae42](https://github.com/tkabala/brzask/commit/53cae42269990cae3f9f60c05299d6a78417e3a5))
+* **web:** ask about an article in the app ([7ee9c5a](https://github.com/tkabala/brzask/commit/7ee9c5a689eedf9695683499f5d803c760f7c9ee))
+* **web:** read an article's brief in the app ([c3b4199](https://github.com/tkabala/brzask/commit/c3b4199aaa73828c5211699f7286b4b4b661c3ce))
+* **web:** request and read deep dives ([d294c29](https://github.com/tkabala/brzask/commit/d294c2933d1466cdb38296c093f70320ae5c166f))
+
+
+### Bug Fixes
+
+* **api:** refuse a question containing a NUL character ([73b5705](https://github.com/tkabala/brzask/commit/73b5705d1e8408eb2acc253cf9d0699b2ff0f7ec))
+* **conversation:** never leave an answer in progress after an error ([71c6ea5](https://github.com/tkabala/brzask/commit/71c6ea51893f9f3e9d42a72d9902d26932e57f5a))
+* **conversation:** read the latest answer fresh under the lock ([095809a](https://github.com/tkabala/brzask/commit/095809a37b74b0422533037e1d88d03ac3e5f22e))
+* **deep-dive:** close review findings in requests, export and paging ([bf24f65](https://github.com/tkabala/brzask/commit/bf24f6579600d91608801c263722e73a622b6b42))
+* **deep-dive:** keep reports to their sources and trim the archive ([80cf0dd](https://github.com/tkabala/brzask/commit/80cf0dd5ea3bcef4557cdc2f4107a80511566020))
+* **deep-dive:** label the deep_dive run kind and export deep dives ([bae755d](https://github.com/tkabala/brzask/commit/bae755df8f8d3f9ddc3d574b311bd18118436e75))
+* **digest:** ask again for briefs whose points are not text ([ef26600](https://github.com/tkabala/brzask/commit/ef26600d42a79a484db0971172443f27d589dc74))
+* **digest:** skip empty briefs and junk pages, never invent dates ([1001e84](https://github.com/tkabala/brzask/commit/1001e84bd58b62ec538a1a9f386a00b12ad251a1))
+* **extract:** keep caption errors inside the extractor ([7ff2d70](https://github.com/tkabala/brzask/commit/7ff2d70ac1e9b57ce19561fe5b8da6f8539ae99f))
+* **extract:** keep captions off environment proxies ([1645927](https://github.com/tkabala/brzask/commit/164592771a191e2c6349a20aed3f5cc91906c761))
+* **visited:** say read, not opened, in a proposed source's note ([91f120b](https://github.com/tkabala/brzask/commit/91f120bff09e14aa1790f90b709bd7c0bed6f5ad))
+* **web:** keep long commands in a deep dive from widening the page ([69a824d](https://github.com/tkabala/brzask/commit/69a824de3430ca8d8b01a61c0e28baa0bb093082))
+* **web:** open a brief's links in the background and show offline state ([afc3b2f](https://github.com/tkabala/brzask/commit/afc3b2f10678a7d505d54baf0220616d6e0c51e3))
+
+
+### Documentation
+
+* conversations and their ADR ([2d468b3](https://github.com/tkabala/brzask/commit/2d468b3ba29797ad9cc5461e117bee90a4f98b9f))
+* deep dives and their ADR ([a521057](https://github.com/tkabala/brzask/commit/a52105756ae58d66aa7903a20f03477c190e3dd9))
+* **install:** run the fetch proxy safely with tinyproxy ([015ca94](https://github.com/tkabala/brzask/commit/015ca943b3619b530b350e1c8621946b46172696))
+* **web:** stories for deep dives ([74759cf](https://github.com/tkabala/brzask/commit/74759cf23f111cdc87517811a7c051cd33f248c4))
+
 ## [0.3.1](https://github.com/tkabala/brzask/compare/v0.3.0...v0.3.1) (2026-11-16)
 
 
