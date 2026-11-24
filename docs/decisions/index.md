@@ -31,6 +31,7 @@ Significant decisions are recorded as Architecture Decision Records (ADRs) in th
 | [0024](0024-third-party-fetches-may-go-through-one-proxy.md) | Third-party fetches may go through one proxy; the address guard stays in brzask | Accepted |
 | [0025](0025-entering-the-brief-counts-with-opening-the-original.md) | Entering the brief counts with opening the original | Accepted |
 | [0026](0026-deep-dives-follow-a-fixed-pipeline-and-cite-only-gathered-sources.md) | Deep dives follow a fixed pipeline and cite only gathered sources | Accepted |
+| [0027](0027-a-conversation-answers-from-stored-material-and-searching-is-the-readers-action.md) | A conversation answers from stored material; searching is the reader's action | Accepted |
 
 To add a decision, copy the [template](0000-template.md) to the next free number,
 fill it in and add it to this table and to the `nav` in `mkdocs.yml`.

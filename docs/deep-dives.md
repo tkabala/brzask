@@ -48,3 +48,32 @@ A finished report has three buttons: **Share** (the system share sheet, on
 phones), **Copy as Markdown** and **Download .md**. The Markdown keeps the
 source numbers and lists the sources with their links, so it reads the same
 in a notes app.
+
+## Asking about an article
+
+"Ask" on a brief or a report opens the article's conversation: one per
+article, kept with it and continued whenever you come back. An empty one
+offers three starters ("Explain it more simply", "What does this mean for
+me?", "What are the weak points?"); every answer suggests up to three
+follow-ups, and the field takes your own questions (up to 1,000 characters).
+
+An answer comes from what brzask already stored: the article, its brief, its
+deep dives and the sources found earlier in the conversation. It cites them by
+number (tap a number for the title and link) and arrives whole, usually within
+a few seconds and always within about 45. When the material does not answer
+the question, the answer says what is missing, and "Search the web and the
+archive" becomes the main button. Questions about the present (the latest
+version, a price today) are answered as of the article.
+
+A search runs only when you tap it: up to two web searches and one archive
+search, five pages read, then the answer is written again with the new sources.
+It takes 25-50 seconds; the page updates when it is done. When nothing new
+turned up, or nothing new answered the question, the answer says so. Without
+`WEB_SEARCH` the round searches the archive only.
+
+Measured on a copy of real data: an answer costs $0.0002-0.0016, a search
+round about $0.013 with `WEB_SEARCH=llm-online`. Conversations count towards
+the same spending limits as reports; over a limit, asking is refused with the
+reason. The conversation exports like a report (Share, Copy as Markdown,
+Download .md), with the cited sources listed under their numbers. See
+[ADR 0027](decisions/0027-a-conversation-answers-from-stored-material-and-searching-is-the-readers-action.md).

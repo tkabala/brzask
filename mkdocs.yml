@@ -87,6 +87,7 @@ nav:
       - decisions/0024-third-party-fetches-may-go-through-one-proxy.md
       - decisions/0025-entering-the-brief-counts-with-opening-the-original.md
       - decisions/0026-deep-dives-follow-a-fixed-pipeline-and-cite-only-gathered-sources.md
+      - decisions/0027-a-conversation-answers-from-stored-material-and-searching-is-the-readers-action.md
       - Template: decisions/0000-template.md
 
 validation:
