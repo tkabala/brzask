@@ -29,6 +29,13 @@
       "groupSlug": "{{manager}}-minor-patch"
     },
     {
+      "description": "pnpm refuses to install versions published less than a day ago (its minimumReleaseAge default); propose only versions it accepts",
+      "matchDatasources": [
+        "npm"
+      ],
+      "minimumReleaseAge": "1 day"
+    },
+    {
       "description": "pnpm is pinned in mise.toml and in frontend/package.json (packageManager); update both in one PR",
       "matchDepNames": [
         "pnpm"
