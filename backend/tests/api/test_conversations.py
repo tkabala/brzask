@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -55,7 +56,8 @@ def over_budget(monkeypatch: pytest.MonkeyPatch, session: Session, make: Factori
 
     budget = BudgetSettings(daily_usd=Decimal("0.01"), monthly_usd=None)
     monkeypatch.setattr(conversations, "_limits", lambda: (budget, NOW.tzinfo))
-    make.run(NOW, cost=0.02)
+    # The endpoint counts today's spending by the real clock.
+    make.run(datetime.now(UTC), cost=0.02)
     session.commit()
 
 
