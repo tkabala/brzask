@@ -119,6 +119,16 @@ healthchecks and scrapers inside your network keep their paths.
 feed` use, so it is worth setting with a host name of its own too
 (`BASE_URL=https://news.example.com/`).
 
+## Security headers
+
+brzask sets its own Content Security Policy, `X-Content-Type-Options`,
+`X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy` on every response;
+leave them as they are. It does not set HSTS, as it may be served over plain
+HTTP on a home network. Once it is reached over HTTPS only, let the proxy add
+it: Caddy `header Strict-Transport-Security "max-age=31536000"`, nginx
+`add_header Strict-Transport-Security "max-age=31536000" always;`, Traefik a
+`headers` middleware with `stsSeconds: 31536000`.
+
 ## Trusting the proxy
 
 brzask believes forwarding headers only from the addresses in

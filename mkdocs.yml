@@ -52,6 +52,7 @@ nav:
       - Agents (MCP): agents.md
       - Backup and restore: backup.md
       - Observability: observability.md
+      - Privacy: privacy.md
   - How it works:
       - Architecture: architecture.md
       - Data model: data-model.md

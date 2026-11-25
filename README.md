@@ -75,6 +75,8 @@ Settings are environment variables, read from a `.env` file next to `compose.yam
 
 Every variable, with its default and description, is in the [configuration reference](https://tkabala.github.io/brzask/configuration/) and in [`.env.example`](.env.example). One OpenRouter key covers ranking, embeddings and the judge; for a fully local setup point the URLs at Ollama.
 
+brzask sends no telemetry. Every request it makes to another machine, and what it carries, is listed under [privacy](https://tkabala.github.io/brzask/privacy/); how to report a vulnerability is in [`SECURITY.md`](SECURITY.md).
+
 ## How is this different
 
 - **Horizon** scores each article 0–10 and keeps those above a threshold; brzask ranks articles against each other and always shows 7.
