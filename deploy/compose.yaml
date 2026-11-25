@@ -129,7 +129,7 @@ services:
       - ${BRZASK_SECRETS:-./secrets}:/deploy/secrets
 
   crawl4ai:
-    image: unclecode/crawl4ai:0.9.5
+    image: unclecode/crawl4ai:0.9.6
     profiles: [crawler]
     restart: unless-stopped
     logging: *logging
@@ -160,7 +160,7 @@ services:
   # --- observability profile ---------------------------------------------------
 
   otel-collector:
-    image: otel/opentelemetry-collector:0.165.0
+    image: otel/opentelemetry-collector:0.166.0
     profiles: [observability]
     restart: unless-stopped
     logging: *logging
@@ -204,7 +204,7 @@ services:
       - tempo-data:/var/tempo
 
   grafana:
-    image: grafana/grafana:13.3.1
+    image: grafana/grafana:13.3.2
     profiles: [observability]
     restart: unless-stopped
     logging: *logging
