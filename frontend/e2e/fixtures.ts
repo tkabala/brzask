@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, type Page } from '@playwright/test'
+import { test as base, expect, type Page } from '@playwright/test'
 
 import { E2E_PASSWORD } from '../playwright.config.ts'
 
@@ -24,4 +24,22 @@ export async function logIn(page: Page, start = '/'): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible()
 }
 
-export { expect, test } from '@playwright/test'
+/** Every test fails when the browser refuses something under the Content
+ * Security Policy, so each screen and dialog the tests reach is checked. */
+export const test = base.extend<{ cspViolations: string[] }>({
+  cspViolations: [
+    async ({ page }, use) => {
+      const refused: string[] = []
+      page.on('console', (message) => {
+        if (message.type() === 'error' && message.text().includes('Content Security Policy')) {
+          refused.push(message.text())
+        }
+      })
+      await use(refused)
+      expect(refused, refused.join('\n')).toEqual([])
+    },
+    { auto: true },
+  ],
+})
+
+export { expect }

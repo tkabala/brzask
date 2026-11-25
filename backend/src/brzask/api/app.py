@@ -45,6 +45,7 @@ from brzask.api import (
     problems,
     runs,
     search,
+    security,
     sources,
     status,
     web,
@@ -68,6 +69,7 @@ log = get_logger(__name__)
 
 API_PREFIX = "/api/v1"
 OPENAPI_URL = f"{API_PREFIX}/openapi.json"
+DOCS_URL = f"{API_PREFIX}/docs"
 
 
 def create_app(
@@ -124,7 +126,7 @@ def create_app(
         version=__version__,
         summary="Self-hosted daily news digest.",
         openapi_url=OPENAPI_URL,
-        docs_url=f"{API_PREFIX}/docs",
+        docs_url=DOCS_URL,
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=None,
         # Operation IDs are the route function names, e.g. list_sources, so the
@@ -181,9 +183,17 @@ def create_app(
             include_in_schema=False,
         )
     )
+    script_hashes: list[str] = []
     if web_dir is not None:
+        web_app = web.WebApp(web_dir, f"{server.root_path}/")
+        script_hashes = security.inline_script_hashes(web_app.index)
         # Last, so every route above wins over a file of the same name.
-        app.mount("/", web.WebApp(web_dir, f"{server.root_path}/"), name="web")
+        app.mount("/", web_app, name="web")
+    app.add_middleware(
+        security.SecurityHeaders,
+        policy=security.app_policy(script_hashes),
+        docs_path=DOCS_URL,
+    )
 
     app.openapi = lambda: _openapi(app)  # type: ignore[method-assign]
     instrument_app(app, meter_provider)
