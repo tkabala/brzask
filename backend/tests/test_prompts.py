@@ -397,6 +397,17 @@ def test_brief_of_a_page_asks_for_no_chapters() -> None:
     assert "cut short" in text
 
 
+def test_brief_of_a_video_calls_it_a_video() -> None:
+    video = prompts.render("brief", **SAMPLES["brief"])
+    page = prompts.render("brief", **{**SAMPLES["brief"], "kind": "page"})
+
+    assert "the article" not in video
+    assert "Write a brief of the video below" in video
+    assert "never call it an article" in video
+    assert "Write a brief of the article below" in page
+    assert "never call it" not in page
+
+
 def test_brief_text_cannot_close_the_mark() -> None:
     sample = {
         **SAMPLES["brief"],
