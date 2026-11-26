@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0](https://github.com/tkabala/brzask/compare/v0.4.0...v0.5.0) (2026-11-26)
+
+
+### Features
+
+* **api:** send a Content Security Policy and security headers ([e7647e2](https://github.com/tkabala/brzask/commit/e7647e28187323994add16963e779c19294a420d))
+
+
+### Bug Fixes
+
+* **briefs:** call a video a video in its brief ([5b069a5](https://github.com/tkabala/brzask/commit/5b069a5491a06d349a3abd89b7969de0df5dfde1))
+
+
+### Documentation
+
+* add a security policy and a privacy statement ([052e234](https://github.com/tkabala/brzask/commit/052e23442867da04ec9a9937375f24aad1aa1c3a))
+
 ## [0.4.0](https://github.com/tkabala/brzask/compare/v0.3.1...v0.4.0) (2026-11-24)
 
 
